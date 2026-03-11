@@ -1,0 +1,374 @@
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccQz8nTr.s 			page 1
+
+
+   1              		.cpu cortex-m3
+   2              		.arch armv7-m
+   3              		.fpu softvfp
+   4              		.eabi_attribute 20, 1
+   5              		.eabi_attribute 21, 1
+   6              		.eabi_attribute 23, 3
+   7              		.eabi_attribute 24, 1
+   8              		.eabi_attribute 25, 1
+   9              		.eabi_attribute 26, 1
+  10              		.eabi_attribute 30, 1
+  11              		.eabi_attribute 34, 1
+  12              		.eabi_attribute 18, 4
+  13              		.file	"control.c"
+  14              		.text
+  15              	.Ltext0:
+  16              		.cfi_sections	.debug_frame
+  17              		.file 1 "HARDWARE/control/control.c"
+  18              		.section	.text.beep_init,"ax",%progbits
+  19              		.align	1
+  20              		.global	beep_init
+  21              		.syntax unified
+  22              		.thumb
+  23              		.thumb_func
+  25              	beep_init:
+  26              	.LFB29:
+   1:HARDWARE/control/control.c **** /**
+   2:HARDWARE/control/control.c ****  * control.c
+   3:HARDWARE/control/control.c ****  * 控制模块驱动文件
+   4:HARDWARE/control/control.c ****  * 功能：实现蜂鸣器、加热器、制冷器和除湿器的GPIO初始化
+   5:HARDWARE/control/control.c ****  * 版本：V1.0
+   6:HARDWARE/control/control.c ****  * MCU：STM32F103C8T6
+   7:HARDWARE/control/control.c ****  * 作者：蔬菜恒温库监控系统
+   8:HARDWARE/control/control.c ****  */
+   9:HARDWARE/control/control.c **** 
+  10:HARDWARE/control/control.c **** #include "control.h"
+  11:HARDWARE/control/control.c **** #include "delay.h"
+  12:HARDWARE/control/control.c **** 
+  13:HARDWARE/control/control.c **** /**
+  14:HARDWARE/control/control.c ****  * 蜂鸣器初始化函数
+  15:HARDWARE/control/control.c ****  * 功能：初始化蜂鸣器控制引脚
+  16:HARDWARE/control/control.c ****  * @param 无
+  17:HARDWARE/control/control.c ****  * @retval 无
+  18:HARDWARE/control/control.c ****  * @note 蜂鸣器连接到PA8引脚
+  19:HARDWARE/control/control.c ****  */
+  20:HARDWARE/control/control.c **** void beep_init(void) 
+  21:HARDWARE/control/control.c **** {
+  27              		.loc 1 21 1 view -0
+  28              		.cfi_startproc
+  29              		@ args = 0, pretend = 0, frame = 8
+  30              		@ frame_needed = 0, uses_anonymous_args = 0
+  31 0000 00B5     		push	{lr}
+  32              	.LCFI0:
+  33              		.cfi_def_cfa_offset 4
+  34              		.cfi_offset 14, -4
+  35 0002 83B0     		sub	sp, sp, #12
+  36              	.LCFI1:
+  37              		.cfi_def_cfa_offset 16
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccQz8nTr.s 			page 2
+
+
+  22:HARDWARE/control/control.c ****     GPIO_InitTypeDef GPIO_InitStructure;
+  38              		.loc 1 22 5 view .LVU1
+  23:HARDWARE/control/control.c ****     
+  24:HARDWARE/control/control.c ****     // 1. 开启GPIOA时钟
+  25:HARDWARE/control/control.c ****     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+  39              		.loc 1 25 5 view .LVU2
+  40 0004 0121     		movs	r1, #1
+  41 0006 0420     		movs	r0, #4
+  42 0008 FFF7FEFF 		bl	RCC_APB2PeriphClockCmd
+  43              	.LVL0:
+  26:HARDWARE/control/control.c **** 
+  27:HARDWARE/control/control.c ****     // 2. 配置PA8引脚为推挽输出
+  28:HARDWARE/control/control.c ****     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8;
+  44              		.loc 1 28 5 view .LVU3
+  45              		.loc 1 28 33 is_stmt 0 view .LVU4
+  46 000c 4FF48073 		mov	r3, #256
+  47 0010 ADF80430 		strh	r3, [sp, #4]	@ movhi
+  29:HARDWARE/control/control.c ****     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;        // 推挽输出模式
+  48              		.loc 1 29 5 is_stmt 1 view .LVU5
+  49              		.loc 1 29 34 is_stmt 0 view .LVU6
+  50 0014 1023     		movs	r3, #16
+  51 0016 8DF80730 		strb	r3, [sp, #7]
+  30:HARDWARE/control/control.c ****     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;       // 高速模式
+  52              		.loc 1 30 5 is_stmt 1 view .LVU7
+  53              		.loc 1 30 35 is_stmt 0 view .LVU8
+  54 001a 0323     		movs	r3, #3
+  55 001c 8DF80630 		strb	r3, [sp, #6]
+  31:HARDWARE/control/control.c ****     GPIO_Init(GPIOA, &GPIO_InitStructure);
+  56              		.loc 1 31 5 is_stmt 1 view .LVU9
+  57 0020 01A9     		add	r1, sp, #4
+  58 0022 0348     		ldr	r0, .L3
+  59 0024 FFF7FEFF 		bl	GPIO_Init
+  60              	.LVL1:
+  32:HARDWARE/control/control.c **** }
+  61              		.loc 1 32 1 is_stmt 0 view .LVU10
+  62 0028 03B0     		add	sp, sp, #12
+  63              	.LCFI2:
+  64              		.cfi_def_cfa_offset 4
+  65              		@ sp needed
+  66 002a 5DF804FB 		ldr	pc, [sp], #4
+  67              	.L4:
+  68 002e 00BF     		.align	2
+  69              	.L3:
+  70 0030 00080140 		.word	1073809408
+  71              		.cfi_endproc
+  72              	.LFE29:
+  74              		.section	.text.warm_init,"ax",%progbits
+  75              		.align	1
+  76              		.global	warm_init
+  77              		.syntax unified
+  78              		.thumb
+  79              		.thumb_func
+  81              	warm_init:
+  82              	.LFB30:
+  33:HARDWARE/control/control.c **** 
+  34:HARDWARE/control/control.c **** /**
+  35:HARDWARE/control/control.c ****  * 加热器初始化函数
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccQz8nTr.s 			page 3
+
+
+  36:HARDWARE/control/control.c ****  * 功能：初始化加热器控制引脚
+  37:HARDWARE/control/control.c ****  * @param 无
+  38:HARDWARE/control/control.c ****  * @retval 无
+  39:HARDWARE/control/control.c ****  * @note 加热器连接到PB11引脚
+  40:HARDWARE/control/control.c ****  */
+  41:HARDWARE/control/control.c **** void warm_init(void)
+  42:HARDWARE/control/control.c **** {
+  83              		.loc 1 42 1 is_stmt 1 view -0
+  84              		.cfi_startproc
+  85              		@ args = 0, pretend = 0, frame = 8
+  86              		@ frame_needed = 0, uses_anonymous_args = 0
+  87 0000 00B5     		push	{lr}
+  88              	.LCFI3:
+  89              		.cfi_def_cfa_offset 4
+  90              		.cfi_offset 14, -4
+  91 0002 83B0     		sub	sp, sp, #12
+  92              	.LCFI4:
+  93              		.cfi_def_cfa_offset 16
+  43:HARDWARE/control/control.c ****     GPIO_InitTypeDef GPIO_InitStructure;
+  94              		.loc 1 43 5 view .LVU12
+  44:HARDWARE/control/control.c ****     
+  45:HARDWARE/control/control.c ****     // 1. 开启GPIOB时钟
+  46:HARDWARE/control/control.c ****     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+  95              		.loc 1 46 5 view .LVU13
+  96 0004 0121     		movs	r1, #1
+  97 0006 0820     		movs	r0, #8
+  98 0008 FFF7FEFF 		bl	RCC_APB2PeriphClockCmd
+  99              	.LVL2:
+  47:HARDWARE/control/control.c **** 
+  48:HARDWARE/control/control.c ****     // 2. 配置PB11引脚为推挽输出
+  49:HARDWARE/control/control.c ****     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11;
+ 100              		.loc 1 49 5 view .LVU14
+ 101              		.loc 1 49 33 is_stmt 0 view .LVU15
+ 102 000c 4FF40063 		mov	r3, #2048
+ 103 0010 ADF80430 		strh	r3, [sp, #4]	@ movhi
+  50:HARDWARE/control/control.c ****     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;        // 推挽输出模式
+ 104              		.loc 1 50 5 is_stmt 1 view .LVU16
+ 105              		.loc 1 50 34 is_stmt 0 view .LVU17
+ 106 0014 1023     		movs	r3, #16
+ 107 0016 8DF80730 		strb	r3, [sp, #7]
+  51:HARDWARE/control/control.c ****     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;       // 高速模式
+ 108              		.loc 1 51 5 is_stmt 1 view .LVU18
+ 109              		.loc 1 51 35 is_stmt 0 view .LVU19
+ 110 001a 0323     		movs	r3, #3
+ 111 001c 8DF80630 		strb	r3, [sp, #6]
+  52:HARDWARE/control/control.c ****     GPIO_Init(GPIOB, &GPIO_InitStructure);
+ 112              		.loc 1 52 5 is_stmt 1 view .LVU20
+ 113 0020 01A9     		add	r1, sp, #4
+ 114 0022 0348     		ldr	r0, .L7
+ 115 0024 FFF7FEFF 		bl	GPIO_Init
+ 116              	.LVL3:
+  53:HARDWARE/control/control.c **** }
+ 117              		.loc 1 53 1 is_stmt 0 view .LVU21
+ 118 0028 03B0     		add	sp, sp, #12
+ 119              	.LCFI5:
+ 120              		.cfi_def_cfa_offset 4
+ 121              		@ sp needed
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccQz8nTr.s 			page 4
+
+
+ 122 002a 5DF804FB 		ldr	pc, [sp], #4
+ 123              	.L8:
+ 124 002e 00BF     		.align	2
+ 125              	.L7:
+ 126 0030 000C0140 		.word	1073810432
+ 127              		.cfi_endproc
+ 128              	.LFE30:
+ 130              		.section	.text.zhileng_init,"ax",%progbits
+ 131              		.align	1
+ 132              		.global	zhileng_init
+ 133              		.syntax unified
+ 134              		.thumb
+ 135              		.thumb_func
+ 137              	zhileng_init:
+ 138              	.LFB31:
+  54:HARDWARE/control/control.c **** 
+  55:HARDWARE/control/control.c **** /**
+  56:HARDWARE/control/control.c ****  * 制冷器初始化函数
+  57:HARDWARE/control/control.c ****  * 功能：初始化制冷器控制引脚
+  58:HARDWARE/control/control.c ****  * @param 无
+  59:HARDWARE/control/control.c ****  * @retval 无
+  60:HARDWARE/control/control.c ****  * @note 制冷器连接到PB1引脚
+  61:HARDWARE/control/control.c ****  */
+  62:HARDWARE/control/control.c **** void zhileng_init(void)
+  63:HARDWARE/control/control.c **** {
+ 139              		.loc 1 63 1 is_stmt 1 view -0
+ 140              		.cfi_startproc
+ 141              		@ args = 0, pretend = 0, frame = 8
+ 142              		@ frame_needed = 0, uses_anonymous_args = 0
+ 143 0000 00B5     		push	{lr}
+ 144              	.LCFI6:
+ 145              		.cfi_def_cfa_offset 4
+ 146              		.cfi_offset 14, -4
+ 147 0002 83B0     		sub	sp, sp, #12
+ 148              	.LCFI7:
+ 149              		.cfi_def_cfa_offset 16
+  64:HARDWARE/control/control.c ****     GPIO_InitTypeDef GPIO_InitStructure;
+ 150              		.loc 1 64 5 view .LVU23
+  65:HARDWARE/control/control.c ****     
+  66:HARDWARE/control/control.c ****     // 1. 开启GPIOB时钟
+  67:HARDWARE/control/control.c ****     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+ 151              		.loc 1 67 5 view .LVU24
+ 152 0004 0121     		movs	r1, #1
+ 153 0006 0820     		movs	r0, #8
+ 154 0008 FFF7FEFF 		bl	RCC_APB2PeriphClockCmd
+ 155              	.LVL4:
+  68:HARDWARE/control/control.c **** 
+  69:HARDWARE/control/control.c ****     // 2. 配置PB1引脚为推挽输出
+  70:HARDWARE/control/control.c ****     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
+ 156              		.loc 1 70 5 view .LVU25
+ 157              		.loc 1 70 33 is_stmt 0 view .LVU26
+ 158 000c 0223     		movs	r3, #2
+ 159 000e ADF80430 		strh	r3, [sp, #4]	@ movhi
+  71:HARDWARE/control/control.c ****     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;        // 推挽输出模式
+ 160              		.loc 1 71 5 is_stmt 1 view .LVU27
+ 161              		.loc 1 71 34 is_stmt 0 view .LVU28
+ 162 0012 1023     		movs	r3, #16
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccQz8nTr.s 			page 5
+
+
+ 163 0014 8DF80730 		strb	r3, [sp, #7]
+  72:HARDWARE/control/control.c ****     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;       // 高速模式
+ 164              		.loc 1 72 5 is_stmt 1 view .LVU29
+ 165              		.loc 1 72 35 is_stmt 0 view .LVU30
+ 166 0018 0323     		movs	r3, #3
+ 167 001a 8DF80630 		strb	r3, [sp, #6]
+  73:HARDWARE/control/control.c ****     GPIO_Init(GPIOB, &GPIO_InitStructure);
+ 168              		.loc 1 73 5 is_stmt 1 view .LVU31
+ 169 001e 01A9     		add	r1, sp, #4
+ 170 0020 0248     		ldr	r0, .L11
+ 171 0022 FFF7FEFF 		bl	GPIO_Init
+ 172              	.LVL5:
+  74:HARDWARE/control/control.c **** }
+ 173              		.loc 1 74 1 is_stmt 0 view .LVU32
+ 174 0026 03B0     		add	sp, sp, #12
+ 175              	.LCFI8:
+ 176              		.cfi_def_cfa_offset 4
+ 177              		@ sp needed
+ 178 0028 5DF804FB 		ldr	pc, [sp], #4
+ 179              	.L12:
+ 180              		.align	2
+ 181              	.L11:
+ 182 002c 000C0140 		.word	1073810432
+ 183              		.cfi_endproc
+ 184              	.LFE31:
+ 186              		.section	.text.chushi_init,"ax",%progbits
+ 187              		.align	1
+ 188              		.global	chushi_init
+ 189              		.syntax unified
+ 190              		.thumb
+ 191              		.thumb_func
+ 193              	chushi_init:
+ 194              	.LFB32:
+  75:HARDWARE/control/control.c **** 
+  76:HARDWARE/control/control.c **** /**
+  77:HARDWARE/control/control.c ****  * 除湿器初始化函数
+  78:HARDWARE/control/control.c ****  * 功能：初始化除湿器控制引脚
+  79:HARDWARE/control/control.c ****  * @param 无
+  80:HARDWARE/control/control.c ****  * @retval 无
+  81:HARDWARE/control/control.c ****  * @note 除湿器连接到PB10引脚
+  82:HARDWARE/control/control.c ****  */
+  83:HARDWARE/control/control.c **** void chushi_init(void)
+  84:HARDWARE/control/control.c **** {
+ 195              		.loc 1 84 1 is_stmt 1 view -0
+ 196              		.cfi_startproc
+ 197              		@ args = 0, pretend = 0, frame = 8
+ 198              		@ frame_needed = 0, uses_anonymous_args = 0
+ 199 0000 00B5     		push	{lr}
+ 200              	.LCFI9:
+ 201              		.cfi_def_cfa_offset 4
+ 202              		.cfi_offset 14, -4
+ 203 0002 83B0     		sub	sp, sp, #12
+ 204              	.LCFI10:
+ 205              		.cfi_def_cfa_offset 16
+  85:HARDWARE/control/control.c ****     GPIO_InitTypeDef GPIO_InitStructure;
+ 206              		.loc 1 85 5 view .LVU34
+  86:HARDWARE/control/control.c ****     
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccQz8nTr.s 			page 6
+
+
+  87:HARDWARE/control/control.c ****     // 1. 开启GPIOB时钟
+  88:HARDWARE/control/control.c ****     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+ 207              		.loc 1 88 5 view .LVU35
+ 208 0004 0121     		movs	r1, #1
+ 209 0006 0820     		movs	r0, #8
+ 210 0008 FFF7FEFF 		bl	RCC_APB2PeriphClockCmd
+ 211              	.LVL6:
+  89:HARDWARE/control/control.c **** 
+  90:HARDWARE/control/control.c ****     // 2. 配置PB10引脚为推挽输出
+  91:HARDWARE/control/control.c ****     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
+ 212              		.loc 1 91 5 view .LVU36
+ 213              		.loc 1 91 33 is_stmt 0 view .LVU37
+ 214 000c 4FF48063 		mov	r3, #1024
+ 215 0010 ADF80430 		strh	r3, [sp, #4]	@ movhi
+  92:HARDWARE/control/control.c ****     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;        // 推挽输出模式
+ 216              		.loc 1 92 5 is_stmt 1 view .LVU38
+ 217              		.loc 1 92 34 is_stmt 0 view .LVU39
+ 218 0014 1023     		movs	r3, #16
+ 219 0016 8DF80730 		strb	r3, [sp, #7]
+  93:HARDWARE/control/control.c ****     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;       // 高速模式
+ 220              		.loc 1 93 5 is_stmt 1 view .LVU40
+ 221              		.loc 1 93 35 is_stmt 0 view .LVU41
+ 222 001a 0323     		movs	r3, #3
+ 223 001c 8DF80630 		strb	r3, [sp, #6]
+  94:HARDWARE/control/control.c ****     GPIO_Init(GPIOB, &GPIO_InitStructure);
+ 224              		.loc 1 94 5 is_stmt 1 view .LVU42
+ 225 0020 01A9     		add	r1, sp, #4
+ 226 0022 0348     		ldr	r0, .L15
+ 227 0024 FFF7FEFF 		bl	GPIO_Init
+ 228              	.LVL7:
+  95:HARDWARE/control/control.c **** }
+ 229              		.loc 1 95 1 is_stmt 0 view .LVU43
+ 230 0028 03B0     		add	sp, sp, #12
+ 231              	.LCFI11:
+ 232              		.cfi_def_cfa_offset 4
+ 233              		@ sp needed
+ 234 002a 5DF804FB 		ldr	pc, [sp], #4
+ 235              	.L16:
+ 236 002e 00BF     		.align	2
+ 237              	.L15:
+ 238 0030 000C0140 		.word	1073810432
+ 239              		.cfi_endproc
+ 240              	.LFE32:
+ 242              		.text
+ 243              	.Letext0:
+ 244              		.file 2 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 245              		.file 3 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 246              		.file 4 "USER/stm32f10x.h"
+ 247              		.file 5 "STM32F10x_FWLib/inc/stm32f10x_gpio.h"
+ 248              		.file 6 "STM32F10x_FWLib/inc/stm32f10x_rcc.h"
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccQz8nTr.s 			page 7
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 control.c
+C:\Users\31687\AppData\Local\Temp\ccQz8nTr.s:19     .text.beep_init:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccQz8nTr.s:25     .text.beep_init:00000000 beep_init
+C:\Users\31687\AppData\Local\Temp\ccQz8nTr.s:70     .text.beep_init:00000030 $d
+C:\Users\31687\AppData\Local\Temp\ccQz8nTr.s:75     .text.warm_init:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccQz8nTr.s:81     .text.warm_init:00000000 warm_init
+C:\Users\31687\AppData\Local\Temp\ccQz8nTr.s:126    .text.warm_init:00000030 $d
+C:\Users\31687\AppData\Local\Temp\ccQz8nTr.s:131    .text.zhileng_init:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccQz8nTr.s:137    .text.zhileng_init:00000000 zhileng_init
+C:\Users\31687\AppData\Local\Temp\ccQz8nTr.s:182    .text.zhileng_init:0000002c $d
+C:\Users\31687\AppData\Local\Temp\ccQz8nTr.s:187    .text.chushi_init:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccQz8nTr.s:193    .text.chushi_init:00000000 chushi_init
+C:\Users\31687\AppData\Local\Temp\ccQz8nTr.s:238    .text.chushi_init:00000030 $d
+
+UNDEFINED SYMBOLS
+RCC_APB2PeriphClockCmd
+GPIO_Init

@@ -1,0 +1,5476 @@
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 1
+
+
+   1              		.cpu cortex-m3
+   2              		.arch armv7-m
+   3              		.fpu softvfp
+   4              		.eabi_attribute 20, 1
+   5              		.eabi_attribute 21, 1
+   6              		.eabi_attribute 23, 3
+   7              		.eabi_attribute 24, 1
+   8              		.eabi_attribute 25, 1
+   9              		.eabi_attribute 26, 1
+  10              		.eabi_attribute 30, 1
+  11              		.eabi_attribute 34, 1
+  12              		.eabi_attribute 18, 4
+  13              		.file	"oled.c"
+  14              		.text
+  15              	.Ltext0:
+  16              		.cfi_sections	.debug_frame
+  17              		.file 1 "HARDWARE/OLED/oled.c"
+  18              		.section	.text.IIC_Start1,"ax",%progbits
+  19              		.align	1
+  20              		.global	IIC_Start1
+  21              		.syntax unified
+  22              		.thumb
+  23              		.thumb_func
+  25              	IIC_Start1:
+  26              	.LFB29:
+   1:HARDWARE/OLED/oled.c **** /**
+   2:HARDWARE/OLED/oled.c ****  * oled.c
+   3:HARDWARE/OLED/oled.c ****  * OLED显示模块驱动实现
+   4:HARDWARE/OLED/oled.c ****  * 功能：实现OLED显示模块的初始化、IIC通信、显示控制等功能
+   5:HARDWARE/OLED/oled.c ****  * 版本：V1.0
+   6:HARDWARE/OLED/oled.c ****  * 测试硬件：单片机STM32F103RCT6,晶振72M  单片机工作电压3.3V或5V
+   7:HARDWARE/OLED/oled.c ****  * 作者：xiao冯@ShenZhen QDtech co.,LTD
+   8:HARDWARE/OLED/oled.c ****  * 公司网站:www.qdtech.net
+   9:HARDWARE/OLED/oled.c ****  * 淘宝网站：http://qdtech.taobao.com
+  10:HARDWARE/OLED/oled.c ****  * 邮箱:QDtech2008@gmail.com 
+  11:HARDWARE/OLED/oled.c ****  * Skype:QDtech2008
+  12:HARDWARE/OLED/oled.c ****  * 技术交流QQ群:324828016
+  13:HARDWARE/OLED/oled.c ****  * 创建日期:2018/6/6
+  14:HARDWARE/OLED/oled.c ****  * 项目：蔬菜恒温库监控系统
+  15:HARDWARE/OLED/oled.c ****  *
+  16:HARDWARE/OLED/oled.c ****  * 版权所有，盗版必究。
+  17:HARDWARE/OLED/oled.c ****  * Copyright(C) 深圳市全动电子技术有限公司 2009-2019
+  18:HARDWARE/OLED/oled.c ****  * All rights reserved
+  19:HARDWARE/OLED/oled.c ****  */
+  20:HARDWARE/OLED/oled.c **** 
+  21:HARDWARE/OLED/oled.c **** /**************************************************************************************************
+  22:HARDWARE/OLED/oled.c ****  * 电源接线：
+  23:HARDWARE/OLED/oled.c ****  *      5V  接DC 5V电源
+  24:HARDWARE/OLED/oled.c ****  *     GND  接地
+  25:HARDWARE/OLED/oled.c ****  * 
+  26:HARDWARE/OLED/oled.c ****  * OLED屏数据线接线：
+  27:HARDWARE/OLED/oled.c ****  * 本模块数据总线类型为IIC
+  28:HARDWARE/OLED/oled.c ****  *     SCL  接PB13    // IIC时钟信号
+  29:HARDWARE/OLED/oled.c ****  *     SDA  接PB14    // IIC数据信号
+  30:HARDWARE/OLED/oled.c ****  * 
+  31:HARDWARE/OLED/oled.c ****  * OLED屏控制线接线：
+  32:HARDWARE/OLED/oled.c ****  * 本模块数据总线类型为IIC，不需要接控制信号线    
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 2
+
+
+  33:HARDWARE/OLED/oled.c ****  * 
+  34:HARDWARE/OLED/oled.c ****  * 触摸屏接线：
+  35:HARDWARE/OLED/oled.c ****  * 本模块本身不带触摸，不需要接触摸屏线
+  36:HARDWARE/OLED/oled.c ****  **************************************************************************************************
+  37:HARDWARE/OLED/oled.c **** 
+  38:HARDWARE/OLED/oled.c **** /**************************************************************************************************
+  39:HARDWARE/OLED/oled.c ****  * @attention
+  40:HARDWARE/OLED/oled.c ****  *
+  41:HARDWARE/OLED/oled.c ****  * THE PRESENT FIRMWARE WHICH IS FOR GUIDANCE ONLY AIMS AT PROVIDING CUSTOMERS
+  42:HARDWARE/OLED/oled.c ****  * WITH CODING INFORMATION REGARDING THEIR PRODUCTS IN ORDER FOR THEM TO SAVE
+  43:HARDWARE/OLED/oled.c ****  * TIME. AS A RESULT, QD electronic SHALL NOT BE HELD LIABLE FOR ANY
+  44:HARDWARE/OLED/oled.c ****  * DIRECT, INDIRECT OR CONSEQUENTIAL DAMAGES WITH RESPECT TO ANY CLAIMS ARISING
+  45:HARDWARE/OLED/oled.c ****  * FROM THE CONTENT OF SUCH FIRMWARE AND/OR THE USE MADE BY CUSTOMERS OF THE
+  46:HARDWARE/OLED/oled.c ****  * CODING INFORMATION CONTAINED HEREIN IN CONNECTION WITH THEIR PRODUCTS.
+  47:HARDWARE/OLED/oled.c ****  **************************************************************************************************
+  48:HARDWARE/OLED/oled.c **** 
+  49:HARDWARE/OLED/oled.c **** #include "oled.h"
+  50:HARDWARE/OLED/oled.c **** #include "stdlib.h"
+  51:HARDWARE/OLED/oled.c **** #include "oledfont.h"  	 
+  52:HARDWARE/OLED/oled.c **** #include "delay.h"
+  53:HARDWARE/OLED/oled.c **** 
+  54:HARDWARE/OLED/oled.c **** /**
+  55:HARDWARE/OLED/oled.c ****  * OLED的显存
+  56:HARDWARE/OLED/oled.c ****  * 存放格式如下：
+  57:HARDWARE/OLED/oled.c ****  * [0]0 1 2 3 ... 127
+  58:HARDWARE/OLED/oled.c ****  * [1]0 1 2 3 ... 127
+  59:HARDWARE/OLED/oled.c ****  * [2]0 1 2 3 ... 127
+  60:HARDWARE/OLED/oled.c ****  * [3]0 1 2 3 ... 127
+  61:HARDWARE/OLED/oled.c ****  * [4]0 1 2 3 ... 127
+  62:HARDWARE/OLED/oled.c ****  * [5]0 1 2 3 ... 127
+  63:HARDWARE/OLED/oled.c ****  * [6]0 1 2 3 ... 127
+  64:HARDWARE/OLED/oled.c ****  * [7]0 1 2 3 ... 127
+  65:HARDWARE/OLED/oled.c ****  */
+  66:HARDWARE/OLED/oled.c **** 
+  67:HARDWARE/OLED/oled.c **** /**
+  68:HARDWARE/OLED/oled.c ****  * @brief IIC开始信号
+  69:HARDWARE/OLED/oled.c ****  */
+  70:HARDWARE/OLED/oled.c **** void IIC_Start1()
+  71:HARDWARE/OLED/oled.c **** {
+  27              		.loc 1 71 1 view -0
+  28              		.cfi_startproc
+  29              		@ args = 0, pretend = 0, frame = 0
+  30              		@ frame_needed = 0, uses_anonymous_args = 0
+  31 0000 10B5     		push	{r4, lr}
+  32              	.LCFI0:
+  33              		.cfi_def_cfa_offset 8
+  34              		.cfi_offset 4, -8
+  35              		.cfi_offset 14, -4
+  72:HARDWARE/OLED/oled.c **** 	OLED_SCLK_Set();
+  36              		.loc 1 72 2 view .LVU1
+  37 0002 0B4C     		ldr	r4, .L3
+  38 0004 4FF48071 		mov	r1, #256
+  39 0008 2046     		mov	r0, r4
+  40 000a FFF7FEFF 		bl	GPIO_SetBits
+  41              	.LVL0:
+  73:HARDWARE/OLED/oled.c **** 	OLED_SDIN_Set();
+  42              		.loc 1 73 2 view .LVU2
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 3
+
+
+  43 000e 4FF40071 		mov	r1, #512
+  44 0012 2046     		mov	r0, r4
+  45 0014 FFF7FEFF 		bl	GPIO_SetBits
+  46              	.LVL1:
+  74:HARDWARE/OLED/oled.c **** 	OLED_SDIN_Clr();
+  47              		.loc 1 74 2 view .LVU3
+  48 0018 4FF40071 		mov	r1, #512
+  49 001c 2046     		mov	r0, r4
+  50 001e FFF7FEFF 		bl	GPIO_ResetBits
+  51              	.LVL2:
+  75:HARDWARE/OLED/oled.c **** 	OLED_SCLK_Clr();
+  52              		.loc 1 75 2 view .LVU4
+  53 0022 4FF48071 		mov	r1, #256
+  54 0026 2046     		mov	r0, r4
+  55 0028 FFF7FEFF 		bl	GPIO_ResetBits
+  56              	.LVL3:
+  76:HARDWARE/OLED/oled.c **** }
+  57              		.loc 1 76 1 is_stmt 0 view .LVU5
+  58 002c 10BD     		pop	{r4, pc}
+  59              	.L4:
+  60 002e 00BF     		.align	2
+  61              	.L3:
+  62 0030 000C0140 		.word	1073810432
+  63              		.cfi_endproc
+  64              	.LFE29:
+  66              		.section	.text.IIC_Stop1,"ax",%progbits
+  67              		.align	1
+  68              		.global	IIC_Stop1
+  69              		.syntax unified
+  70              		.thumb
+  71              		.thumb_func
+  73              	IIC_Stop1:
+  74              	.LFB30:
+  77:HARDWARE/OLED/oled.c **** 
+  78:HARDWARE/OLED/oled.c **** /**
+  79:HARDWARE/OLED/oled.c ****  * @brief IIC停止信号
+  80:HARDWARE/OLED/oled.c ****  */
+  81:HARDWARE/OLED/oled.c **** void IIC_Stop1()
+  82:HARDWARE/OLED/oled.c **** {
+  75              		.loc 1 82 1 is_stmt 1 view -0
+  76              		.cfi_startproc
+  77              		@ args = 0, pretend = 0, frame = 0
+  78              		@ frame_needed = 0, uses_anonymous_args = 0
+  79 0000 10B5     		push	{r4, lr}
+  80              	.LCFI1:
+  81              		.cfi_def_cfa_offset 8
+  82              		.cfi_offset 4, -8
+  83              		.cfi_offset 14, -4
+  83:HARDWARE/OLED/oled.c **** 	OLED_SCLK_Set();
+  84              		.loc 1 83 2 view .LVU7
+  85 0002 084C     		ldr	r4, .L7
+  86 0004 4FF48071 		mov	r1, #256
+  87 0008 2046     		mov	r0, r4
+  88 000a FFF7FEFF 		bl	GPIO_SetBits
+  89              	.LVL4:
+  84:HARDWARE/OLED/oled.c **** 	OLED_SDIN_Clr();
+  90              		.loc 1 84 2 view .LVU8
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 4
+
+
+  91 000e 4FF40071 		mov	r1, #512
+  92 0012 2046     		mov	r0, r4
+  93 0014 FFF7FEFF 		bl	GPIO_ResetBits
+  94              	.LVL5:
+  85:HARDWARE/OLED/oled.c **** 	OLED_SDIN_Set();
+  95              		.loc 1 85 2 view .LVU9
+  96 0018 4FF40071 		mov	r1, #512
+  97 001c 2046     		mov	r0, r4
+  98 001e FFF7FEFF 		bl	GPIO_SetBits
+  99              	.LVL6:
+  86:HARDWARE/OLED/oled.c **** }
+ 100              		.loc 1 86 1 is_stmt 0 view .LVU10
+ 101 0022 10BD     		pop	{r4, pc}
+ 102              	.L8:
+ 103              		.align	2
+ 104              	.L7:
+ 105 0024 000C0140 		.word	1073810432
+ 106              		.cfi_endproc
+ 107              	.LFE30:
+ 109              		.section	.text.IIC_Wait_Ack1,"ax",%progbits
+ 110              		.align	1
+ 111              		.global	IIC_Wait_Ack1
+ 112              		.syntax unified
+ 113              		.thumb
+ 114              		.thumb_func
+ 116              	IIC_Wait_Ack1:
+ 117              	.LFB31:
+  87:HARDWARE/OLED/oled.c **** 
+  88:HARDWARE/OLED/oled.c **** /**
+  89:HARDWARE/OLED/oled.c ****  * @brief IIC等待应答
+  90:HARDWARE/OLED/oled.c ****  */
+  91:HARDWARE/OLED/oled.c **** void IIC_Wait_Ack1()
+  92:HARDWARE/OLED/oled.c **** {
+ 118              		.loc 1 92 1 is_stmt 1 view -0
+ 119              		.cfi_startproc
+ 120              		@ args = 0, pretend = 0, frame = 0
+ 121              		@ frame_needed = 0, uses_anonymous_args = 0
+ 122 0000 10B5     		push	{r4, lr}
+ 123              	.LCFI2:
+ 124              		.cfi_def_cfa_offset 8
+ 125              		.cfi_offset 4, -8
+ 126              		.cfi_offset 14, -4
+  93:HARDWARE/OLED/oled.c **** 	// 简化版的等待应答，实际项目中可能需要更完善的实现
+  94:HARDWARE/OLED/oled.c **** 	OLED_SCLK_Set();
+ 127              		.loc 1 94 2 view .LVU12
+ 128 0002 064C     		ldr	r4, .L11
+ 129 0004 4FF48071 		mov	r1, #256
+ 130 0008 2046     		mov	r0, r4
+ 131 000a FFF7FEFF 		bl	GPIO_SetBits
+ 132              	.LVL7:
+  95:HARDWARE/OLED/oled.c **** 	OLED_SCLK_Clr();
+ 133              		.loc 1 95 2 view .LVU13
+ 134 000e 4FF48071 		mov	r1, #256
+ 135 0012 2046     		mov	r0, r4
+ 136 0014 FFF7FEFF 		bl	GPIO_ResetBits
+ 137              	.LVL8:
+  96:HARDWARE/OLED/oled.c **** }
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 5
+
+
+ 138              		.loc 1 96 1 is_stmt 0 view .LVU14
+ 139 0018 10BD     		pop	{r4, pc}
+ 140              	.L12:
+ 141 001a 00BF     		.align	2
+ 142              	.L11:
+ 143 001c 000C0140 		.word	1073810432
+ 144              		.cfi_endproc
+ 145              	.LFE31:
+ 147              		.section	.text.Write_IIC_Byte,"ax",%progbits
+ 148              		.align	1
+ 149              		.global	Write_IIC_Byte
+ 150              		.syntax unified
+ 151              		.thumb
+ 152              		.thumb_func
+ 154              	Write_IIC_Byte:
+ 155              	.LVL9:
+ 156              	.LFB32:
+  97:HARDWARE/OLED/oled.c **** 
+  98:HARDWARE/OLED/oled.c **** /**
+  99:HARDWARE/OLED/oled.c ****  * @brief IIC写入一个字节
+ 100:HARDWARE/OLED/oled.c ****  * @param IIC_Byte: 要写入的字节
+ 101:HARDWARE/OLED/oled.c ****  */
+ 102:HARDWARE/OLED/oled.c **** void Write_IIC_Byte(unsigned char IIC_Byte)
+ 103:HARDWARE/OLED/oled.c **** {
+ 157              		.loc 1 103 1 is_stmt 1 view -0
+ 158              		.cfi_startproc
+ 159              		@ args = 0, pretend = 0, frame = 0
+ 160              		@ frame_needed = 0, uses_anonymous_args = 0
+ 161              		.loc 1 103 1 is_stmt 0 view .LVU16
+ 162 0000 70B5     		push	{r4, r5, r6, lr}
+ 163              	.LCFI3:
+ 164              		.cfi_def_cfa_offset 16
+ 165              		.cfi_offset 4, -16
+ 166              		.cfi_offset 5, -12
+ 167              		.cfi_offset 6, -8
+ 168              		.cfi_offset 14, -4
+ 169 0002 0446     		mov	r4, r0
+ 104:HARDWARE/OLED/oled.c **** 	unsigned char i;
+ 170              		.loc 1 104 2 is_stmt 1 view .LVU17
+ 105:HARDWARE/OLED/oled.c **** 	unsigned char m, da;
+ 171              		.loc 1 105 2 view .LVU18
+ 106:HARDWARE/OLED/oled.c **** 	da = IIC_Byte;
+ 172              		.loc 1 106 2 view .LVU19
+ 173              	.LVL10:
+ 107:HARDWARE/OLED/oled.c **** 	OLED_SCLK_Clr();
+ 174              		.loc 1 107 2 view .LVU20
+ 175 0004 4FF48071 		mov	r1, #256
+ 176 0008 1248     		ldr	r0, .L20
+ 177              	.LVL11:
+ 178              		.loc 1 107 2 is_stmt 0 view .LVU21
+ 179 000a FFF7FEFF 		bl	GPIO_ResetBits
+ 180              	.LVL12:
+ 108:HARDWARE/OLED/oled.c **** 	
+ 109:HARDWARE/OLED/oled.c **** 	// 逐位发送数据
+ 110:HARDWARE/OLED/oled.c **** 	for(i = 0; i < 8; i++)
+ 181              		.loc 1 110 2 is_stmt 1 view .LVU22
+ 182              		.loc 1 110 8 is_stmt 0 view .LVU23
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 6
+
+
+ 183 000e 0025     		movs	r5, #0
+ 184              		.loc 1 110 2 view .LVU24
+ 185 0010 13E0     		b	.L14
+ 186              	.LVL13:
+ 187              	.L15:
+ 111:HARDWARE/OLED/oled.c **** 	{
+ 112:HARDWARE/OLED/oled.c **** 		m = da;
+ 113:HARDWARE/OLED/oled.c **** 		m = m & 0x80;
+ 114:HARDWARE/OLED/oled.c **** 		if(m == 0x80)
+ 115:HARDWARE/OLED/oled.c **** 		{
+ 116:HARDWARE/OLED/oled.c **** 			OLED_SDIN_Set();
+ 117:HARDWARE/OLED/oled.c **** 		}
+ 118:HARDWARE/OLED/oled.c **** 		else
+ 119:HARDWARE/OLED/oled.c **** 		{
+ 120:HARDWARE/OLED/oled.c **** 			OLED_SDIN_Clr();
+ 188              		.loc 1 120 4 is_stmt 1 view .LVU25
+ 189 0012 4FF40071 		mov	r1, #512
+ 190 0016 0F48     		ldr	r0, .L20
+ 191 0018 FFF7FEFF 		bl	GPIO_ResetBits
+ 192              	.LVL14:
+ 193              	.L16:
+ 121:HARDWARE/OLED/oled.c **** 		}
+ 122:HARDWARE/OLED/oled.c **** 		da = da << 1;
+ 194              		.loc 1 122 3 view .LVU26
+ 195              		.loc 1 122 6 is_stmt 0 view .LVU27
+ 196 001c 6400     		lsls	r4, r4, #1
+ 197              	.LVL15:
+ 198              		.loc 1 122 6 view .LVU28
+ 199 001e E4B2     		uxtb	r4, r4
+ 200              	.LVL16:
+ 123:HARDWARE/OLED/oled.c **** 		OLED_SCLK_Set();
+ 201              		.loc 1 123 3 is_stmt 1 view .LVU29
+ 202 0020 0C4E     		ldr	r6, .L20
+ 203 0022 4FF48071 		mov	r1, #256
+ 204 0026 3046     		mov	r0, r6
+ 205 0028 FFF7FEFF 		bl	GPIO_SetBits
+ 206              	.LVL17:
+ 124:HARDWARE/OLED/oled.c **** 		OLED_SCLK_Clr();
+ 207              		.loc 1 124 3 view .LVU30
+ 208 002c 4FF48071 		mov	r1, #256
+ 209 0030 3046     		mov	r0, r6
+ 210 0032 FFF7FEFF 		bl	GPIO_ResetBits
+ 211              	.LVL18:
+ 110:HARDWARE/OLED/oled.c **** 	{
+ 212              		.loc 1 110 21 discriminator 2 view .LVU31
+ 213 0036 0135     		adds	r5, r5, #1
+ 214              	.LVL19:
+ 110:HARDWARE/OLED/oled.c **** 	{
+ 215              		.loc 1 110 21 is_stmt 0 discriminator 2 view .LVU32
+ 216 0038 EDB2     		uxtb	r5, r5
+ 217              	.LVL20:
+ 218              	.L14:
+ 110:HARDWARE/OLED/oled.c **** 	{
+ 219              		.loc 1 110 15 is_stmt 1 discriminator 1 view .LVU33
+ 220 003a 072D     		cmp	r5, #7
+ 221 003c 08D8     		bhi	.L19
+ 112:HARDWARE/OLED/oled.c **** 		m = m & 0x80;
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 7
+
+
+ 222              		.loc 1 112 3 view .LVU34
+ 223              	.LVL21:
+ 113:HARDWARE/OLED/oled.c **** 		if(m == 0x80)
+ 224              		.loc 1 113 3 view .LVU35
+ 114:HARDWARE/OLED/oled.c **** 		{
+ 225              		.loc 1 114 3 view .LVU36
+ 114:HARDWARE/OLED/oled.c **** 		{
+ 226              		.loc 1 114 5 is_stmt 0 view .LVU37
+ 227 003e 14F0800F 		tst	r4, #128
+ 228 0042 E6D0     		beq	.L15
+ 116:HARDWARE/OLED/oled.c **** 		}
+ 229              		.loc 1 116 4 is_stmt 1 view .LVU38
+ 230 0044 4FF40071 		mov	r1, #512
+ 231 0048 0248     		ldr	r0, .L20
+ 232 004a FFF7FEFF 		bl	GPIO_SetBits
+ 233              	.LVL22:
+ 234 004e E5E7     		b	.L16
+ 235              	.LVL23:
+ 236              	.L19:
+ 125:HARDWARE/OLED/oled.c **** 	}
+ 126:HARDWARE/OLED/oled.c **** }
+ 237              		.loc 1 126 1 is_stmt 0 view .LVU39
+ 238 0050 70BD     		pop	{r4, r5, r6, pc}
+ 239              	.LVL24:
+ 240              	.L21:
+ 241              		.loc 1 126 1 view .LVU40
+ 242 0052 00BF     		.align	2
+ 243              	.L20:
+ 244 0054 000C0140 		.word	1073810432
+ 245              		.cfi_endproc
+ 246              	.LFE32:
+ 248              		.section	.text.Write_IIC_Command,"ax",%progbits
+ 249              		.align	1
+ 250              		.global	Write_IIC_Command
+ 251              		.syntax unified
+ 252              		.thumb
+ 253              		.thumb_func
+ 255              	Write_IIC_Command:
+ 256              	.LVL25:
+ 257              	.LFB33:
+ 127:HARDWARE/OLED/oled.c **** /**********************************************
+ 128:HARDWARE/OLED/oled.c **** // IIC Write Command
+ 129:HARDWARE/OLED/oled.c **** **********************************************/
+ 130:HARDWARE/OLED/oled.c **** void Write_IIC_Command(unsigned char IIC_Command)
+ 131:HARDWARE/OLED/oled.c **** {
+ 258              		.loc 1 131 1 is_stmt 1 view -0
+ 259              		.cfi_startproc
+ 260              		@ args = 0, pretend = 0, frame = 0
+ 261              		@ frame_needed = 0, uses_anonymous_args = 0
+ 262              		.loc 1 131 1 is_stmt 0 view .LVU42
+ 263 0000 10B5     		push	{r4, lr}
+ 264              	.LCFI4:
+ 265              		.cfi_def_cfa_offset 8
+ 266              		.cfi_offset 4, -8
+ 267              		.cfi_offset 14, -4
+ 268 0002 0446     		mov	r4, r0
+ 132:HARDWARE/OLED/oled.c ****    IIC_Start1();
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 8
+
+
+ 269              		.loc 1 132 4 is_stmt 1 view .LVU43
+ 270 0004 FFF7FEFF 		bl	IIC_Start1
+ 271              	.LVL26:
+ 133:HARDWARE/OLED/oled.c ****    Write_IIC_Byte(IIC_SLAVE_ADDR);            //Slave address,SA0=0
+ 272              		.loc 1 133 4 view .LVU44
+ 273 0008 7820     		movs	r0, #120
+ 274 000a FFF7FEFF 		bl	Write_IIC_Byte
+ 275              	.LVL27:
+ 134:HARDWARE/OLED/oled.c **** 	IIC_Wait_Ack1();	
+ 276              		.loc 1 134 2 view .LVU45
+ 277 000e FFF7FEFF 		bl	IIC_Wait_Ack1
+ 278              	.LVL28:
+ 135:HARDWARE/OLED/oled.c ****    Write_IIC_Byte(0x00);			//write command
+ 279              		.loc 1 135 4 view .LVU46
+ 280 0012 0020     		movs	r0, #0
+ 281 0014 FFF7FEFF 		bl	Write_IIC_Byte
+ 282              	.LVL29:
+ 136:HARDWARE/OLED/oled.c **** 	IIC_Wait_Ack1();	
+ 283              		.loc 1 136 2 view .LVU47
+ 284 0018 FFF7FEFF 		bl	IIC_Wait_Ack1
+ 285              	.LVL30:
+ 137:HARDWARE/OLED/oled.c ****    Write_IIC_Byte(IIC_Command); 
+ 286              		.loc 1 137 4 view .LVU48
+ 287 001c 2046     		mov	r0, r4
+ 288 001e FFF7FEFF 		bl	Write_IIC_Byte
+ 289              	.LVL31:
+ 138:HARDWARE/OLED/oled.c **** 	IIC_Wait_Ack1();	
+ 290              		.loc 1 138 2 view .LVU49
+ 291 0022 FFF7FEFF 		bl	IIC_Wait_Ack1
+ 292              	.LVL32:
+ 139:HARDWARE/OLED/oled.c ****    IIC_Stop1();
+ 293              		.loc 1 139 4 view .LVU50
+ 294 0026 FFF7FEFF 		bl	IIC_Stop1
+ 295              	.LVL33:
+ 140:HARDWARE/OLED/oled.c **** }
+ 296              		.loc 1 140 1 is_stmt 0 view .LVU51
+ 297 002a 10BD     		pop	{r4, pc}
+ 298              		.loc 1 140 1 view .LVU52
+ 299              		.cfi_endproc
+ 300              	.LFE33:
+ 302              		.section	.text.Write_IIC_Data,"ax",%progbits
+ 303              		.align	1
+ 304              		.global	Write_IIC_Data
+ 305              		.syntax unified
+ 306              		.thumb
+ 307              		.thumb_func
+ 309              	Write_IIC_Data:
+ 310              	.LVL34:
+ 311              	.LFB34:
+ 141:HARDWARE/OLED/oled.c **** /**********************************************
+ 142:HARDWARE/OLED/oled.c **** // IIC Write Data
+ 143:HARDWARE/OLED/oled.c **** **********************************************/
+ 144:HARDWARE/OLED/oled.c **** void Write_IIC_Data(unsigned char IIC_Data)
+ 145:HARDWARE/OLED/oled.c **** {
+ 312              		.loc 1 145 1 is_stmt 1 view -0
+ 313              		.cfi_startproc
+ 314              		@ args = 0, pretend = 0, frame = 0
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 9
+
+
+ 315              		@ frame_needed = 0, uses_anonymous_args = 0
+ 316              		.loc 1 145 1 is_stmt 0 view .LVU54
+ 317 0000 10B5     		push	{r4, lr}
+ 318              	.LCFI5:
+ 319              		.cfi_def_cfa_offset 8
+ 320              		.cfi_offset 4, -8
+ 321              		.cfi_offset 14, -4
+ 322 0002 0446     		mov	r4, r0
+ 146:HARDWARE/OLED/oled.c ****    IIC_Start1();
+ 323              		.loc 1 146 4 is_stmt 1 view .LVU55
+ 324 0004 FFF7FEFF 		bl	IIC_Start1
+ 325              	.LVL35:
+ 147:HARDWARE/OLED/oled.c ****    Write_IIC_Byte(IIC_SLAVE_ADDR);			//D/C#=0; R/W#=0
+ 326              		.loc 1 147 4 view .LVU56
+ 327 0008 7820     		movs	r0, #120
+ 328 000a FFF7FEFF 		bl	Write_IIC_Byte
+ 329              	.LVL36:
+ 148:HARDWARE/OLED/oled.c **** 	IIC_Wait_Ack1();	
+ 330              		.loc 1 148 2 view .LVU57
+ 331 000e FFF7FEFF 		bl	IIC_Wait_Ack1
+ 332              	.LVL37:
+ 149:HARDWARE/OLED/oled.c ****    Write_IIC_Byte(0x40);			//write data
+ 333              		.loc 1 149 4 view .LVU58
+ 334 0012 4020     		movs	r0, #64
+ 335 0014 FFF7FEFF 		bl	Write_IIC_Byte
+ 336              	.LVL38:
+ 150:HARDWARE/OLED/oled.c **** 	IIC_Wait_Ack1();	
+ 337              		.loc 1 150 2 view .LVU59
+ 338 0018 FFF7FEFF 		bl	IIC_Wait_Ack1
+ 339              	.LVL39:
+ 151:HARDWARE/OLED/oled.c ****    Write_IIC_Byte(IIC_Data);
+ 340              		.loc 1 151 4 view .LVU60
+ 341 001c 2046     		mov	r0, r4
+ 342 001e FFF7FEFF 		bl	Write_IIC_Byte
+ 343              	.LVL40:
+ 152:HARDWARE/OLED/oled.c **** 	IIC_Wait_Ack1();	
+ 344              		.loc 1 152 2 view .LVU61
+ 345 0022 FFF7FEFF 		bl	IIC_Wait_Ack1
+ 346              	.LVL41:
+ 153:HARDWARE/OLED/oled.c ****    IIC_Stop1();
+ 347              		.loc 1 153 4 view .LVU62
+ 348 0026 FFF7FEFF 		bl	IIC_Stop1
+ 349              	.LVL42:
+ 154:HARDWARE/OLED/oled.c **** }
+ 350              		.loc 1 154 1 is_stmt 0 view .LVU63
+ 351 002a 10BD     		pop	{r4, pc}
+ 352              		.loc 1 154 1 view .LVU64
+ 353              		.cfi_endproc
+ 354              	.LFE34:
+ 356              		.section	.text.OLED_WR_Byte,"ax",%progbits
+ 357              		.align	1
+ 358              		.global	OLED_WR_Byte
+ 359              		.syntax unified
+ 360              		.thumb
+ 361              		.thumb_func
+ 363              	OLED_WR_Byte:
+ 364              	.LVL43:
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 10
+
+
+ 365              	.LFB35:
+ 155:HARDWARE/OLED/oled.c **** void OLED_WR_Byte(unsigned dat,unsigned cmd)
+ 156:HARDWARE/OLED/oled.c **** {
+ 366              		.loc 1 156 1 is_stmt 1 view -0
+ 367              		.cfi_startproc
+ 368              		@ args = 0, pretend = 0, frame = 0
+ 369              		@ frame_needed = 0, uses_anonymous_args = 0
+ 370              		.loc 1 156 1 is_stmt 0 view .LVU66
+ 371 0000 08B5     		push	{r3, lr}
+ 372              	.LCFI6:
+ 373              		.cfi_def_cfa_offset 8
+ 374              		.cfi_offset 3, -8
+ 375              		.cfi_offset 14, -4
+ 157:HARDWARE/OLED/oled.c **** 	if(cmd)
+ 376              		.loc 1 157 2 is_stmt 1 view .LVU67
+ 377              		.loc 1 157 4 is_stmt 0 view .LVU68
+ 378 0002 19B1     		cbz	r1, .L27
+ 158:HARDWARE/OLED/oled.c **** 			{
+ 159:HARDWARE/OLED/oled.c **** 
+ 160:HARDWARE/OLED/oled.c ****    Write_IIC_Data(dat);
+ 379              		.loc 1 160 4 is_stmt 1 view .LVU69
+ 380 0004 C0B2     		uxtb	r0, r0
+ 381              	.LVL44:
+ 382              		.loc 1 160 4 is_stmt 0 view .LVU70
+ 383 0006 FFF7FEFF 		bl	Write_IIC_Data
+ 384              	.LVL45:
+ 385              	.L26:
+ 161:HARDWARE/OLED/oled.c ****    
+ 162:HARDWARE/OLED/oled.c **** 		}
+ 163:HARDWARE/OLED/oled.c **** 	else {
+ 164:HARDWARE/OLED/oled.c ****    Write_IIC_Command(dat);
+ 165:HARDWARE/OLED/oled.c **** 		
+ 166:HARDWARE/OLED/oled.c **** 	}
+ 167:HARDWARE/OLED/oled.c **** 
+ 168:HARDWARE/OLED/oled.c **** 
+ 169:HARDWARE/OLED/oled.c **** }
+ 386              		.loc 1 169 1 view .LVU71
+ 387 000a 08BD     		pop	{r3, pc}
+ 388              	.LVL46:
+ 389              	.L27:
+ 164:HARDWARE/OLED/oled.c **** 		
+ 390              		.loc 1 164 4 is_stmt 1 view .LVU72
+ 391 000c C0B2     		uxtb	r0, r0
+ 392              	.LVL47:
+ 164:HARDWARE/OLED/oled.c **** 		
+ 393              		.loc 1 164 4 is_stmt 0 view .LVU73
+ 394 000e FFF7FEFF 		bl	Write_IIC_Command
+ 395              	.LVL48:
+ 396              		.loc 1 169 1 view .LVU74
+ 397 0012 FAE7     		b	.L26
+ 398              		.cfi_endproc
+ 399              	.LFE35:
+ 401              		.section	.text.fill_picture,"ax",%progbits
+ 402              		.align	1
+ 403              		.global	fill_picture
+ 404              		.syntax unified
+ 405              		.thumb
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 11
+
+
+ 406              		.thumb_func
+ 408              	fill_picture:
+ 409              	.LVL49:
+ 410              	.LFB36:
+ 170:HARDWARE/OLED/oled.c **** 
+ 171:HARDWARE/OLED/oled.c **** 
+ 172:HARDWARE/OLED/oled.c **** /********************************************
+ 173:HARDWARE/OLED/oled.c **** // fill_Picture
+ 174:HARDWARE/OLED/oled.c **** ********************************************/
+ 175:HARDWARE/OLED/oled.c **** void fill_picture(unsigned char fill_Data)
+ 176:HARDWARE/OLED/oled.c **** {
+ 411              		.loc 1 176 1 is_stmt 1 view -0
+ 412              		.cfi_startproc
+ 413              		@ args = 0, pretend = 0, frame = 0
+ 414              		@ frame_needed = 0, uses_anonymous_args = 0
+ 415              		.loc 1 176 1 is_stmt 0 view .LVU76
+ 416 0000 70B5     		push	{r4, r5, r6, lr}
+ 417              	.LCFI7:
+ 418              		.cfi_def_cfa_offset 16
+ 419              		.cfi_offset 4, -16
+ 420              		.cfi_offset 5, -12
+ 421              		.cfi_offset 6, -8
+ 422              		.cfi_offset 14, -4
+ 423 0002 0546     		mov	r5, r0
+ 177:HARDWARE/OLED/oled.c **** 	unsigned char m,n;
+ 424              		.loc 1 177 2 is_stmt 1 view .LVU77
+ 178:HARDWARE/OLED/oled.c **** 	for(m=0;m<8;m++)
+ 425              		.loc 1 178 2 view .LVU78
+ 426              	.LVL50:
+ 427              		.loc 1 178 7 is_stmt 0 view .LVU79
+ 428 0004 0026     		movs	r6, #0
+ 429              		.loc 1 178 2 view .LVU80
+ 430 0006 0AE0     		b	.L31
+ 431              	.LVL51:
+ 432              	.L33:
+ 179:HARDWARE/OLED/oled.c **** 	{
+ 180:HARDWARE/OLED/oled.c **** 		OLED_WR_Byte(0xb0+m,0);		//page0-page1
+ 181:HARDWARE/OLED/oled.c **** 		OLED_WR_Byte(0x00,0);		//low column start address
+ 182:HARDWARE/OLED/oled.c **** 		OLED_WR_Byte(0x10,0);		//high column start address
+ 183:HARDWARE/OLED/oled.c **** 		for(n=0;n<128;n++)
+ 184:HARDWARE/OLED/oled.c **** 			{
+ 185:HARDWARE/OLED/oled.c **** 				OLED_WR_Byte(fill_Data,1);
+ 433              		.loc 1 185 5 is_stmt 1 view .LVU81
+ 434 0008 0121     		movs	r1, #1
+ 435 000a 2846     		mov	r0, r5
+ 436 000c FFF7FEFF 		bl	OLED_WR_Byte
+ 437              	.LVL52:
+ 183:HARDWARE/OLED/oled.c **** 			{
+ 438              		.loc 1 183 18 discriminator 3 view .LVU82
+ 439 0010 0134     		adds	r4, r4, #1
+ 440              	.LVL53:
+ 183:HARDWARE/OLED/oled.c **** 			{
+ 441              		.loc 1 183 18 is_stmt 0 discriminator 3 view .LVU83
+ 442 0012 E4B2     		uxtb	r4, r4
+ 443              	.LVL54:
+ 444              	.L32:
+ 183:HARDWARE/OLED/oled.c **** 			{
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 12
+
+
+ 445              		.loc 1 183 12 is_stmt 1 discriminator 1 view .LVU84
+ 446 0014 14F0800F 		tst	r4, #128
+ 447 0018 F6D0     		beq	.L33
+ 178:HARDWARE/OLED/oled.c **** 	for(m=0;m<8;m++)
+ 448              		.loc 1 178 15 discriminator 2 view .LVU85
+ 449 001a 0136     		adds	r6, r6, #1
+ 450              	.LVL55:
+ 178:HARDWARE/OLED/oled.c **** 	for(m=0;m<8;m++)
+ 451              		.loc 1 178 15 is_stmt 0 discriminator 2 view .LVU86
+ 452 001c F6B2     		uxtb	r6, r6
+ 453              	.LVL56:
+ 454              	.L31:
+ 178:HARDWARE/OLED/oled.c **** 	for(m=0;m<8;m++)
+ 455              		.loc 1 178 11 is_stmt 1 discriminator 1 view .LVU87
+ 456 001e 072E     		cmp	r6, #7
+ 457 0020 0ED8     		bhi	.L36
+ 180:HARDWARE/OLED/oled.c **** 		OLED_WR_Byte(0x00,0);		//low column start address
+ 458              		.loc 1 180 3 view .LVU88
+ 459 0022 0021     		movs	r1, #0
+ 460 0024 06F1B000 		add	r0, r6, #176
+ 461 0028 FFF7FEFF 		bl	OLED_WR_Byte
+ 462              	.LVL57:
+ 181:HARDWARE/OLED/oled.c **** 		OLED_WR_Byte(0x10,0);		//high column start address
+ 463              		.loc 1 181 3 view .LVU89
+ 464 002c 0021     		movs	r1, #0
+ 465 002e 0846     		mov	r0, r1
+ 466 0030 FFF7FEFF 		bl	OLED_WR_Byte
+ 467              	.LVL58:
+ 182:HARDWARE/OLED/oled.c **** 		for(n=0;n<128;n++)
+ 468              		.loc 1 182 3 view .LVU90
+ 469 0034 0021     		movs	r1, #0
+ 470 0036 1020     		movs	r0, #16
+ 471 0038 FFF7FEFF 		bl	OLED_WR_Byte
+ 472              	.LVL59:
+ 183:HARDWARE/OLED/oled.c **** 			{
+ 473              		.loc 1 183 3 view .LVU91
+ 183:HARDWARE/OLED/oled.c **** 			{
+ 474              		.loc 1 183 8 is_stmt 0 view .LVU92
+ 475 003c 0024     		movs	r4, #0
+ 183:HARDWARE/OLED/oled.c **** 			{
+ 476              		.loc 1 183 3 view .LVU93
+ 477 003e E9E7     		b	.L32
+ 478              	.LVL60:
+ 479              	.L36:
+ 186:HARDWARE/OLED/oled.c **** 			}
+ 187:HARDWARE/OLED/oled.c **** 	}
+ 188:HARDWARE/OLED/oled.c **** }
+ 480              		.loc 1 188 1 view .LVU94
+ 481 0040 70BD     		pop	{r4, r5, r6, pc}
+ 482              		.loc 1 188 1 view .LVU95
+ 483              		.cfi_endproc
+ 484              	.LFE36:
+ 486              		.section	.text.Delay_50ms,"ax",%progbits
+ 487              		.align	1
+ 488              		.global	Delay_50ms
+ 489              		.syntax unified
+ 490              		.thumb
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 13
+
+
+ 491              		.thumb_func
+ 493              	Delay_50ms:
+ 494              	.LVL61:
+ 495              	.LFB37:
+ 189:HARDWARE/OLED/oled.c **** 
+ 190:HARDWARE/OLED/oled.c **** 
+ 191:HARDWARE/OLED/oled.c **** /***********************Delay****************************************/
+ 192:HARDWARE/OLED/oled.c **** void Delay_50ms(unsigned int Del_50ms)
+ 193:HARDWARE/OLED/oled.c **** {
+ 496              		.loc 1 193 1 is_stmt 1 view -0
+ 497              		.cfi_startproc
+ 498              		@ args = 0, pretend = 0, frame = 0
+ 499              		@ frame_needed = 0, uses_anonymous_args = 0
+ 500              		@ link register save eliminated.
+ 194:HARDWARE/OLED/oled.c **** 	unsigned int m;
+ 501              		.loc 1 194 2 view .LVU97
+ 195:HARDWARE/OLED/oled.c **** 	for(;Del_50ms>0;Del_50ms--)
+ 502              		.loc 1 195 2 view .LVU98
+ 503 0000 03E0     		b	.L38
+ 504              	.LVL62:
+ 505              	.L39:
+ 196:HARDWARE/OLED/oled.c **** 		for(m=6245;m>0;m--);
+ 506              		.loc 1 196 19 discriminator 3 view .LVU99
+ 507 0002 013B     		subs	r3, r3, #1
+ 508              	.LVL63:
+ 509              	.L40:
+ 510              		.loc 1 196 15 discriminator 1 view .LVU100
+ 511 0004 002B     		cmp	r3, #0
+ 512 0006 FCD1     		bne	.L39
+ 195:HARDWARE/OLED/oled.c **** 	for(;Del_50ms>0;Del_50ms--)
+ 513              		.loc 1 195 26 view .LVU101
+ 514 0008 0138     		subs	r0, r0, #1
+ 515              	.LVL64:
+ 516              	.L38:
+ 195:HARDWARE/OLED/oled.c **** 	for(;Del_50ms>0;Del_50ms--)
+ 517              		.loc 1 195 15 discriminator 1 view .LVU102
+ 518 000a 10B1     		cbz	r0, .L42
+ 519              		.loc 1 196 8 is_stmt 0 view .LVU103
+ 520 000c 41F66503 		movw	r3, #6245
+ 521 0010 F8E7     		b	.L40
+ 522              	.L42:
+ 197:HARDWARE/OLED/oled.c **** }
+ 523              		.loc 1 197 1 view .LVU104
+ 524 0012 7047     		bx	lr
+ 525              		.cfi_endproc
+ 526              	.LFE37:
+ 528              		.section	.text.Delay_1ms,"ax",%progbits
+ 529              		.align	1
+ 530              		.global	Delay_1ms
+ 531              		.syntax unified
+ 532              		.thumb
+ 533              		.thumb_func
+ 535              	Delay_1ms:
+ 536              	.LVL65:
+ 537              	.LFB38:
+ 198:HARDWARE/OLED/oled.c **** 
+ 199:HARDWARE/OLED/oled.c **** void Delay_1ms(unsigned int Del_1ms)
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 14
+
+
+ 200:HARDWARE/OLED/oled.c **** {
+ 538              		.loc 1 200 1 is_stmt 1 view -0
+ 539              		.cfi_startproc
+ 540              		@ args = 0, pretend = 0, frame = 0
+ 541              		@ frame_needed = 0, uses_anonymous_args = 0
+ 542              		@ link register save eliminated.
+ 543              		.loc 1 200 1 is_stmt 0 view .LVU106
+ 544 0000 0246     		mov	r2, r0
+ 201:HARDWARE/OLED/oled.c **** 	unsigned char j;
+ 545              		.loc 1 201 2 is_stmt 1 view .LVU107
+ 202:HARDWARE/OLED/oled.c **** 	while(Del_1ms--)
+ 546              		.loc 1 202 2 view .LVU108
+ 547              		.loc 1 202 7 is_stmt 0 view .LVU109
+ 548 0002 03E0     		b	.L44
+ 549              	.LVL66:
+ 550              	.L45:
+ 203:HARDWARE/OLED/oled.c **** 	{	
+ 204:HARDWARE/OLED/oled.c **** 		for(j=0;j<123;j++);
+ 551              		.loc 1 204 18 is_stmt 1 discriminator 3 view .LVU110
+ 552 0004 0133     		adds	r3, r3, #1
+ 553              	.LVL67:
+ 554              		.loc 1 204 18 is_stmt 0 discriminator 3 view .LVU111
+ 555 0006 DBB2     		uxtb	r3, r3
+ 556              	.LVL68:
+ 557              	.L46:
+ 558              		.loc 1 204 12 is_stmt 1 discriminator 1 view .LVU112
+ 559 0008 7A2B     		cmp	r3, #122
+ 560 000a FBD9     		bls	.L45
+ 561              	.LVL69:
+ 562              	.L44:
+ 202:HARDWARE/OLED/oled.c **** 	while(Del_1ms--)
+ 563              		.loc 1 202 8 view .LVU113
+ 564 000c 1346     		mov	r3, r2
+ 202:HARDWARE/OLED/oled.c **** 	while(Del_1ms--)
+ 565              		.loc 1 202 15 is_stmt 0 view .LVU114
+ 566 000e 013A     		subs	r2, r2, #1
+ 567              	.LVL70:
+ 202:HARDWARE/OLED/oled.c **** 	while(Del_1ms--)
+ 568              		.loc 1 202 8 view .LVU115
+ 569 0010 0BB1     		cbz	r3, .L48
+ 570              		.loc 1 204 8 view .LVU116
+ 571 0012 0023     		movs	r3, #0
+ 572 0014 F8E7     		b	.L46
+ 573              	.L48:
+ 205:HARDWARE/OLED/oled.c **** 	}
+ 206:HARDWARE/OLED/oled.c **** }
+ 574              		.loc 1 206 1 view .LVU117
+ 575 0016 7047     		bx	lr
+ 576              		.cfi_endproc
+ 577              	.LFE38:
+ 579              		.section	.text.OLED_Set_Pos,"ax",%progbits
+ 580              		.align	1
+ 581              		.global	OLED_Set_Pos
+ 582              		.syntax unified
+ 583              		.thumb
+ 584              		.thumb_func
+ 586              	OLED_Set_Pos:
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 15
+
+
+ 587              	.LVL71:
+ 588              	.LFB39:
+ 207:HARDWARE/OLED/oled.c **** 
+ 208:HARDWARE/OLED/oled.c **** //坐标设置
+ 209:HARDWARE/OLED/oled.c **** 
+ 210:HARDWARE/OLED/oled.c **** 	void OLED_Set_Pos(unsigned char x, unsigned char y) 
+ 211:HARDWARE/OLED/oled.c **** { 	OLED_WR_Byte(0xb0+y,OLED_CMD);
+ 589              		.loc 1 211 1 is_stmt 1 view -0
+ 590              		.cfi_startproc
+ 591              		@ args = 0, pretend = 0, frame = 0
+ 592              		@ frame_needed = 0, uses_anonymous_args = 0
+ 593              		.loc 1 211 1 is_stmt 0 view .LVU119
+ 594 0000 10B5     		push	{r4, lr}
+ 595              	.LCFI8:
+ 596              		.cfi_def_cfa_offset 8
+ 597              		.cfi_offset 4, -8
+ 598              		.cfi_offset 14, -4
+ 599 0002 0446     		mov	r4, r0
+ 600 0004 0846     		mov	r0, r1
+ 601              	.LVL72:
+ 602              		.loc 1 211 4 is_stmt 1 view .LVU120
+ 603 0006 0021     		movs	r1, #0
+ 604              	.LVL73:
+ 605              		.loc 1 211 4 is_stmt 0 view .LVU121
+ 606 0008 B030     		adds	r0, r0, #176
+ 607              	.LVL74:
+ 608              		.loc 1 211 4 view .LVU122
+ 609 000a FFF7FEFF 		bl	OLED_WR_Byte
+ 610              	.LVL75:
+ 212:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(((x&0xf0)>>4)|0x10,OLED_CMD);
+ 611              		.loc 1 212 2 is_stmt 1 view .LVU123
+ 612              		.loc 1 212 24 is_stmt 0 view .LVU124
+ 613 000e 2009     		lsrs	r0, r4, #4
+ 614              		.loc 1 212 2 view .LVU125
+ 615 0010 0021     		movs	r1, #0
+ 616 0012 40F01000 		orr	r0, r0, #16
+ 617 0016 FFF7FEFF 		bl	OLED_WR_Byte
+ 618              	.LVL76:
+ 213:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte((x&0x0f),OLED_CMD); 
+ 619              		.loc 1 213 2 is_stmt 1 view .LVU126
+ 620 001a 0021     		movs	r1, #0
+ 621 001c 04F00F00 		and	r0, r4, #15
+ 622 0020 FFF7FEFF 		bl	OLED_WR_Byte
+ 623              	.LVL77:
+ 214:HARDWARE/OLED/oled.c **** }   	  
+ 624              		.loc 1 214 1 is_stmt 0 view .LVU127
+ 625 0024 10BD     		pop	{r4, pc}
+ 626              		.loc 1 214 1 view .LVU128
+ 627              		.cfi_endproc
+ 628              	.LFE39:
+ 630              		.section	.text.OLED_Display_On,"ax",%progbits
+ 631              		.align	1
+ 632              		.global	OLED_Display_On
+ 633              		.syntax unified
+ 634              		.thumb
+ 635              		.thumb_func
+ 637              	OLED_Display_On:
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 16
+
+
+ 638              	.LFB40:
+ 215:HARDWARE/OLED/oled.c **** //开启OLED显示    
+ 216:HARDWARE/OLED/oled.c **** void OLED_Display_On(void)
+ 217:HARDWARE/OLED/oled.c **** {
+ 639              		.loc 1 217 1 is_stmt 1 view -0
+ 640              		.cfi_startproc
+ 641              		@ args = 0, pretend = 0, frame = 0
+ 642              		@ frame_needed = 0, uses_anonymous_args = 0
+ 643 0000 08B5     		push	{r3, lr}
+ 644              	.LCFI9:
+ 645              		.cfi_def_cfa_offset 8
+ 646              		.cfi_offset 3, -8
+ 647              		.cfi_offset 14, -4
+ 218:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0X8D,OLED_CMD);  //SET DCDC命令
+ 648              		.loc 1 218 2 view .LVU130
+ 649 0002 0021     		movs	r1, #0
+ 650 0004 8D20     		movs	r0, #141
+ 651 0006 FFF7FEFF 		bl	OLED_WR_Byte
+ 652              	.LVL78:
+ 219:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0X14,OLED_CMD);  //DCDC ON
+ 653              		.loc 1 219 2 view .LVU131
+ 654 000a 0021     		movs	r1, #0
+ 655 000c 1420     		movs	r0, #20
+ 656 000e FFF7FEFF 		bl	OLED_WR_Byte
+ 657              	.LVL79:
+ 220:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0XAF,OLED_CMD);  //DISPLAY ON
+ 658              		.loc 1 220 2 view .LVU132
+ 659 0012 0021     		movs	r1, #0
+ 660 0014 AF20     		movs	r0, #175
+ 661 0016 FFF7FEFF 		bl	OLED_WR_Byte
+ 662              	.LVL80:
+ 221:HARDWARE/OLED/oled.c **** }
+ 663              		.loc 1 221 1 is_stmt 0 view .LVU133
+ 664 001a 08BD     		pop	{r3, pc}
+ 665              		.cfi_endproc
+ 666              	.LFE40:
+ 668              		.section	.text.OLED_Display_Off,"ax",%progbits
+ 669              		.align	1
+ 670              		.global	OLED_Display_Off
+ 671              		.syntax unified
+ 672              		.thumb
+ 673              		.thumb_func
+ 675              	OLED_Display_Off:
+ 676              	.LFB41:
+ 222:HARDWARE/OLED/oled.c **** //关闭OLED显示     
+ 223:HARDWARE/OLED/oled.c **** void OLED_Display_Off(void)
+ 224:HARDWARE/OLED/oled.c **** {
+ 677              		.loc 1 224 1 is_stmt 1 view -0
+ 678              		.cfi_startproc
+ 679              		@ args = 0, pretend = 0, frame = 0
+ 680              		@ frame_needed = 0, uses_anonymous_args = 0
+ 681 0000 08B5     		push	{r3, lr}
+ 682              	.LCFI10:
+ 683              		.cfi_def_cfa_offset 8
+ 684              		.cfi_offset 3, -8
+ 685              		.cfi_offset 14, -4
+ 225:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0X8D,OLED_CMD);  //SET DCDC命令
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 17
+
+
+ 686              		.loc 1 225 2 view .LVU135
+ 687 0002 0021     		movs	r1, #0
+ 688 0004 8D20     		movs	r0, #141
+ 689 0006 FFF7FEFF 		bl	OLED_WR_Byte
+ 690              	.LVL81:
+ 226:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0X10,OLED_CMD);  //DCDC OFF
+ 691              		.loc 1 226 2 view .LVU136
+ 692 000a 0021     		movs	r1, #0
+ 693 000c 1020     		movs	r0, #16
+ 694 000e FFF7FEFF 		bl	OLED_WR_Byte
+ 695              	.LVL82:
+ 227:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0XAE,OLED_CMD);  //DISPLAY OFF
+ 696              		.loc 1 227 2 view .LVU137
+ 697 0012 0021     		movs	r1, #0
+ 698 0014 AE20     		movs	r0, #174
+ 699 0016 FFF7FEFF 		bl	OLED_WR_Byte
+ 700              	.LVL83:
+ 228:HARDWARE/OLED/oled.c **** }		   			 
+ 701              		.loc 1 228 1 is_stmt 0 view .LVU138
+ 702 001a 08BD     		pop	{r3, pc}
+ 703              		.cfi_endproc
+ 704              	.LFE41:
+ 706              		.section	.text.OLED_Clear,"ax",%progbits
+ 707              		.align	1
+ 708              		.global	OLED_Clear
+ 709              		.syntax unified
+ 710              		.thumb
+ 711              		.thumb_func
+ 713              	OLED_Clear:
+ 714              	.LVL84:
+ 715              	.LFB42:
+ 229:HARDWARE/OLED/oled.c **** //清屏函数,清完屏,整个屏幕是黑色的
+ 230:HARDWARE/OLED/oled.c **** void OLED_Clear(unsigned dat)  
+ 231:HARDWARE/OLED/oled.c **** {  
+ 716              		.loc 1 231 1 is_stmt 1 view -0
+ 717              		.cfi_startproc
+ 718              		@ args = 0, pretend = 0, frame = 0
+ 719              		@ frame_needed = 0, uses_anonymous_args = 0
+ 720              		.loc 1 231 1 is_stmt 0 view .LVU140
+ 721 0000 70B5     		push	{r4, r5, r6, lr}
+ 722              	.LCFI11:
+ 723              		.cfi_def_cfa_offset 16
+ 724              		.cfi_offset 4, -16
+ 725              		.cfi_offset 5, -12
+ 726              		.cfi_offset 6, -8
+ 727              		.cfi_offset 14, -4
+ 728 0002 0546     		mov	r5, r0
+ 232:HARDWARE/OLED/oled.c **** 	u8 i,n;		    
+ 729              		.loc 1 232 2 is_stmt 1 view .LVU141
+ 233:HARDWARE/OLED/oled.c **** 	for(i=0;i<8;i++)  
+ 730              		.loc 1 233 2 view .LVU142
+ 731              	.LVL85:
+ 732              		.loc 1 233 7 is_stmt 0 view .LVU143
+ 733 0004 0026     		movs	r6, #0
+ 734              		.loc 1 233 2 view .LVU144
+ 735 0006 0AE0     		b	.L56
+ 736              	.LVL86:
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 18
+
+
+ 737              	.L58:
+ 234:HARDWARE/OLED/oled.c **** 	{  
+ 235:HARDWARE/OLED/oled.c **** 		OLED_WR_Byte (0xb0+i,OLED_CMD);    //设置页地址（0~7）
+ 236:HARDWARE/OLED/oled.c **** 		OLED_WR_Byte (0x00,OLED_CMD);      //设置显示位置—列低地址
+ 237:HARDWARE/OLED/oled.c **** 		OLED_WR_Byte (0x10,OLED_CMD);      //设置显示位置—列高地址   
+ 238:HARDWARE/OLED/oled.c **** 		for(n=0;n<128;n++)OLED_WR_Byte(dat,OLED_DATA); 
+ 738              		.loc 1 238 21 is_stmt 1 discriminator 3 view .LVU145
+ 739 0008 0121     		movs	r1, #1
+ 740 000a 2846     		mov	r0, r5
+ 741 000c FFF7FEFF 		bl	OLED_WR_Byte
+ 742              	.LVL87:
+ 743              		.loc 1 238 18 discriminator 3 view .LVU146
+ 744 0010 0134     		adds	r4, r4, #1
+ 745              	.LVL88:
+ 746              		.loc 1 238 18 is_stmt 0 discriminator 3 view .LVU147
+ 747 0012 E4B2     		uxtb	r4, r4
+ 748              	.LVL89:
+ 749              	.L57:
+ 750              		.loc 1 238 12 is_stmt 1 discriminator 2 view .LVU148
+ 751 0014 14F0800F 		tst	r4, #128
+ 752 0018 F6D0     		beq	.L58
+ 233:HARDWARE/OLED/oled.c **** 	for(i=0;i<8;i++)  
+ 753              		.loc 1 233 15 discriminator 2 view .LVU149
+ 754 001a 0136     		adds	r6, r6, #1
+ 755              	.LVL90:
+ 233:HARDWARE/OLED/oled.c **** 	for(i=0;i<8;i++)  
+ 756              		.loc 1 233 15 is_stmt 0 discriminator 2 view .LVU150
+ 757 001c F6B2     		uxtb	r6, r6
+ 758              	.LVL91:
+ 759              	.L56:
+ 233:HARDWARE/OLED/oled.c **** 	for(i=0;i<8;i++)  
+ 760              		.loc 1 233 11 is_stmt 1 discriminator 1 view .LVU151
+ 761 001e 072E     		cmp	r6, #7
+ 762 0020 0ED8     		bhi	.L61
+ 235:HARDWARE/OLED/oled.c **** 		OLED_WR_Byte (0x00,OLED_CMD);      //设置显示位置—列低地址
+ 763              		.loc 1 235 3 view .LVU152
+ 764 0022 0021     		movs	r1, #0
+ 765 0024 06F1B000 		add	r0, r6, #176
+ 766 0028 FFF7FEFF 		bl	OLED_WR_Byte
+ 767              	.LVL92:
+ 236:HARDWARE/OLED/oled.c **** 		OLED_WR_Byte (0x10,OLED_CMD);      //设置显示位置—列高地址   
+ 768              		.loc 1 236 3 view .LVU153
+ 769 002c 0021     		movs	r1, #0
+ 770 002e 0846     		mov	r0, r1
+ 771 0030 FFF7FEFF 		bl	OLED_WR_Byte
+ 772              	.LVL93:
+ 237:HARDWARE/OLED/oled.c **** 		for(n=0;n<128;n++)OLED_WR_Byte(dat,OLED_DATA); 
+ 773              		.loc 1 237 3 view .LVU154
+ 774 0034 0021     		movs	r1, #0
+ 775 0036 1020     		movs	r0, #16
+ 776 0038 FFF7FEFF 		bl	OLED_WR_Byte
+ 777              	.LVL94:
+ 778              		.loc 1 238 3 view .LVU155
+ 779              		.loc 1 238 8 is_stmt 0 view .LVU156
+ 780 003c 0024     		movs	r4, #0
+ 781              		.loc 1 238 3 view .LVU157
+ 782 003e E9E7     		b	.L57
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 19
+
+
+ 783              	.LVL95:
+ 784              	.L61:
+ 239:HARDWARE/OLED/oled.c **** 	} //更新显示
+ 240:HARDWARE/OLED/oled.c **** }
+ 785              		.loc 1 240 1 view .LVU158
+ 786 0040 70BD     		pop	{r4, r5, r6, pc}
+ 787              		.loc 1 240 1 view .LVU159
+ 788              		.cfi_endproc
+ 789              	.LFE42:
+ 791              		.section	.text.OLED_On,"ax",%progbits
+ 792              		.align	1
+ 793              		.global	OLED_On
+ 794              		.syntax unified
+ 795              		.thumb
+ 796              		.thumb_func
+ 798              	OLED_On:
+ 799              	.LFB43:
+ 241:HARDWARE/OLED/oled.c **** void OLED_On(void)  
+ 242:HARDWARE/OLED/oled.c **** {  
+ 800              		.loc 1 242 1 is_stmt 1 view -0
+ 801              		.cfi_startproc
+ 802              		@ args = 0, pretend = 0, frame = 0
+ 803              		@ frame_needed = 0, uses_anonymous_args = 0
+ 804 0000 38B5     		push	{r3, r4, r5, lr}
+ 805              	.LCFI12:
+ 806              		.cfi_def_cfa_offset 16
+ 807              		.cfi_offset 3, -16
+ 808              		.cfi_offset 4, -12
+ 809              		.cfi_offset 5, -8
+ 810              		.cfi_offset 14, -4
+ 243:HARDWARE/OLED/oled.c **** 	u8 i,n;		    
+ 811              		.loc 1 243 2 view .LVU161
+ 244:HARDWARE/OLED/oled.c **** 	for(i=0;i<8;i++)  
+ 812              		.loc 1 244 2 view .LVU162
+ 813              	.LVL96:
+ 814              		.loc 1 244 7 is_stmt 0 view .LVU163
+ 815 0002 0025     		movs	r5, #0
+ 816              		.loc 1 244 2 view .LVU164
+ 817 0004 0AE0     		b	.L63
+ 818              	.LVL97:
+ 819              	.L65:
+ 245:HARDWARE/OLED/oled.c **** 	{  
+ 246:HARDWARE/OLED/oled.c **** 		OLED_WR_Byte (0xb0+i,OLED_CMD);    //设置页地址（0~7）
+ 247:HARDWARE/OLED/oled.c **** 		OLED_WR_Byte (0x00,OLED_CMD);      //设置显示位置—列低地址
+ 248:HARDWARE/OLED/oled.c **** 		OLED_WR_Byte (0x10,OLED_CMD);      //设置显示位置—列高地址   
+ 249:HARDWARE/OLED/oled.c **** 		for(n=0;n<128;n++)OLED_WR_Byte(1,OLED_DATA); 
+ 820              		.loc 1 249 21 is_stmt 1 discriminator 3 view .LVU165
+ 821 0006 0121     		movs	r1, #1
+ 822 0008 0846     		mov	r0, r1
+ 823 000a FFF7FEFF 		bl	OLED_WR_Byte
+ 824              	.LVL98:
+ 825              		.loc 1 249 18 discriminator 3 view .LVU166
+ 826 000e 0134     		adds	r4, r4, #1
+ 827              	.LVL99:
+ 828              		.loc 1 249 18 is_stmt 0 discriminator 3 view .LVU167
+ 829 0010 E4B2     		uxtb	r4, r4
+ 830              	.LVL100:
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 20
+
+
+ 831              	.L64:
+ 832              		.loc 1 249 12 is_stmt 1 discriminator 2 view .LVU168
+ 833 0012 14F0800F 		tst	r4, #128
+ 834 0016 F6D0     		beq	.L65
+ 244:HARDWARE/OLED/oled.c **** 	for(i=0;i<8;i++)  
+ 835              		.loc 1 244 15 discriminator 2 view .LVU169
+ 836 0018 0135     		adds	r5, r5, #1
+ 837              	.LVL101:
+ 244:HARDWARE/OLED/oled.c **** 	for(i=0;i<8;i++)  
+ 838              		.loc 1 244 15 is_stmt 0 discriminator 2 view .LVU170
+ 839 001a EDB2     		uxtb	r5, r5
+ 840              	.LVL102:
+ 841              	.L63:
+ 244:HARDWARE/OLED/oled.c **** 	for(i=0;i<8;i++)  
+ 842              		.loc 1 244 11 is_stmt 1 discriminator 1 view .LVU171
+ 843 001c 072D     		cmp	r5, #7
+ 844 001e 0ED8     		bhi	.L68
+ 246:HARDWARE/OLED/oled.c **** 		OLED_WR_Byte (0x00,OLED_CMD);      //设置显示位置—列低地址
+ 845              		.loc 1 246 3 view .LVU172
+ 846 0020 0021     		movs	r1, #0
+ 847 0022 05F1B000 		add	r0, r5, #176
+ 848 0026 FFF7FEFF 		bl	OLED_WR_Byte
+ 849              	.LVL103:
+ 247:HARDWARE/OLED/oled.c **** 		OLED_WR_Byte (0x10,OLED_CMD);      //设置显示位置—列高地址   
+ 850              		.loc 1 247 3 view .LVU173
+ 851 002a 0021     		movs	r1, #0
+ 852 002c 0846     		mov	r0, r1
+ 853 002e FFF7FEFF 		bl	OLED_WR_Byte
+ 854              	.LVL104:
+ 248:HARDWARE/OLED/oled.c **** 		for(n=0;n<128;n++)OLED_WR_Byte(1,OLED_DATA); 
+ 855              		.loc 1 248 3 view .LVU174
+ 856 0032 0021     		movs	r1, #0
+ 857 0034 1020     		movs	r0, #16
+ 858 0036 FFF7FEFF 		bl	OLED_WR_Byte
+ 859              	.LVL105:
+ 860              		.loc 1 249 3 view .LVU175
+ 861              		.loc 1 249 8 is_stmt 0 view .LVU176
+ 862 003a 0024     		movs	r4, #0
+ 863              		.loc 1 249 3 view .LVU177
+ 864 003c E9E7     		b	.L64
+ 865              	.LVL106:
+ 866              	.L68:
+ 250:HARDWARE/OLED/oled.c **** 	} //更新显示
+ 251:HARDWARE/OLED/oled.c **** }
+ 867              		.loc 1 251 1 view .LVU178
+ 868 003e 38BD     		pop	{r3, r4, r5, pc}
+ 869              		.loc 1 251 1 view .LVU179
+ 870              		.cfi_endproc
+ 871              	.LFE43:
+ 873              		.section	.text.OLED_ShowChar,"ax",%progbits
+ 874              		.align	1
+ 875              		.global	OLED_ShowChar
+ 876              		.syntax unified
+ 877              		.thumb
+ 878              		.thumb_func
+ 880              	OLED_ShowChar:
+ 881              	.LVL107:
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 21
+
+
+ 882              	.LFB44:
+ 252:HARDWARE/OLED/oled.c **** //在指定位置显示一个字符,包括部分字符
+ 253:HARDWARE/OLED/oled.c **** //x:0~127
+ 254:HARDWARE/OLED/oled.c **** //y:0~63
+ 255:HARDWARE/OLED/oled.c **** //mode:0,反白显示;1,正常显示				 
+ 256:HARDWARE/OLED/oled.c **** //size:选择字体 16/12 
+ 257:HARDWARE/OLED/oled.c **** void OLED_ShowChar(u8 x,u8 y,u8 chr,u8 Char_Size)
+ 258:HARDWARE/OLED/oled.c **** {      	
+ 883              		.loc 1 258 1 is_stmt 1 view -0
+ 884              		.cfi_startproc
+ 885              		@ args = 0, pretend = 0, frame = 0
+ 886              		@ frame_needed = 0, uses_anonymous_args = 0
+ 887              		.loc 1 258 1 is_stmt 0 view .LVU181
+ 888 0000 F8B5     		push	{r3, r4, r5, r6, r7, lr}
+ 889              	.LCFI13:
+ 890              		.cfi_def_cfa_offset 24
+ 891              		.cfi_offset 3, -24
+ 892              		.cfi_offset 4, -20
+ 893              		.cfi_offset 5, -16
+ 894              		.cfi_offset 6, -12
+ 895              		.cfi_offset 7, -8
+ 896              		.cfi_offset 14, -4
+ 897 0002 0746     		mov	r7, r0
+ 898 0004 0E46     		mov	r6, r1
+ 259:HARDWARE/OLED/oled.c **** 	unsigned char c=0,i=0;	
+ 899              		.loc 1 259 2 is_stmt 1 view .LVU182
+ 900              	.LVL108:
+ 260:HARDWARE/OLED/oled.c **** 		c=chr-' ';//得到偏移后的值			
+ 901              		.loc 1 260 3 view .LVU183
+ 902              		.loc 1 260 4 is_stmt 0 view .LVU184
+ 903 0006 203A     		subs	r2, r2, #32
+ 904              	.LVL109:
+ 905              		.loc 1 260 4 view .LVU185
+ 906 0008 D5B2     		uxtb	r5, r2
+ 907              	.LVL110:
+ 261:HARDWARE/OLED/oled.c **** 		if(x>Max_Column-1){x=0;y=y+2;}
+ 908              		.loc 1 261 3 is_stmt 1 view .LVU186
+ 909              		.loc 1 261 5 is_stmt 0 view .LVU187
+ 910 000a 10F0800F 		tst	r0, #128
+ 911 000e 07D1     		bne	.L80
+ 912              	.LVL111:
+ 913              	.L70:
+ 262:HARDWARE/OLED/oled.c **** 		if(Char_Size ==16)
+ 914              		.loc 1 262 3 is_stmt 1 view .LVU188
+ 915              		.loc 1 262 5 is_stmt 0 view .LVU189
+ 916 0010 102B     		cmp	r3, #16
+ 917 0012 09D0     		beq	.L81
+ 263:HARDWARE/OLED/oled.c **** 			{
+ 264:HARDWARE/OLED/oled.c **** 			OLED_Set_Pos(x,y);	
+ 265:HARDWARE/OLED/oled.c **** 			for(i=0;i<8;i++)
+ 266:HARDWARE/OLED/oled.c **** 			OLED_WR_Byte(F8X16[c*16+i],OLED_DATA);
+ 267:HARDWARE/OLED/oled.c **** 			OLED_Set_Pos(x,y+1);
+ 268:HARDWARE/OLED/oled.c **** 			for(i=0;i<8;i++)
+ 269:HARDWARE/OLED/oled.c **** 			OLED_WR_Byte(F8X16[c*16+i+8],OLED_DATA);
+ 270:HARDWARE/OLED/oled.c **** 			}
+ 271:HARDWARE/OLED/oled.c **** 			else {	
+ 272:HARDWARE/OLED/oled.c **** 				OLED_Set_Pos(x,y);
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 22
+
+
+ 918              		.loc 1 272 5 is_stmt 1 view .LVU190
+ 919 0014 3146     		mov	r1, r6
+ 920 0016 3846     		mov	r0, r7
+ 921 0018 FFF7FEFF 		bl	OLED_Set_Pos
+ 922              	.LVL112:
+ 273:HARDWARE/OLED/oled.c **** 				for(i=0;i<6;i++)
+ 923              		.loc 1 273 5 view .LVU191
+ 924              		.loc 1 273 10 is_stmt 0 view .LVU192
+ 925 001c 0024     		movs	r4, #0
+ 926              		.loc 1 273 5 view .LVU193
+ 927 001e 33E0     		b	.L77
+ 928              	.LVL113:
+ 929              	.L80:
+ 261:HARDWARE/OLED/oled.c **** 		if(Char_Size ==16)
+ 930              		.loc 1 261 22 is_stmt 1 discriminator 1 view .LVU194
+ 261:HARDWARE/OLED/oled.c **** 		if(Char_Size ==16)
+ 931              		.loc 1 261 26 discriminator 1 view .LVU195
+ 261:HARDWARE/OLED/oled.c **** 		if(Char_Size ==16)
+ 932              		.loc 1 261 27 is_stmt 0 discriminator 1 view .LVU196
+ 933 0020 0236     		adds	r6, r6, #2
+ 934 0022 F6B2     		uxtb	r6, r6
+ 935              	.LVL114:
+ 261:HARDWARE/OLED/oled.c **** 		if(Char_Size ==16)
+ 936              		.loc 1 261 23 discriminator 1 view .LVU197
+ 937 0024 0027     		movs	r7, #0
+ 938 0026 F3E7     		b	.L70
+ 939              	.LVL115:
+ 940              	.L81:
+ 264:HARDWARE/OLED/oled.c **** 			for(i=0;i<8;i++)
+ 941              		.loc 1 264 4 is_stmt 1 view .LVU198
+ 942 0028 3146     		mov	r1, r6
+ 943 002a 3846     		mov	r0, r7
+ 944 002c FFF7FEFF 		bl	OLED_Set_Pos
+ 945              	.LVL116:
+ 265:HARDWARE/OLED/oled.c **** 			OLED_WR_Byte(F8X16[c*16+i],OLED_DATA);
+ 946              		.loc 1 265 4 view .LVU199
+ 265:HARDWARE/OLED/oled.c **** 			OLED_WR_Byte(F8X16[c*16+i],OLED_DATA);
+ 947              		.loc 1 265 9 is_stmt 0 view .LVU200
+ 948 0030 0024     		movs	r4, #0
+ 265:HARDWARE/OLED/oled.c **** 			OLED_WR_Byte(F8X16[c*16+i],OLED_DATA);
+ 949              		.loc 1 265 4 view .LVU201
+ 950 0032 08E0     		b	.L72
+ 951              	.LVL117:
+ 952              	.L73:
+ 266:HARDWARE/OLED/oled.c **** 			OLED_Set_Pos(x,y+1);
+ 953              		.loc 1 266 4 is_stmt 1 view .LVU202
+ 266:HARDWARE/OLED/oled.c **** 			OLED_Set_Pos(x,y+1);
+ 954              		.loc 1 266 27 is_stmt 0 view .LVU203
+ 955 0034 04EB0513 		add	r3, r4, r5, lsl #4
+ 266:HARDWARE/OLED/oled.c **** 			OLED_Set_Pos(x,y+1);
+ 956              		.loc 1 266 4 view .LVU204
+ 957 0038 0121     		movs	r1, #1
+ 958 003a 154A     		ldr	r2, .L82
+ 959 003c D05C     		ldrb	r0, [r2, r3]	@ zero_extendqisi2
+ 960 003e FFF7FEFF 		bl	OLED_WR_Byte
+ 961              	.LVL118:
+ 265:HARDWARE/OLED/oled.c **** 			OLED_WR_Byte(F8X16[c*16+i],OLED_DATA);
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 23
+
+
+ 962              		.loc 1 265 17 is_stmt 1 discriminator 3 view .LVU205
+ 963 0042 0134     		adds	r4, r4, #1
+ 964              	.LVL119:
+ 265:HARDWARE/OLED/oled.c **** 			OLED_WR_Byte(F8X16[c*16+i],OLED_DATA);
+ 965              		.loc 1 265 17 is_stmt 0 discriminator 3 view .LVU206
+ 966 0044 E4B2     		uxtb	r4, r4
+ 967              	.LVL120:
+ 968              	.L72:
+ 265:HARDWARE/OLED/oled.c **** 			OLED_WR_Byte(F8X16[c*16+i],OLED_DATA);
+ 969              		.loc 1 265 13 is_stmt 1 discriminator 1 view .LVU207
+ 970 0046 072C     		cmp	r4, #7
+ 971 0048 F4D9     		bls	.L73
+ 267:HARDWARE/OLED/oled.c **** 			for(i=0;i<8;i++)
+ 972              		.loc 1 267 4 view .LVU208
+ 973 004a 711C     		adds	r1, r6, #1
+ 974 004c C9B2     		uxtb	r1, r1
+ 975 004e 3846     		mov	r0, r7
+ 976 0050 FFF7FEFF 		bl	OLED_Set_Pos
+ 977              	.LVL121:
+ 268:HARDWARE/OLED/oled.c **** 			OLED_WR_Byte(F8X16[c*16+i+8],OLED_DATA);
+ 978              		.loc 1 268 4 view .LVU209
+ 268:HARDWARE/OLED/oled.c **** 			OLED_WR_Byte(F8X16[c*16+i+8],OLED_DATA);
+ 979              		.loc 1 268 9 is_stmt 0 view .LVU210
+ 980 0054 0024     		movs	r4, #0
+ 268:HARDWARE/OLED/oled.c **** 			OLED_WR_Byte(F8X16[c*16+i+8],OLED_DATA);
+ 981              		.loc 1 268 4 view .LVU211
+ 982 0056 09E0     		b	.L74
+ 983              	.LVL122:
+ 984              	.L75:
+ 269:HARDWARE/OLED/oled.c **** 			}
+ 985              		.loc 1 269 4 is_stmt 1 view .LVU212
+ 269:HARDWARE/OLED/oled.c **** 			}
+ 986              		.loc 1 269 27 is_stmt 0 view .LVU213
+ 987 0058 04EB0513 		add	r3, r4, r5, lsl #4
+ 269:HARDWARE/OLED/oled.c **** 			}
+ 988              		.loc 1 269 29 view .LVU214
+ 989 005c 0833     		adds	r3, r3, #8
+ 269:HARDWARE/OLED/oled.c **** 			}
+ 990              		.loc 1 269 4 view .LVU215
+ 991 005e 0121     		movs	r1, #1
+ 992 0060 0B4A     		ldr	r2, .L82
+ 993 0062 D05C     		ldrb	r0, [r2, r3]	@ zero_extendqisi2
+ 994 0064 FFF7FEFF 		bl	OLED_WR_Byte
+ 995              	.LVL123:
+ 268:HARDWARE/OLED/oled.c **** 			OLED_WR_Byte(F8X16[c*16+i+8],OLED_DATA);
+ 996              		.loc 1 268 17 is_stmt 1 discriminator 3 view .LVU216
+ 997 0068 0134     		adds	r4, r4, #1
+ 998              	.LVL124:
+ 268:HARDWARE/OLED/oled.c **** 			OLED_WR_Byte(F8X16[c*16+i+8],OLED_DATA);
+ 999              		.loc 1 268 17 is_stmt 0 discriminator 3 view .LVU217
+ 1000 006a E4B2     		uxtb	r4, r4
+ 1001              	.LVL125:
+ 1002              	.L74:
+ 268:HARDWARE/OLED/oled.c **** 			OLED_WR_Byte(F8X16[c*16+i+8],OLED_DATA);
+ 1003              		.loc 1 268 13 is_stmt 1 discriminator 1 view .LVU218
+ 1004 006c 072C     		cmp	r4, #7
+ 1005 006e F3D9     		bls	.L75
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 24
+
+
+ 1006 0070 0CE0     		b	.L69
+ 1007              	.L78:
+ 274:HARDWARE/OLED/oled.c **** 				OLED_WR_Byte(F6x8[c][i],OLED_DATA);
+ 1008              		.loc 1 274 5 view .LVU219
+ 1009              		.loc 1 274 25 is_stmt 0 view .LVU220
+ 1010 0072 05EB4502 		add	r2, r5, r5, lsl #1
+ 1011 0076 074B     		ldr	r3, .L82+4
+ 1012 0078 03EB4203 		add	r3, r3, r2, lsl #1
+ 1013              		.loc 1 274 5 view .LVU221
+ 1014 007c 0121     		movs	r1, #1
+ 1015 007e 185D     		ldrb	r0, [r3, r4]	@ zero_extendqisi2
+ 1016 0080 FFF7FEFF 		bl	OLED_WR_Byte
+ 1017              	.LVL126:
+ 273:HARDWARE/OLED/oled.c **** 				OLED_WR_Byte(F6x8[c][i],OLED_DATA);
+ 1018              		.loc 1 273 18 is_stmt 1 discriminator 3 view .LVU222
+ 1019 0084 0134     		adds	r4, r4, #1
+ 1020              	.LVL127:
+ 273:HARDWARE/OLED/oled.c **** 				OLED_WR_Byte(F6x8[c][i],OLED_DATA);
+ 1021              		.loc 1 273 18 is_stmt 0 discriminator 3 view .LVU223
+ 1022 0086 E4B2     		uxtb	r4, r4
+ 1023              	.LVL128:
+ 1024              	.L77:
+ 273:HARDWARE/OLED/oled.c **** 				OLED_WR_Byte(F6x8[c][i],OLED_DATA);
+ 1025              		.loc 1 273 14 is_stmt 1 discriminator 1 view .LVU224
+ 1026 0088 052C     		cmp	r4, #5
+ 1027 008a F2D9     		bls	.L78
+ 1028              	.L69:
+ 275:HARDWARE/OLED/oled.c **** 				
+ 276:HARDWARE/OLED/oled.c **** 			}
+ 277:HARDWARE/OLED/oled.c **** }
+ 1029              		.loc 1 277 1 is_stmt 0 view .LVU225
+ 1030 008c F8BD     		pop	{r3, r4, r5, r6, r7, pc}
+ 1031              	.LVL129:
+ 1032              	.L83:
+ 1033              		.loc 1 277 1 view .LVU226
+ 1034 008e 00BF     		.align	2
+ 1035              	.L82:
+ 1036 0090 00000000 		.word	F8X16
+ 1037 0094 00000000 		.word	F6x8
+ 1038              		.cfi_endproc
+ 1039              	.LFE44:
+ 1041              		.section	.text.oled_pow,"ax",%progbits
+ 1042              		.align	1
+ 1043              		.global	oled_pow
+ 1044              		.syntax unified
+ 1045              		.thumb
+ 1046              		.thumb_func
+ 1048              	oled_pow:
+ 1049              	.LVL130:
+ 1050              	.LFB45:
+ 278:HARDWARE/OLED/oled.c **** //m^n函数
+ 279:HARDWARE/OLED/oled.c **** u32 oled_pow(u8 m,u8 n)
+ 280:HARDWARE/OLED/oled.c **** {
+ 1051              		.loc 1 280 1 is_stmt 1 view -0
+ 1052              		.cfi_startproc
+ 1053              		@ args = 0, pretend = 0, frame = 0
+ 1054              		@ frame_needed = 0, uses_anonymous_args = 0
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 25
+
+
+ 1055              		@ link register save eliminated.
+ 1056              		.loc 1 280 1 is_stmt 0 view .LVU228
+ 1057 0000 0246     		mov	r2, r0
+ 281:HARDWARE/OLED/oled.c **** 	u32 result=1;	 
+ 1058              		.loc 1 281 2 is_stmt 1 view .LVU229
+ 1059              	.LVL131:
+ 282:HARDWARE/OLED/oled.c **** 	while(n--)result*=m;    
+ 1060              		.loc 1 282 2 view .LVU230
+ 281:HARDWARE/OLED/oled.c **** 	u32 result=1;	 
+ 1061              		.loc 1 281 6 is_stmt 0 view .LVU231
+ 1062 0002 0120     		movs	r0, #1
+ 1063              	.LVL132:
+ 1064              		.loc 1 282 7 view .LVU232
+ 1065 0004 02E0     		b	.L85
+ 1066              	.LVL133:
+ 1067              	.L86:
+ 1068              		.loc 1 282 12 is_stmt 1 discriminator 2 view .LVU233
+ 1069              		.loc 1 282 18 is_stmt 0 discriminator 2 view .LVU234
+ 1070 0006 02FB00F0 		mul	r0, r2, r0
+ 1071              	.LVL134:
+ 1072              		.loc 1 282 9 discriminator 1 view .LVU235
+ 1073 000a 1946     		mov	r1, r3
+ 1074              	.LVL135:
+ 1075              	.L85:
+ 1076              		.loc 1 282 8 is_stmt 1 discriminator 1 view .LVU236
+ 1077              		.loc 1 282 9 is_stmt 0 discriminator 1 view .LVU237
+ 1078 000c 4B1E     		subs	r3, r1, #1
+ 1079 000e DBB2     		uxtb	r3, r3
+ 1080              	.LVL136:
+ 1081              		.loc 1 282 8 discriminator 1 view .LVU238
+ 1082 0010 0029     		cmp	r1, #0
+ 1083 0012 F8D1     		bne	.L86
+ 283:HARDWARE/OLED/oled.c **** 	return result;
+ 1084              		.loc 1 283 2 is_stmt 1 view .LVU239
+ 284:HARDWARE/OLED/oled.c **** }				  
+ 1085              		.loc 1 284 1 is_stmt 0 view .LVU240
+ 1086 0014 7047     		bx	lr
+ 1087              		.cfi_endproc
+ 1088              	.LFE45:
+ 1090              		.section	.text.OLED_ShowNum,"ax",%progbits
+ 1091              		.align	1
+ 1092              		.global	OLED_ShowNum
+ 1093              		.syntax unified
+ 1094              		.thumb
+ 1095              		.thumb_func
+ 1097              	OLED_ShowNum:
+ 1098              	.LVL137:
+ 1099              	.LFB46:
+ 285:HARDWARE/OLED/oled.c **** //显示2个数字
+ 286:HARDWARE/OLED/oled.c **** //x,y :起点坐标	 
+ 287:HARDWARE/OLED/oled.c **** //len :数字的位数
+ 288:HARDWARE/OLED/oled.c **** //size:字体大小
+ 289:HARDWARE/OLED/oled.c **** //mode:模式	0,填充模式;1,叠加模式
+ 290:HARDWARE/OLED/oled.c **** //num:数值(0~4294967295);	 		  
+ 291:HARDWARE/OLED/oled.c **** void OLED_ShowNum(u8 x,u8 y,u32 num,u8 len,u8 size2)
+ 292:HARDWARE/OLED/oled.c **** {         	
+ 1100              		.loc 1 292 1 is_stmt 1 view -0
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 26
+
+
+ 1101              		.cfi_startproc
+ 1102              		@ args = 4, pretend = 0, frame = 0
+ 1103              		@ frame_needed = 0, uses_anonymous_args = 0
+ 1104              		.loc 1 292 1 is_stmt 0 view .LVU242
+ 1105 0000 2DE9F047 		push	{r4, r5, r6, r7, r8, r9, r10, lr}
+ 1106              	.LCFI14:
+ 1107              		.cfi_def_cfa_offset 32
+ 1108              		.cfi_offset 4, -32
+ 1109              		.cfi_offset 5, -28
+ 1110              		.cfi_offset 6, -24
+ 1111              		.cfi_offset 7, -20
+ 1112              		.cfi_offset 8, -16
+ 1113              		.cfi_offset 9, -12
+ 1114              		.cfi_offset 10, -8
+ 1115              		.cfi_offset 14, -4
+ 1116 0004 8246     		mov	r10, r0
+ 1117 0006 8946     		mov	r9, r1
+ 1118 0008 9046     		mov	r8, r2
+ 1119 000a 1D46     		mov	r5, r3
+ 1120 000c 9DF82060 		ldrb	r6, [sp, #32]	@ zero_extendqisi2
+ 293:HARDWARE/OLED/oled.c **** 	u8 t,temp;
+ 1121              		.loc 1 293 2 is_stmt 1 view .LVU243
+ 294:HARDWARE/OLED/oled.c **** 	u8 enshow=0;						   
+ 1122              		.loc 1 294 2 view .LVU244
+ 1123              	.LVL138:
+ 295:HARDWARE/OLED/oled.c **** 	for(t=0;t<len;t++)
+ 1124              		.loc 1 295 2 view .LVU245
+ 294:HARDWARE/OLED/oled.c **** 	u8 enshow=0;						   
+ 1125              		.loc 1 294 5 is_stmt 0 view .LVU246
+ 1126 0010 0027     		movs	r7, #0
+ 1127              		.loc 1 295 7 view .LVU247
+ 1128 0012 3C46     		mov	r4, r7
+ 1129              		.loc 1 295 2 view .LVU248
+ 1130 0014 19E0     		b	.L88
+ 1131              	.LVL139:
+ 1132              	.L95:
+ 296:HARDWARE/OLED/oled.c **** 	{
+ 297:HARDWARE/OLED/oled.c **** 		temp=(num/oled_pow(10,len-t-1))%10;
+ 298:HARDWARE/OLED/oled.c **** 		if(enshow==0&&t<(len-1))
+ 299:HARDWARE/OLED/oled.c **** 		{
+ 300:HARDWARE/OLED/oled.c **** 			if(temp==0)
+ 301:HARDWARE/OLED/oled.c **** 			{
+ 302:HARDWARE/OLED/oled.c **** 				OLED_ShowChar(x+(size2/2)*t,y,' ',size2);
+ 1133              		.loc 1 302 5 is_stmt 1 view .LVU249
+ 1134              		.loc 1 302 30 is_stmt 0 view .LVU250
+ 1135 0016 7008     		lsrs	r0, r6, #1
+ 1136 0018 04FB00F0 		mul	r0, r4, r0
+ 1137 001c C0B2     		uxtb	r0, r0
+ 1138              		.loc 1 302 5 view .LVU251
+ 1139 001e 5044     		add	r0, r0, r10
+ 1140 0020 3346     		mov	r3, r6
+ 1141 0022 2022     		movs	r2, #32
+ 1142              	.LVL140:
+ 1143              		.loc 1 302 5 view .LVU252
+ 1144 0024 4946     		mov	r1, r9
+ 1145 0026 C0B2     		uxtb	r0, r0
+ 1146 0028 FFF7FEFF 		bl	OLED_ShowChar
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 27
+
+
+ 1147              	.LVL141:
+ 303:HARDWARE/OLED/oled.c **** 				continue;
+ 1148              		.loc 1 303 5 is_stmt 1 view .LVU253
+ 1149 002c 0BE0     		b	.L90
+ 1150              	.LVL142:
+ 1151              	.L89:
+ 304:HARDWARE/OLED/oled.c **** 			}else enshow=1; 
+ 305:HARDWARE/OLED/oled.c **** 		 	 
+ 306:HARDWARE/OLED/oled.c **** 		}
+ 307:HARDWARE/OLED/oled.c **** 	 	OLED_ShowChar(x+(size2/2)*t,y,temp+'0',size2); 
+ 1152              		.loc 1 307 4 view .LVU254
+ 1153              		.loc 1 307 29 is_stmt 0 view .LVU255
+ 1154 002e 7008     		lsrs	r0, r6, #1
+ 1155 0030 04FB00F0 		mul	r0, r4, r0
+ 1156 0034 C0B2     		uxtb	r0, r0
+ 1157              		.loc 1 307 4 view .LVU256
+ 1158 0036 3032     		adds	r2, r2, #48
+ 1159              	.LVL143:
+ 1160              		.loc 1 307 4 view .LVU257
+ 1161 0038 5044     		add	r0, r0, r10
+ 1162 003a 3346     		mov	r3, r6
+ 1163 003c D2B2     		uxtb	r2, r2
+ 1164              	.LVL144:
+ 1165              		.loc 1 307 4 view .LVU258
+ 1166 003e 4946     		mov	r1, r9
+ 1167 0040 C0B2     		uxtb	r0, r0
+ 1168 0042 FFF7FEFF 		bl	OLED_ShowChar
+ 1169              	.LVL145:
+ 1170              	.L90:
+ 295:HARDWARE/OLED/oled.c **** 	{
+ 1171              		.loc 1 295 17 is_stmt 1 discriminator 2 view .LVU259
+ 1172 0046 0134     		adds	r4, r4, #1
+ 1173              	.LVL146:
+ 295:HARDWARE/OLED/oled.c **** 	{
+ 1174              		.loc 1 295 17 is_stmt 0 discriminator 2 view .LVU260
+ 1175 0048 E4B2     		uxtb	r4, r4
+ 1176              	.LVL147:
+ 1177              	.L88:
+ 295:HARDWARE/OLED/oled.c **** 	{
+ 1178              		.loc 1 295 11 is_stmt 1 discriminator 1 view .LVU261
+ 1179 004a AC42     		cmp	r4, r5
+ 1180 004c 1CD2     		bcs	.L94
+ 297:HARDWARE/OLED/oled.c **** 		if(enshow==0&&t<(len-1))
+ 1181              		.loc 1 297 3 view .LVU262
+ 297:HARDWARE/OLED/oled.c **** 		if(enshow==0&&t<(len-1))
+ 1182              		.loc 1 297 28 is_stmt 0 view .LVU263
+ 1183 004e 291B     		subs	r1, r5, r4
+ 1184 0050 C9B2     		uxtb	r1, r1
+ 297:HARDWARE/OLED/oled.c **** 		if(enshow==0&&t<(len-1))
+ 1185              		.loc 1 297 13 view .LVU264
+ 1186 0052 0139     		subs	r1, r1, #1
+ 1187 0054 C9B2     		uxtb	r1, r1
+ 1188 0056 0A20     		movs	r0, #10
+ 1189 0058 FFF7FEFF 		bl	oled_pow
+ 1190              	.LVL148:
+ 297:HARDWARE/OLED/oled.c **** 		if(enshow==0&&t<(len-1))
+ 1191              		.loc 1 297 12 discriminator 1 view .LVU265
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 28
+
+
+ 1192 005c B8FBF0F0 		udiv	r0, r8, r0
+ 297:HARDWARE/OLED/oled.c **** 		if(enshow==0&&t<(len-1))
+ 1193              		.loc 1 297 34 discriminator 1 view .LVU266
+ 1194 0060 0A4B     		ldr	r3, .L96
+ 1195 0062 A3FB003C 		umull	r3, ip, r3, r0
+ 1196 0066 4FEADC0C 		lsr	ip, ip, #3
+ 1197 006a 0CEB8C0C 		add	ip, ip, ip, lsl #2
+ 1198 006e A0EB4C0C 		sub	ip, r0, ip, lsl #1
+ 297:HARDWARE/OLED/oled.c **** 		if(enshow==0&&t<(len-1))
+ 1199              		.loc 1 297 7 discriminator 1 view .LVU267
+ 1200 0072 5FFA8CF2 		uxtb	r2, ip
+ 1201              	.LVL149:
+ 298:HARDWARE/OLED/oled.c **** 		{
+ 1202              		.loc 1 298 3 is_stmt 1 view .LVU268
+ 298:HARDWARE/OLED/oled.c **** 		{
+ 1203              		.loc 1 298 5 is_stmt 0 view .LVU269
+ 1204 0076 002F     		cmp	r7, #0
+ 1205 0078 D9D1     		bne	.L89
+ 298:HARDWARE/OLED/oled.c **** 		{
+ 1206              		.loc 1 298 23 discriminator 1 view .LVU270
+ 1207 007a 6B1E     		subs	r3, r5, #1
+ 298:HARDWARE/OLED/oled.c **** 		{
+ 1208              		.loc 1 298 15 discriminator 1 view .LVU271
+ 1209 007c 9C42     		cmp	r4, r3
+ 1210 007e D6DA     		bge	.L89
+ 300:HARDWARE/OLED/oled.c **** 			{
+ 1211              		.loc 1 300 4 is_stmt 1 view .LVU272
+ 300:HARDWARE/OLED/oled.c **** 			{
+ 1212              		.loc 1 300 6 is_stmt 0 view .LVU273
+ 1213 0080 002A     		cmp	r2, #0
+ 1214 0082 C8D0     		beq	.L95
+ 304:HARDWARE/OLED/oled.c **** 		 	 
+ 1215              		.loc 1 304 16 view .LVU274
+ 1216 0084 0127     		movs	r7, #1
+ 1217              	.LVL150:
+ 304:HARDWARE/OLED/oled.c **** 		 	 
+ 1218              		.loc 1 304 16 view .LVU275
+ 1219 0086 D2E7     		b	.L89
+ 1220              	.LVL151:
+ 1221              	.L94:
+ 308:HARDWARE/OLED/oled.c **** 	}
+ 309:HARDWARE/OLED/oled.c **** } 
+ 1222              		.loc 1 309 1 view .LVU276
+ 1223 0088 BDE8F087 		pop	{r4, r5, r6, r7, r8, r9, r10, pc}
+ 1224              	.LVL152:
+ 1225              	.L97:
+ 1226              		.loc 1 309 1 view .LVU277
+ 1227              		.align	2
+ 1228              	.L96:
+ 1229 008c CDCCCCCC 		.word	-858993459
+ 1230              		.cfi_endproc
+ 1231              	.LFE46:
+ 1233              		.section	.text.OLED_ShowString,"ax",%progbits
+ 1234              		.align	1
+ 1235              		.global	OLED_ShowString
+ 1236              		.syntax unified
+ 1237              		.thumb
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 29
+
+
+ 1238              		.thumb_func
+ 1240              	OLED_ShowString:
+ 1241              	.LVL153:
+ 1242              	.LFB47:
+ 310:HARDWARE/OLED/oled.c **** //显示一个字符号串
+ 311:HARDWARE/OLED/oled.c **** void OLED_ShowString(u8 x,u8 y,u8 *chr,u8 Char_Size)
+ 312:HARDWARE/OLED/oled.c **** {
+ 1243              		.loc 1 312 1 is_stmt 1 view -0
+ 1244              		.cfi_startproc
+ 1245              		@ args = 0, pretend = 0, frame = 0
+ 1246              		@ frame_needed = 0, uses_anonymous_args = 0
+ 1247              		.loc 1 312 1 is_stmt 0 view .LVU279
+ 1248 0000 2DE9F041 		push	{r4, r5, r6, r7, r8, lr}
+ 1249              	.LCFI15:
+ 1250              		.cfi_def_cfa_offset 24
+ 1251              		.cfi_offset 4, -24
+ 1252              		.cfi_offset 5, -20
+ 1253              		.cfi_offset 6, -16
+ 1254              		.cfi_offset 7, -12
+ 1255              		.cfi_offset 8, -8
+ 1256              		.cfi_offset 14, -4
+ 1257 0004 0446     		mov	r4, r0
+ 1258 0006 0E46     		mov	r6, r1
+ 1259 0008 1746     		mov	r7, r2
+ 1260 000a 9846     		mov	r8, r3
+ 313:HARDWARE/OLED/oled.c **** 	unsigned char j=0;
+ 1261              		.loc 1 313 2 is_stmt 1 view .LVU280
+ 1262              	.LVL154:
+ 314:HARDWARE/OLED/oled.c **** 	while (chr[j]!='\0')
+ 1263              		.loc 1 314 2 view .LVU281
+ 313:HARDWARE/OLED/oled.c **** 	unsigned char j=0;
+ 1264              		.loc 1 313 16 is_stmt 0 view .LVU282
+ 1265 000c 0025     		movs	r5, #0
+ 1266              		.loc 1 314 8 view .LVU283
+ 1267 000e 01E0     		b	.L99
+ 1268              	.LVL155:
+ 1269              	.L100:
+ 315:HARDWARE/OLED/oled.c **** 	{		OLED_ShowChar(x,y,chr[j],Char_Size);
+ 316:HARDWARE/OLED/oled.c **** 			x+=8;
+ 317:HARDWARE/OLED/oled.c **** 		if(x>120){x=0;y+=2;}
+ 318:HARDWARE/OLED/oled.c **** 			j++;
+ 1270              		.loc 1 318 4 is_stmt 1 view .LVU284
+ 1271              		.loc 1 318 5 is_stmt 0 view .LVU285
+ 1272 0010 0135     		adds	r5, r5, #1
+ 1273              	.LVL156:
+ 1274              		.loc 1 318 5 view .LVU286
+ 1275 0012 EDB2     		uxtb	r5, r5
+ 1276              	.LVL157:
+ 1277              	.L99:
+ 314:HARDWARE/OLED/oled.c **** 	while (chr[j]!='\0')
+ 1278              		.loc 1 314 15 is_stmt 1 view .LVU287
+ 314:HARDWARE/OLED/oled.c **** 	while (chr[j]!='\0')
+ 1279              		.loc 1 314 12 is_stmt 0 view .LVU288
+ 1280 0014 7A5D     		ldrb	r2, [r7, r5]	@ zero_extendqisi2
+ 314:HARDWARE/OLED/oled.c **** 	while (chr[j]!='\0')
+ 1281              		.loc 1 314 15 view .LVU289
+ 1282 0016 62B1     		cbz	r2, .L103
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 30
+
+
+ 315:HARDWARE/OLED/oled.c **** 	{		OLED_ShowChar(x,y,chr[j],Char_Size);
+ 1283              		.loc 1 315 5 is_stmt 1 view .LVU290
+ 1284 0018 4346     		mov	r3, r8
+ 1285 001a 3146     		mov	r1, r6
+ 1286 001c 2046     		mov	r0, r4
+ 1287 001e FFF7FEFF 		bl	OLED_ShowChar
+ 1288              	.LVL158:
+ 316:HARDWARE/OLED/oled.c **** 		if(x>120){x=0;y+=2;}
+ 1289              		.loc 1 316 4 view .LVU291
+ 316:HARDWARE/OLED/oled.c **** 		if(x>120){x=0;y+=2;}
+ 1290              		.loc 1 316 5 is_stmt 0 view .LVU292
+ 1291 0022 0834     		adds	r4, r4, #8
+ 1292              	.LVL159:
+ 316:HARDWARE/OLED/oled.c **** 		if(x>120){x=0;y+=2;}
+ 1293              		.loc 1 316 5 view .LVU293
+ 1294 0024 E4B2     		uxtb	r4, r4
+ 1295              	.LVL160:
+ 317:HARDWARE/OLED/oled.c **** 			j++;
+ 1296              		.loc 1 317 3 is_stmt 1 view .LVU294
+ 317:HARDWARE/OLED/oled.c **** 			j++;
+ 1297              		.loc 1 317 5 is_stmt 0 view .LVU295
+ 1298 0026 782C     		cmp	r4, #120
+ 1299 0028 F2D9     		bls	.L100
+ 317:HARDWARE/OLED/oled.c **** 			j++;
+ 1300              		.loc 1 317 13 is_stmt 1 discriminator 1 view .LVU296
+ 1301              	.LVL161:
+ 317:HARDWARE/OLED/oled.c **** 			j++;
+ 1302              		.loc 1 317 17 discriminator 1 view .LVU297
+ 317:HARDWARE/OLED/oled.c **** 			j++;
+ 1303              		.loc 1 317 18 is_stmt 0 discriminator 1 view .LVU298
+ 1304 002a 0236     		adds	r6, r6, #2
+ 1305              	.LVL162:
+ 317:HARDWARE/OLED/oled.c **** 			j++;
+ 1306              		.loc 1 317 18 discriminator 1 view .LVU299
+ 1307 002c F6B2     		uxtb	r6, r6
+ 1308              	.LVL163:
+ 317:HARDWARE/OLED/oled.c **** 			j++;
+ 1309              		.loc 1 317 14 discriminator 1 view .LVU300
+ 1310 002e 0024     		movs	r4, #0
+ 1311 0030 EEE7     		b	.L100
+ 1312              	.LVL164:
+ 1313              	.L103:
+ 319:HARDWARE/OLED/oled.c **** 	}
+ 320:HARDWARE/OLED/oled.c **** }
+ 1314              		.loc 1 320 1 view .LVU301
+ 1315 0032 BDE8F081 		pop	{r4, r5, r6, r7, r8, pc}
+ 1316              		.loc 1 320 1 view .LVU302
+ 1317              		.cfi_endproc
+ 1318              	.LFE47:
+ 1320              		.section	.text.OLED_ShowCHinese,"ax",%progbits
+ 1321              		.align	1
+ 1322              		.global	OLED_ShowCHinese
+ 1323              		.syntax unified
+ 1324              		.thumb
+ 1325              		.thumb_func
+ 1327              	OLED_ShowCHinese:
+ 1328              	.LVL165:
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 31
+
+
+ 1329              	.LFB48:
+ 321:HARDWARE/OLED/oled.c **** //显示汉字
+ 322:HARDWARE/OLED/oled.c ****  void OLED_ShowCHinese(u8 x,u8 y,u8 no)
+ 323:HARDWARE/OLED/oled.c **** {      			    
+ 1330              		.loc 1 323 1 is_stmt 1 view -0
+ 1331              		.cfi_startproc
+ 1332              		@ args = 0, pretend = 0, frame = 0
+ 1333              		@ frame_needed = 0, uses_anonymous_args = 0
+ 1334              		.loc 1 323 1 is_stmt 0 view .LVU304
+ 1335 0000 F8B5     		push	{r3, r4, r5, r6, r7, lr}
+ 1336              	.LCFI16:
+ 1337              		.cfi_def_cfa_offset 24
+ 1338              		.cfi_offset 3, -24
+ 1339              		.cfi_offset 4, -20
+ 1340              		.cfi_offset 5, -16
+ 1341              		.cfi_offset 6, -12
+ 1342              		.cfi_offset 7, -8
+ 1343              		.cfi_offset 14, -4
+ 1344 0002 0746     		mov	r7, r0
+ 1345 0004 0E46     		mov	r6, r1
+ 1346 0006 1546     		mov	r5, r2
+ 324:HARDWARE/OLED/oled.c **** 	u8 t,adder=0;
+ 1347              		.loc 1 324 2 is_stmt 1 view .LVU305
+ 1348              	.LVL166:
+ 325:HARDWARE/OLED/oled.c **** 	OLED_Set_Pos(x,y);	
+ 1349              		.loc 1 325 2 view .LVU306
+ 1350 0008 FFF7FEFF 		bl	OLED_Set_Pos
+ 1351              	.LVL167:
+ 326:HARDWARE/OLED/oled.c ****     for(t=0;t<16;t++)
+ 1352              		.loc 1 326 5 view .LVU307
+ 1353              		.loc 1 326 10 is_stmt 0 view .LVU308
+ 1354 000c 0024     		movs	r4, #0
+ 1355              		.loc 1 326 5 view .LVU309
+ 1356 000e 08E0     		b	.L105
+ 1357              	.LVL168:
+ 1358              	.L106:
+ 327:HARDWARE/OLED/oled.c **** 		{
+ 328:HARDWARE/OLED/oled.c **** 				OLED_WR_Byte(Hzk[2*no][t],OLED_DATA);
+ 1359              		.loc 1 328 5 is_stmt 1 view .LVU310
+ 1360              		.loc 1 328 27 is_stmt 0 view .LVU311
+ 1361 0010 0F4B     		ldr	r3, .L110
+ 1362 0012 03EB8513 		add	r3, r3, r5, lsl #6
+ 1363              		.loc 1 328 5 view .LVU312
+ 1364 0016 0121     		movs	r1, #1
+ 1365 0018 185D     		ldrb	r0, [r3, r4]	@ zero_extendqisi2
+ 1366 001a FFF7FEFF 		bl	OLED_WR_Byte
+ 1367              	.LVL169:
+ 329:HARDWARE/OLED/oled.c **** 				adder+=1;
+ 1368              		.loc 1 329 5 is_stmt 1 view .LVU313
+ 326:HARDWARE/OLED/oled.c ****     for(t=0;t<16;t++)
+ 1369              		.loc 1 326 19 discriminator 3 view .LVU314
+ 1370 001e 0134     		adds	r4, r4, #1
+ 1371              	.LVL170:
+ 326:HARDWARE/OLED/oled.c ****     for(t=0;t<16;t++)
+ 1372              		.loc 1 326 19 is_stmt 0 discriminator 3 view .LVU315
+ 1373 0020 E4B2     		uxtb	r4, r4
+ 1374              	.LVL171:
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 32
+
+
+ 1375              	.L105:
+ 326:HARDWARE/OLED/oled.c ****     for(t=0;t<16;t++)
+ 1376              		.loc 1 326 14 is_stmt 1 discriminator 1 view .LVU316
+ 1377 0022 0F2C     		cmp	r4, #15
+ 1378 0024 F4D9     		bls	.L106
+ 330:HARDWARE/OLED/oled.c ****      }	
+ 331:HARDWARE/OLED/oled.c **** 		OLED_Set_Pos(x,y+1);	
+ 1379              		.loc 1 331 3 view .LVU317
+ 1380 0026 711C     		adds	r1, r6, #1
+ 1381 0028 C9B2     		uxtb	r1, r1
+ 1382 002a 3846     		mov	r0, r7
+ 1383 002c FFF7FEFF 		bl	OLED_Set_Pos
+ 1384              	.LVL172:
+ 332:HARDWARE/OLED/oled.c ****     for(t=0;t<16;t++)
+ 1385              		.loc 1 332 5 view .LVU318
+ 1386              		.loc 1 332 10 is_stmt 0 view .LVU319
+ 1387 0030 0024     		movs	r4, #0
+ 1388              		.loc 1 332 5 view .LVU320
+ 1389 0032 0AE0     		b	.L107
+ 1390              	.LVL173:
+ 1391              	.L108:
+ 333:HARDWARE/OLED/oled.c **** 			{	
+ 334:HARDWARE/OLED/oled.c **** 				OLED_WR_Byte(Hzk[2*no+1][t],OLED_DATA);
+ 1392              		.loc 1 334 5 is_stmt 1 view .LVU321
+ 1393              		.loc 1 334 23 is_stmt 0 view .LVU322
+ 1394 0034 6900     		lsls	r1, r5, #1
+ 1395              		.loc 1 334 26 view .LVU323
+ 1396 0036 0131     		adds	r1, r1, #1
+ 1397              		.loc 1 334 29 view .LVU324
+ 1398 0038 054B     		ldr	r3, .L110
+ 1399 003a 03EB4113 		add	r3, r3, r1, lsl #5
+ 1400              		.loc 1 334 5 view .LVU325
+ 1401 003e 0121     		movs	r1, #1
+ 1402 0040 185D     		ldrb	r0, [r3, r4]	@ zero_extendqisi2
+ 1403 0042 FFF7FEFF 		bl	OLED_WR_Byte
+ 1404              	.LVL174:
+ 335:HARDWARE/OLED/oled.c **** 				adder+=1;
+ 1405              		.loc 1 335 5 is_stmt 1 view .LVU326
+ 332:HARDWARE/OLED/oled.c ****     for(t=0;t<16;t++)
+ 1406              		.loc 1 332 19 discriminator 3 view .LVU327
+ 1407 0046 0134     		adds	r4, r4, #1
+ 1408              	.LVL175:
+ 332:HARDWARE/OLED/oled.c ****     for(t=0;t<16;t++)
+ 1409              		.loc 1 332 19 is_stmt 0 discriminator 3 view .LVU328
+ 1410 0048 E4B2     		uxtb	r4, r4
+ 1411              	.LVL176:
+ 1412              	.L107:
+ 332:HARDWARE/OLED/oled.c ****     for(t=0;t<16;t++)
+ 1413              		.loc 1 332 14 is_stmt 1 discriminator 1 view .LVU329
+ 1414 004a 0F2C     		cmp	r4, #15
+ 1415 004c F2D9     		bls	.L108
+ 336:HARDWARE/OLED/oled.c ****       }					
+ 337:HARDWARE/OLED/oled.c **** }
+ 1416              		.loc 1 337 1 is_stmt 0 view .LVU330
+ 1417 004e F8BD     		pop	{r3, r4, r5, r6, r7, pc}
+ 1418              	.LVL177:
+ 1419              	.L111:
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 33
+
+
+ 1420              		.loc 1 337 1 view .LVU331
+ 1421              		.align	2
+ 1422              	.L110:
+ 1423 0050 00000000 		.word	Hzk
+ 1424              		.cfi_endproc
+ 1425              	.LFE48:
+ 1427              		.section	.text.OLED_DrawBMP,"ax",%progbits
+ 1428              		.align	1
+ 1429              		.global	OLED_DrawBMP
+ 1430              		.syntax unified
+ 1431              		.thumb
+ 1432              		.thumb_func
+ 1434              	OLED_DrawBMP:
+ 1435              	.LVL178:
+ 1436              	.LFB49:
+ 338:HARDWARE/OLED/oled.c **** /***********功能描述：显示显示BMP图片128×64起始点坐标(x,y),x的范围0～127，y�
+ 339:HARDWARE/OLED/oled.c **** void OLED_DrawBMP(unsigned char x0, unsigned char y0,unsigned char x1, unsigned char y1,unsigned ch
+ 340:HARDWARE/OLED/oled.c **** { 	
+ 1437              		.loc 1 340 1 is_stmt 1 view -0
+ 1438              		.cfi_startproc
+ 1439              		@ args = 4, pretend = 0, frame = 0
+ 1440              		@ frame_needed = 0, uses_anonymous_args = 0
+ 1441              		.loc 1 340 1 is_stmt 0 view .LVU333
+ 1442 0000 2DE9F84F 		push	{r3, r4, r5, r6, r7, r8, r9, r10, fp, lr}
+ 1443              	.LCFI17:
+ 1444              		.cfi_def_cfa_offset 40
+ 1445              		.cfi_offset 3, -40
+ 1446              		.cfi_offset 4, -36
+ 1447              		.cfi_offset 5, -32
+ 1448              		.cfi_offset 6, -28
+ 1449              		.cfi_offset 7, -24
+ 1450              		.cfi_offset 8, -20
+ 1451              		.cfi_offset 9, -16
+ 1452              		.cfi_offset 10, -12
+ 1453              		.cfi_offset 11, -8
+ 1454              		.cfi_offset 14, -4
+ 1455 0004 8146     		mov	r9, r0
+ 1456 0006 8846     		mov	r8, r1
+ 1457 0008 1646     		mov	r6, r2
+ 1458 000a 9A46     		mov	r10, r3
+ 1459 000c 0A9F     		ldr	r7, [sp, #40]
+ 341:HARDWARE/OLED/oled.c ****  unsigned int j=0;
+ 1460              		.loc 1 341 2 is_stmt 1 view .LVU334
+ 1461              	.LVL179:
+ 342:HARDWARE/OLED/oled.c ****  unsigned char x,y;
+ 1462              		.loc 1 342 2 view .LVU335
+ 343:HARDWARE/OLED/oled.c ****   
+ 344:HARDWARE/OLED/oled.c ****   if(y1%8==0) y=y1/8;      
+ 1463              		.loc 1 344 3 view .LVU336
+ 345:HARDWARE/OLED/oled.c ****   else y=y1/8+1;
+ 1464              		.loc 1 345 8 view .LVU337
+ 346:HARDWARE/OLED/oled.c **** 	for(y=y0;y<y1;y++)
+ 347:HARDWARE/OLED/oled.c **** 	{
+ 348:HARDWARE/OLED/oled.c **** 		OLED_Set_Pos(x0,y);
+ 349:HARDWARE/OLED/oled.c ****     for(x=x0;x<x1;x++)
+ 350:HARDWARE/OLED/oled.c **** 	    {      
+ 351:HARDWARE/OLED/oled.c **** 	    	OLED_WR_Byte(BMP[j++],OLED_DATA);	    	
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 34
+
+
+ 1465              		.loc 1 351 25 is_stmt 0 view .LVU338
+ 1466 000e 4FF0000B 		mov	fp, #0
+ 1467 0012 0FE0     		b	.L113
+ 1468              	.LVL180:
+ 1469              	.L115:
+ 1470              		.loc 1 351 7 is_stmt 1 view .LVU339
+ 1471              		.loc 1 351 25 is_stmt 0 view .LVU340
+ 1472 0014 0BF10105 		add	r5, fp, #1
+ 1473              	.LVL181:
+ 1474              		.loc 1 351 7 view .LVU341
+ 1475 0018 0121     		movs	r1, #1
+ 1476 001a 17F80B00 		ldrb	r0, [r7, fp]	@ zero_extendqisi2
+ 1477 001e FFF7FEFF 		bl	OLED_WR_Byte
+ 1478              	.LVL182:
+ 349:HARDWARE/OLED/oled.c **** 	    {      
+ 1479              		.loc 1 349 20 is_stmt 1 discriminator 3 view .LVU342
+ 1480 0022 0134     		adds	r4, r4, #1
+ 1481              	.LVL183:
+ 349:HARDWARE/OLED/oled.c **** 	    {      
+ 1482              		.loc 1 349 20 is_stmt 0 discriminator 3 view .LVU343
+ 1483 0024 E4B2     		uxtb	r4, r4
+ 1484              	.LVL184:
+ 1485              		.loc 1 351 25 view .LVU344
+ 1486 0026 AB46     		mov	fp, r5
+ 1487              	.LVL185:
+ 1488              	.L114:
+ 349:HARDWARE/OLED/oled.c **** 	    {      
+ 1489              		.loc 1 349 15 is_stmt 1 discriminator 1 view .LVU345
+ 1490 0028 B442     		cmp	r4, r6
+ 1491 002a F3D3     		bcc	.L115
+ 346:HARDWARE/OLED/oled.c **** 	for(y=y0;y<y1;y++)
+ 1492              		.loc 1 346 17 discriminator 2 view .LVU346
+ 1493 002c 08F10108 		add	r8, r8, #1
+ 1494              	.LVL186:
+ 346:HARDWARE/OLED/oled.c **** 	for(y=y0;y<y1;y++)
+ 1495              		.loc 1 346 17 is_stmt 0 discriminator 2 view .LVU347
+ 1496 0030 5FFA88F8 		uxtb	r8, r8
+ 1497              	.LVL187:
+ 1498              	.L113:
+ 346:HARDWARE/OLED/oled.c **** 	for(y=y0;y<y1;y++)
+ 1499              		.loc 1 346 12 is_stmt 1 discriminator 1 view .LVU348
+ 1500 0034 D045     		cmp	r8, r10
+ 1501 0036 05D2     		bcs	.L118
+ 348:HARDWARE/OLED/oled.c ****     for(x=x0;x<x1;x++)
+ 1502              		.loc 1 348 3 view .LVU349
+ 1503 0038 4146     		mov	r1, r8
+ 1504 003a 4846     		mov	r0, r9
+ 1505 003c FFF7FEFF 		bl	OLED_Set_Pos
+ 1506              	.LVL188:
+ 349:HARDWARE/OLED/oled.c **** 	    {      
+ 1507              		.loc 1 349 5 view .LVU350
+ 349:HARDWARE/OLED/oled.c **** 	    {      
+ 1508              		.loc 1 349 10 is_stmt 0 view .LVU351
+ 1509 0040 4C46     		mov	r4, r9
+ 349:HARDWARE/OLED/oled.c **** 	    {      
+ 1510              		.loc 1 349 5 view .LVU352
+ 1511 0042 F1E7     		b	.L114
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 35
+
+
+ 1512              	.LVL189:
+ 1513              	.L118:
+ 352:HARDWARE/OLED/oled.c **** 	    }
+ 353:HARDWARE/OLED/oled.c **** 	}
+ 354:HARDWARE/OLED/oled.c **** } 
+ 1514              		.loc 1 354 1 view .LVU353
+ 1515 0044 BDE8F88F 		pop	{r3, r4, r5, r6, r7, r8, r9, r10, fp, pc}
+ 1516              		.loc 1 354 1 view .LVU354
+ 1517              		.cfi_endproc
+ 1518              	.LFE49:
+ 1520              		.section	.text.OLED_Init,"ax",%progbits
+ 1521              		.align	1
+ 1522              		.global	OLED_Init
+ 1523              		.syntax unified
+ 1524              		.thumb
+ 1525              		.thumb_func
+ 1527              	OLED_Init:
+ 1528              	.LFB50:
+ 355:HARDWARE/OLED/oled.c **** 
+ 356:HARDWARE/OLED/oled.c **** //初始化SSD1306					    
+ 357:HARDWARE/OLED/oled.c **** void OLED_Init(void)
+ 358:HARDWARE/OLED/oled.c **** { 	
+ 1529              		.loc 1 358 1 is_stmt 1 view -0
+ 1530              		.cfi_startproc
+ 1531              		@ args = 0, pretend = 0, frame = 8
+ 1532              		@ frame_needed = 0, uses_anonymous_args = 0
+ 1533 0000 70B5     		push	{r4, r5, r6, lr}
+ 1534              	.LCFI18:
+ 1535              		.cfi_def_cfa_offset 16
+ 1536              		.cfi_offset 4, -16
+ 1537              		.cfi_offset 5, -12
+ 1538              		.cfi_offset 6, -8
+ 1539              		.cfi_offset 14, -4
+ 1540 0002 82B0     		sub	sp, sp, #8
+ 1541              	.LCFI19:
+ 1542              		.cfi_def_cfa_offset 24
+ 359:HARDWARE/OLED/oled.c ****  
+ 360:HARDWARE/OLED/oled.c ****  	 
+ 361:HARDWARE/OLED/oled.c ****  	GPIO_InitTypeDef  GPIO_InitStructure;
+ 1543              		.loc 1 361 3 view .LVU356
+ 362:HARDWARE/OLED/oled.c ****  	
+ 363:HARDWARE/OLED/oled.c ****  	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);	 //使能B端口时钟
+ 1544              		.loc 1 363 3 view .LVU357
+ 1545 0004 0121     		movs	r1, #1
+ 1546 0006 0820     		movs	r0, #8
+ 1547 0008 FFF7FEFF 		bl	RCC_APB2PeriphClockCmd
+ 1548              	.LVL190:
+ 364:HARDWARE/OLED/oled.c **** 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8|GPIO_Pin_9;	 
+ 1549              		.loc 1 364 2 view .LVU358
+ 1550              		.loc 1 364 30 is_stmt 0 view .LVU359
+ 1551 000c 4FF44076 		mov	r6, #768
+ 1552 0010 ADF80460 		strh	r6, [sp, #4]	@ movhi
+ 365:HARDWARE/OLED/oled.c ****  	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP; 		 //推挽输出
+ 1553              		.loc 1 365 3 is_stmt 1 view .LVU360
+ 1554              		.loc 1 365 32 is_stmt 0 view .LVU361
+ 1555 0014 1024     		movs	r4, #16
+ 1556 0016 8DF80740 		strb	r4, [sp, #7]
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 36
+
+
+ 366:HARDWARE/OLED/oled.c **** 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;//速度50MHz
+ 1557              		.loc 1 366 2 is_stmt 1 view .LVU362
+ 1558              		.loc 1 366 32 is_stmt 0 view .LVU363
+ 1559 001a 0323     		movs	r3, #3
+ 1560 001c 8DF80630 		strb	r3, [sp, #6]
+ 367:HARDWARE/OLED/oled.c ****  	GPIO_Init(GPIOB, &GPIO_InitStructure);	  //初始化GPIOB3,4
+ 1561              		.loc 1 367 3 is_stmt 1 view .LVU364
+ 1562 0020 3C4D     		ldr	r5, .L121
+ 1563 0022 01A9     		add	r1, sp, #4
+ 1564 0024 2846     		mov	r0, r5
+ 1565 0026 FFF7FEFF 		bl	GPIO_Init
+ 1566              	.LVL191:
+ 368:HARDWARE/OLED/oled.c ****  	GPIO_SetBits(GPIOB,GPIO_Pin_8|GPIO_Pin_9);	
+ 1567              		.loc 1 368 3 view .LVU365
+ 1568 002a 3146     		mov	r1, r6
+ 1569 002c 2846     		mov	r0, r5
+ 1570 002e FFF7FEFF 		bl	GPIO_SetBits
+ 1571              	.LVL192:
+ 369:HARDWARE/OLED/oled.c **** 	
+ 370:HARDWARE/OLED/oled.c **** delay_ms(200);
+ 1572              		.loc 1 370 1 view .LVU366
+ 1573 0032 C820     		movs	r0, #200
+ 1574 0034 FFF7FEFF 		bl	delay_ms
+ 1575              	.LVL193:
+ 371:HARDWARE/OLED/oled.c **** 
+ 372:HARDWARE/OLED/oled.c **** OLED_WR_Byte(0xAE,OLED_CMD);//--display off
+ 1576              		.loc 1 372 1 view .LVU367
+ 1577 0038 0021     		movs	r1, #0
+ 1578 003a AE20     		movs	r0, #174
+ 1579 003c FFF7FEFF 		bl	OLED_WR_Byte
+ 1580              	.LVL194:
+ 373:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0x00,OLED_CMD);//---set low column address
+ 1581              		.loc 1 373 2 view .LVU368
+ 1582 0040 0021     		movs	r1, #0
+ 1583 0042 0846     		mov	r0, r1
+ 1584 0044 FFF7FEFF 		bl	OLED_WR_Byte
+ 1585              	.LVL195:
+ 374:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0x10,OLED_CMD);//---set high column address
+ 1586              		.loc 1 374 2 view .LVU369
+ 1587 0048 0021     		movs	r1, #0
+ 1588 004a 2046     		mov	r0, r4
+ 1589 004c FFF7FEFF 		bl	OLED_WR_Byte
+ 1590              	.LVL196:
+ 375:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0x40,OLED_CMD);//--set start line address  
+ 1591              		.loc 1 375 2 view .LVU370
+ 1592 0050 0021     		movs	r1, #0
+ 1593 0052 4020     		movs	r0, #64
+ 1594 0054 FFF7FEFF 		bl	OLED_WR_Byte
+ 1595              	.LVL197:
+ 376:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0xB0,OLED_CMD);//--set page address
+ 1596              		.loc 1 376 2 view .LVU371
+ 1597 0058 0021     		movs	r1, #0
+ 1598 005a B020     		movs	r0, #176
+ 1599 005c FFF7FEFF 		bl	OLED_WR_Byte
+ 1600              	.LVL198:
+ 377:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0x81,OLED_CMD); // contract control
+ 1601              		.loc 1 377 2 view .LVU372
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 37
+
+
+ 1602 0060 0021     		movs	r1, #0
+ 1603 0062 8120     		movs	r0, #129
+ 1604 0064 FFF7FEFF 		bl	OLED_WR_Byte
+ 1605              	.LVL199:
+ 378:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0xFF,OLED_CMD);//--128   
+ 1606              		.loc 1 378 2 view .LVU373
+ 1607 0068 0021     		movs	r1, #0
+ 1608 006a FF20     		movs	r0, #255
+ 1609 006c FFF7FEFF 		bl	OLED_WR_Byte
+ 1610              	.LVL200:
+ 379:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0xA1,OLED_CMD);//set segment remap 
+ 1611              		.loc 1 379 2 view .LVU374
+ 1612 0070 0021     		movs	r1, #0
+ 1613 0072 A120     		movs	r0, #161
+ 1614 0074 FFF7FEFF 		bl	OLED_WR_Byte
+ 1615              	.LVL201:
+ 380:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0xA6,OLED_CMD);//--normal / reverse
+ 1616              		.loc 1 380 2 view .LVU375
+ 1617 0078 0021     		movs	r1, #0
+ 1618 007a A620     		movs	r0, #166
+ 1619 007c FFF7FEFF 		bl	OLED_WR_Byte
+ 1620              	.LVL202:
+ 381:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0xA8,OLED_CMD);//--set multiplex ratio(1 to 64)
+ 1621              		.loc 1 381 2 view .LVU376
+ 1622 0080 0021     		movs	r1, #0
+ 1623 0082 A820     		movs	r0, #168
+ 1624 0084 FFF7FEFF 		bl	OLED_WR_Byte
+ 1625              	.LVL203:
+ 382:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0x3F,OLED_CMD);//--1/32 duty
+ 1626              		.loc 1 382 2 view .LVU377
+ 1627 0088 0021     		movs	r1, #0
+ 1628 008a 3F20     		movs	r0, #63
+ 1629 008c FFF7FEFF 		bl	OLED_WR_Byte
+ 1630              	.LVL204:
+ 383:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0xC8,OLED_CMD);//Com scan direction
+ 1631              		.loc 1 383 2 view .LVU378
+ 1632 0090 0021     		movs	r1, #0
+ 1633 0092 C820     		movs	r0, #200
+ 1634 0094 FFF7FEFF 		bl	OLED_WR_Byte
+ 1635              	.LVL205:
+ 384:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0xD3,OLED_CMD);//-set display offset
+ 1636              		.loc 1 384 2 view .LVU379
+ 1637 0098 0021     		movs	r1, #0
+ 1638 009a D320     		movs	r0, #211
+ 1639 009c FFF7FEFF 		bl	OLED_WR_Byte
+ 1640              	.LVL206:
+ 385:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0x00,OLED_CMD);//
+ 1641              		.loc 1 385 2 view .LVU380
+ 1642 00a0 0021     		movs	r1, #0
+ 1643 00a2 0846     		mov	r0, r1
+ 1644 00a4 FFF7FEFF 		bl	OLED_WR_Byte
+ 1645              	.LVL207:
+ 386:HARDWARE/OLED/oled.c **** 	
+ 387:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0xD5,OLED_CMD);//set osc division
+ 1646              		.loc 1 387 2 view .LVU381
+ 1647 00a8 0021     		movs	r1, #0
+ 1648 00aa D520     		movs	r0, #213
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 38
+
+
+ 1649 00ac FFF7FEFF 		bl	OLED_WR_Byte
+ 1650              	.LVL208:
+ 388:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0x80,OLED_CMD);//
+ 1651              		.loc 1 388 2 view .LVU382
+ 1652 00b0 0021     		movs	r1, #0
+ 1653 00b2 8020     		movs	r0, #128
+ 1654 00b4 FFF7FEFF 		bl	OLED_WR_Byte
+ 1655              	.LVL209:
+ 389:HARDWARE/OLED/oled.c **** 	
+ 390:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0xD8,OLED_CMD);//set area color mode off
+ 1656              		.loc 1 390 2 view .LVU383
+ 1657 00b8 0021     		movs	r1, #0
+ 1658 00ba D820     		movs	r0, #216
+ 1659 00bc FFF7FEFF 		bl	OLED_WR_Byte
+ 1660              	.LVL210:
+ 391:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0x05,OLED_CMD);//
+ 1661              		.loc 1 391 2 view .LVU384
+ 1662 00c0 0021     		movs	r1, #0
+ 1663 00c2 0520     		movs	r0, #5
+ 1664 00c4 FFF7FEFF 		bl	OLED_WR_Byte
+ 1665              	.LVL211:
+ 392:HARDWARE/OLED/oled.c **** 	
+ 393:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0xD9,OLED_CMD);//Set Pre-Charge Period
+ 1666              		.loc 1 393 2 view .LVU385
+ 1667 00c8 0021     		movs	r1, #0
+ 1668 00ca D920     		movs	r0, #217
+ 1669 00cc FFF7FEFF 		bl	OLED_WR_Byte
+ 1670              	.LVL212:
+ 394:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0xF1,OLED_CMD);//
+ 1671              		.loc 1 394 2 view .LVU386
+ 1672 00d0 0021     		movs	r1, #0
+ 1673 00d2 F120     		movs	r0, #241
+ 1674 00d4 FFF7FEFF 		bl	OLED_WR_Byte
+ 1675              	.LVL213:
+ 395:HARDWARE/OLED/oled.c **** 	
+ 396:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0xDA,OLED_CMD);//set com pin configuartion
+ 1676              		.loc 1 396 2 view .LVU387
+ 1677 00d8 0021     		movs	r1, #0
+ 1678 00da DA20     		movs	r0, #218
+ 1679 00dc FFF7FEFF 		bl	OLED_WR_Byte
+ 1680              	.LVL214:
+ 397:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0x12,OLED_CMD);//
+ 1681              		.loc 1 397 2 view .LVU388
+ 1682 00e0 0021     		movs	r1, #0
+ 1683 00e2 1220     		movs	r0, #18
+ 1684 00e4 FFF7FEFF 		bl	OLED_WR_Byte
+ 1685              	.LVL215:
+ 398:HARDWARE/OLED/oled.c **** 	
+ 399:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0xDB,OLED_CMD);//set Vcomh
+ 1686              		.loc 1 399 2 view .LVU389
+ 1687 00e8 0021     		movs	r1, #0
+ 1688 00ea DB20     		movs	r0, #219
+ 1689 00ec FFF7FEFF 		bl	OLED_WR_Byte
+ 1690              	.LVL216:
+ 400:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0x30,OLED_CMD);//
+ 1691              		.loc 1 400 2 view .LVU390
+ 1692 00f0 0021     		movs	r1, #0
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 39
+
+
+ 1693 00f2 3020     		movs	r0, #48
+ 1694 00f4 FFF7FEFF 		bl	OLED_WR_Byte
+ 1695              	.LVL217:
+ 401:HARDWARE/OLED/oled.c **** 	
+ 402:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0x8D,OLED_CMD);//set charge pump enable
+ 1696              		.loc 1 402 2 view .LVU391
+ 1697 00f8 0021     		movs	r1, #0
+ 1698 00fa 8D20     		movs	r0, #141
+ 1699 00fc FFF7FEFF 		bl	OLED_WR_Byte
+ 1700              	.LVL218:
+ 403:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0x14,OLED_CMD);//
+ 1701              		.loc 1 403 2 view .LVU392
+ 1702 0100 0021     		movs	r1, #0
+ 1703 0102 1420     		movs	r0, #20
+ 1704 0104 FFF7FEFF 		bl	OLED_WR_Byte
+ 1705              	.LVL219:
+ 404:HARDWARE/OLED/oled.c **** 	
+ 405:HARDWARE/OLED/oled.c **** 	OLED_WR_Byte(0xAF,OLED_CMD);//--turn on oled panel
+ 1706              		.loc 1 405 2 view .LVU393
+ 1707 0108 0021     		movs	r1, #0
+ 1708 010a AF20     		movs	r0, #175
+ 1709 010c FFF7FEFF 		bl	OLED_WR_Byte
+ 1710              	.LVL220:
+ 406:HARDWARE/OLED/oled.c **** }  
+ 1711              		.loc 1 406 1 is_stmt 0 view .LVU394
+ 1712 0110 02B0     		add	sp, sp, #8
+ 1713              	.LCFI20:
+ 1714              		.cfi_def_cfa_offset 16
+ 1715              		@ sp needed
+ 1716 0112 70BD     		pop	{r4, r5, r6, pc}
+ 1717              	.L122:
+ 1718              		.align	2
+ 1719              	.L121:
+ 1720 0114 000C0140 		.word	1073810432
+ 1721              		.cfi_endproc
+ 1722              	.LFE50:
+ 1724              		.global	Hzk
+ 1725              		.section	.data.Hzk,"aw"
+ 1726              		.align	2
+ 1729              	Hzk:
+ 1730 0000 080889EA 		.ascii	"\010\010\211\352\030\210\000\004\004\374\004\004\004"
+ 1730      18880004 
+ 1730      04FC0404 
+ 1730      04
+ 1731 000d FC000000 		.ascii	"\374\000\000\000"
+ 1732 0011 00000000 		.space	15
+ 1732      00000000 
+ 1732      00000000 
+ 1732      000000
+ 1733 0020 020100FF 		.ascii	"\002\001\000\377\001\206@ \030\007@\200@?\000\000\000"
+ 1733      01864020 
+ 1733      18074080 
+ 1733      403F0000 
+ 1733      00
+ 1734 0031 00000000 		.space	15
+ 1734      00000000 
+ 1734      00000000 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 40
+
+
+ 1734      000000
+ 1735 0040 1010F01F 		.ascii	"\020\020\360\037\020\360\000@\340XG@P`\300\000\000"
+ 1735      10F00040 
+ 1735      E0584740 
+ 1735      5060C000 
+ 1735      00
+ 1736 0051 00000000 		.space	15
+ 1736      00000000 
+ 1736      00000000 
+ 1736      000000
+ 1737 0060 40221508 		.ascii	"@\"\025\010\026!\000\000\376BBBB\376\000\000\000"
+ 1737      16210000 
+ 1737      FE424242 
+ 1737      42FE0000 
+ 1737      00
+ 1738 0071 00000000 		.space	15
+ 1738      00000000 
+ 1738      00000000 
+ 1738      000000
+ 1739 0080 008060F8 		.ascii	"\000\200`\370\007\000\000\000\377@ \020\010\004\000"
+ 1739      07000000 
+ 1739      FF402010 
+ 1739      080400
+ 1740 008f 0000     		.ascii	"\000\000"
+ 1741 0091 00000000 		.space	15
+ 1741      00000000 
+ 1741      00000000 
+ 1741      000000
+ 1742 00a0 010000FF 		.ascii	"\001\000\000\377\000\004\002\001?@@@@@x\000\000"
+ 1742      00040201 
+ 1742      3F404040 
+ 1742      40407800 
+ 1742      00
+ 1743 00b1 00000000 		.space	15
+ 1743      00000000 
+ 1743      00000000 
+ 1743      000000
+ 1744 00c0 0000F010 		.ascii	"\000\000\360\020\020\020\020\377\020\020\020\020\360"
+ 1744      101010FF 
+ 1744      10101010 
+ 1744      F0
+ 1745 00cd 00000000 		.ascii	"\000\000\000\000"
+ 1746 00d1 00000000 		.space	15
+ 1746      00000000 
+ 1746      00000000 
+ 1746      000000
+ 1747 00e0 00000F04 		.ascii	"\000\000\017\004\004\004\004\377\004\004\004\004\017"
+ 1747      040404FF 
+ 1747      04040404 
+ 1747      0F
+ 1748 00ed 00000000 		.ascii	"\000\000\000\000"
+ 1749 00f1 00000000 		.space	15
+ 1749      00000000 
+ 1749      00000000 
+ 1749      000000
+ 1750 0100 404042CC 		.ascii	"@@B\314\000\200\210\210\377\210\210\377\210\210\200"
+ 1750      00808888 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 41
+
+
+ 1750      FF8888FF 
+ 1750      888880
+ 1751 010f 0000     		.ascii	"\000\000"
+ 1752 0111 00000000 		.space	15
+ 1752      00000000 
+ 1752      00000000 
+ 1752      000000
+ 1753 0120 0040201F 		.ascii	"\000@ \037 @PLC@@_@@@\000\000"
+ 1753      2040504C 
+ 1753      4340405F 
+ 1753      40404000 
+ 1753      00
+ 1754 0131 00000000 		.space	15
+ 1754      00000000 
+ 1754      00000000 
+ 1754      000000
+ 1755 0140 0000FC24 		.ascii	"\000\000\374$$$\374%&$\374$$$\004\000\000"
+ 1755      2424FC25 
+ 1755      2624FC24 
+ 1755      24240400 
+ 1755      00
+ 1756 0151 00000000 		.space	15
+ 1756      00000000 
+ 1756      00000000 
+ 1756      000000
+ 1757 0160 40308F80 		.ascii	"@0\217\200\204LU%%%UL\200\200\200\000\000"
+ 1757      844C5525 
+ 1757      2525554C 
+ 1757      80808000 
+ 1757      00
+ 1758 0171 00000000 		.space	15
+ 1758      00000000 
+ 1758      00000000 
+ 1758      000000
+ 1759 0180 00008000 		.ascii	"\000\000\200\000\000\340\002\004\030\000\000\000@\200"
+ 1759      00E00204 
+ 1759      18000000 
+ 1759      4080
+ 1760 018e 000000   		.ascii	"\000\000\000"
+ 1761 0191 00000000 		.space	15
+ 1761      00000000 
+ 1761      00000000 
+ 1761      000000
+ 1762 01a0 100C0300 		.ascii	"\020\014\003\000\000?@@@@@x\000\001\016\000\000"
+ 1762      003F4040 
+ 1762      40404078 
+ 1762      00010E00 
+ 1762      00
+ 1763 01b1 00000000 		.space	15
+ 1763      00000000 
+ 1763      00000000 
+ 1763      000000
+ 1764 01c0 0014A444 		.ascii	"\000\024\244D$4\255f$\224\004D\244\024\000\000\000"
+ 1764      2434AD66 
+ 1764      24940444 
+ 1764      A4140000 
+ 1764      00
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 42
+
+
+ 1765 01d1 00000000 		.space	15
+ 1765      00000000 
+ 1765      00000000 
+ 1765      000000
+ 1766 01e0 08090808 		.ascii	"\010\011\010\010\011\011\011\375\011\011\013\010\010"
+ 1766      090909FD 
+ 1766      09090B08 
+ 1766      08
+ 1767 01ed 09080000 		.ascii	"\011\010\000\000"
+ 1768 01f1 00000000 		.space	15
+ 1768      00000000 
+ 1768      00000000 
+ 1768      000000
+ 1769 0200 0000FE22 		.ascii	"\000\000\376\"\"\"\"\376\"\"\"\"\376\000\000\000\000"
+ 1769      222222FE 
+ 1769      22222222 
+ 1769      FE000000 
+ 1769      00
+ 1770 0211 00000000 		.space	15
+ 1770      00000000 
+ 1770      00000000 
+ 1770      000000
+ 1771 0220 00000702 		.ascii	"\000\000\007\002\002\002\002\377\002\002\002\002\007"
+ 1771      020202FF 
+ 1771      02020202 
+ 1771      07
+ 1772 022d 00000000 		.ascii	"\000\000\000\000"
+ 1773 0231 00000000 		.space	15
+ 1773      00000000 
+ 1773      00000000 
+ 1773      000000
+ 1774 0240 F212FE12 		.ascii	"\362\022\376\022\376\022\362\000\204O$\024$O\204\000"
+ 1774      FE12F200 
+ 1774      844F2414 
+ 1774      244F8400 
+ 1775 0250 00       		.ascii	"\000"
+ 1776 0251 00000000 		.space	15
+ 1776      00000000 
+ 1776      00000000 
+ 1776      000000
+ 1777 0260 FF4A4948 		.ascii	"\377JIHII\377\000@II\177II@\000\000"
+ 1777      4949FF00 
+ 1777      4049497F 
+ 1777      49494000 
+ 1777      00
+ 1778 0271 00000000 		.space	15
+ 1778      00000000 
+ 1778      00000000 
+ 1778      000000
+ 1779 0280 1060028C 		.ascii	"\020`\002\214\000\000\376\222\222\222\222\222\376\000"
+ 1779      0000FE92 
+ 1779      92929292 
+ 1779      FE00
+ 1780 028e 000000   		.ascii	"\000\000\000"
+ 1781 0291 00000000 		.space	15
+ 1781      00000000 
+ 1781      00000000 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 43
+
+
+ 1781      000000
+ 1782 02a0 04047E01 		.ascii	"\004\004~\001@~BB~B~BB~@\000\000"
+ 1782      407E4242 
+ 1782      7E427E42 
+ 1782      427E4000 
+ 1782      00
+ 1783 02b1 00000000 		.space	15
+ 1783      00000000 
+ 1783      00000000 
+ 1783      000000
+ 1784 02c0 1060028C 		.ascii	"\020`\002\214\000\376\222\222\222\222\222\222\376\000"
+ 1784      00FE9292 
+ 1784      92929292 
+ 1784      FE00
+ 1785 02ce 000000   		.ascii	"\000\000\000"
+ 1786 02d1 00000000 		.space	15
+ 1786      00000000 
+ 1786      00000000 
+ 1786      000000
+ 1787 02e0 04047E01 		.ascii	"\004\004~\001DHP\177@@\177PHD@\000\000"
+ 1787      4448507F 
+ 1787      40407F50 
+ 1787      48444000 
+ 1787      00
+ 1788 02f1 00000000 		.space	15
+ 1788      00000000 
+ 1788      00000000 
+ 1788      000000
+ 1789 0300 0000FC24 		.ascii	"\000\000\374$$$\374%&$\374$$$\004\000\000"
+ 1789      2424FC25 
+ 1789      2624FC24 
+ 1789      24240400 
+ 1789      00
+ 1790 0311 00000000 		.space	15
+ 1790      00000000 
+ 1790      00000000 
+ 1790      000000
+ 1791 0320 40308F80 		.ascii	"@0\217\200\204LU%%%UL\200\200\200\000\000"
+ 1791      844C5525 
+ 1791      2525554C 
+ 1791      80808000 
+ 1791      00
+ 1792 0331 00000000 		.space	15
+ 1792      00000000 
+ 1792      00000000 
+ 1792      000000
+ 1793 0340 00000000 		.ascii	"\000\000\000\000\000\000\000\000\000\000\000\000\000"
+ 1793      00000000 
+ 1793      00000000 
+ 1793      00
+ 1794 034d 00000000 		.ascii	"\000\000\000\000"
+ 1795 0351 00000000 		.space	15
+ 1795      00000000 
+ 1795      00000000 
+ 1795      000000
+ 1796 0360 00003636 		.ascii	"\000\00066\000\000\000\000\000\000\000\000\000\000\000"
+ 1796      00000000 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 44
+
+
+ 1796      00000000 
+ 1796      000000
+ 1797 036f 0000     		.ascii	"\000\000"
+ 1798 0371 00000000 		.space	15
+ 1798      00000000 
+ 1798      00000000 
+ 1798      000000
+ 1799 0380 000000FE 		.ascii	"\000\000\000\376\000\000\000\000\000\000\000\000\000"
+ 1799      00000000 
+ 1799      00000000 
+ 1799      00
+ 1800 038d 00000000 		.ascii	"\000\000\000\000"
+ 1801 0391 00000000 		.space	15
+ 1801      00000000 
+ 1801      00000000 
+ 1801      000000
+ 1802 03a0 00000033 		.ascii	"\000\000\0003\000\000\000\000\000\000\000\000\000\000"
+ 1802      00000000 
+ 1802      00000000 
+ 1802      0000
+ 1803 03ae 000000   		.ascii	"\000\000\000"
+ 1804 03b1 00000000 		.space	15
+ 1804      00000000 
+ 1804      00000000 
+ 1804      000000
+ 1805 03c0 10945332 		.ascii	"\020\224S2\0362R\020\000~BBB~\000\000\000"
+ 1805      1E325210 
+ 1805      007E4242 
+ 1805      427E0000 
+ 1805      00
+ 1806 03d1 00000000 		.space	15
+ 1806      00000000 
+ 1806      00000000 
+ 1806      000000
+ 1807 03e0 000000FF 		.ascii	"\000\000\000\377IIIIIII\377\000\000\000\000\000"
+ 1807      49494949 
+ 1807      494949FF 
+ 1807      00000000 
+ 1807      00
+ 1808 03f1 00000000 		.space	15
+ 1808      00000000 
+ 1808      00000000 
+ 1808      000000
+ 1809 0400 08CC4A49 		.ascii	"\010\314JIHJ\314\030\000\177\210\210\204\202\340\000"
+ 1809      484ACC18 
+ 1809      007F8888 
+ 1809      8482E000 
+ 1810 0410 00       		.ascii	"\000"
+ 1811 0411 00000000 		.space	15
+ 1811      00000000 
+ 1811      00000000 
+ 1811      000000
+ 1812 0420 00FF1212 		.ascii	"\000\377\022\022R\222\177\000\000~\210\210\204\202\340"
+ 1812      52927F00 
+ 1812      007E8888 
+ 1812      8482E0
+ 1813 042f 0000     		.ascii	"\000\000"
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 45
+
+
+ 1814 0431 00000000 		.space	15
+ 1814      00000000 
+ 1814      00000000 
+ 1814      000000
+ 1815 0440 20222A2A 		.ascii	" \"**\252j:.)))))  \000\000"
+ 1815      AA6A3A2E 
+ 1815      29292929 
+ 1815      29202000 
+ 1815      00
+ 1816 0451 00000000 		.space	15
+ 1816      00000000 
+ 1816      00000000 
+ 1816      000000
+ 1817 0460 08040201 		.ascii	"\010\004\002\001\377UUUUUU\377\000\000\000\000\000"
+ 1817      FF555555 
+ 1817      555555FF 
+ 1817      00000000 
+ 1817      00
+ 1818 0471 00000000 		.space	15
+ 1818      00000000 
+ 1818      00000000 
+ 1818      000000
+ 1819 0480 101010FF 		.ascii	"\020\020\020\377\020\220\000\370\210\211\216\210\210"
+ 1819      109000F8 
+ 1819      88898E88 
+ 1819      88
+ 1820 048d 88F80000 		.ascii	"\210\370\000\000"
+ 1821 0491 00000000 		.space	15
+ 1821      00000000 
+ 1821      00000000 
+ 1821      000000
+ 1822 04a0 0444827F 		.ascii	"\004D\202\177\201@0\017\000\000\000\000\000\000\001"
+ 1822      8140300F 
+ 1822      00000000 
+ 1822      000001
+ 1823 04af 0000     		.ascii	"\000\000"
+ 1824 04b1 00000000 		.space	15
+ 1824      00000000 
+ 1824      00000000 
+ 1824      000000
+ 1825 04c0 00002232 		.ascii	"\000\000\"2*\246\242b!\021\011\201\001\000\000\000\000"
+ 1825      2AA6A262 
+ 1825      21110981 
+ 1825      01000000 
+ 1825      00
+ 1826 04d1 00000000 		.space	15
+ 1826      00000000 
+ 1826      00000000 
+ 1826      000000
+ 1827 04e0 00422213 		.ascii	"\000B\"\023\013B\202~\002\002\012\022#F\000\000\000"
+ 1827      0B42827E 
+ 1827      02020A12 
+ 1827      23460000 
+ 1827      00
+ 1828 04f1 00000000 		.space	15
+ 1828      00000000 
+ 1828      00000000 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 46
+
+
+ 1828      000000
+ 1829 0500 2030AC63 		.ascii	" 0\254c0\000\210\310\250\231\216\210\250\310\210\000"
+ 1829      300088C8 
+ 1829      A8998E88 
+ 1829      A8C88800 
+ 1830 0510 00       		.ascii	"\000"
+ 1831 0511 00000000 		.space	15
+ 1831      00000000 
+ 1831      00000000 
+ 1831      000000
+ 1832 0520 22672212 		.ascii	"\"g\"\022\022\200@0\017\000\000?@@q\000\000"
+ 1832      12804030 
+ 1832      0F00003F 
+ 1832      40407100 
+ 1832      00
+ 1833 0531 00000000 		.space	15
+ 1833      00000000 
+ 1833      00000000 
+ 1833      000000
+ 1834 0540 000202C2 		.ascii	"\000\002\002\302\002\002\002\376\202\202\202\202\202"
+ 1834      020202FE 
+ 1834      82828282 
+ 1834      82
+ 1835 054d 02000000 		.ascii	"\002\000\000\000"
+ 1836 0551 00000000 		.space	15
+ 1836      00000000 
+ 1836      00000000 
+ 1836      000000
+ 1837 0560 4040407F 		.ascii	"@@@\177@@@\177@@@@@@@\000\000"
+ 1837      4040407F 
+ 1837      40404040 
+ 1837      40404000 
+ 1837      00
+ 1838 0571 00000000 		.space	15
+ 1838      00000000 
+ 1838      00000000 
+ 1838      000000
+ 1839 0580 080888C8 		.ascii	"\010\010\210\3108\014\013\010\010\350\010\010\010\010"
+ 1839      380C0B08 
+ 1839      08E80808 
+ 1839      0808
+ 1840 058e 080000   		.ascii	"\010\000\000"
+ 1841 0591 00000000 		.space	15
+ 1841      00000000 
+ 1841      00000000 
+ 1841      000000
+ 1842 05a0 020100FF 		.ascii	"\002\001\000\377@AAAA\177AAAA@\000\000"
+ 1842      40414141 
+ 1842      417F4141 
+ 1842      41414000 
+ 1842      00
+ 1843 05b1 00000000 		.space	15
+ 1843      00000000 
+ 1843      00000000 
+ 1843      000000
+ 1844 05c0 404042CC 		.ascii	"@@B\314\000\004Dd\\G\364DDD\004\000\000"
+ 1844      00044464 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 47
+
+
+ 1844      5C47F444 
+ 1844      44440400 
+ 1844      00
+ 1845 05d1 00000000 		.space	15
+ 1845      00000000 
+ 1845      00000000 
+ 1845      000000
+ 1846 05e0 0040201F 		.ascii	"\000@ \037 DDDDD\177DDDD\000\000"
+ 1846      20444444 
+ 1846      44447F44 
+ 1846      44444400 
+ 1846      00
+ 1847 05f1 00000000 		.space	15
+ 1847      00000000 
+ 1847      00000000 
+ 1847      000000
+ 1848 0600 101010FF 		.ascii	"\020\020\020\377\020PDTe\306DdTD@\000\000"
+ 1848      10504454 
+ 1848      65C64464 
+ 1848      54444000 
+ 1848      00
+ 1849 0611 00000000 		.space	15
+ 1849      00000000 
+ 1849      00000000 
+ 1849      000000
+ 1850 0620 0444827F 		.ascii	"\004D\202\177\001\202\202JV#\"RN\202\002\000\000"
+ 1850      0182824A 
+ 1850      56232252 
+ 1850      4E820200 
+ 1850      00
+ 1851 0631 00000000 		.space	15
+ 1851      00000000 
+ 1851      00000000 
+ 1851      000000
+ 1852 0640 060909E6 		.ascii	"\006\011\011\346\370\014\004\002\002\002\002\002\004"
+ 1852      F80C0402 
+ 1852      02020202 
+ 1852      04
+ 1853 064d 1E000000 		.ascii	"\036\000\000\000"
+ 1854 0651 00000000 		.space	15
+ 1854      00000000 
+ 1854      00000000 
+ 1854      000000
+ 1855 0660 00000007 		.ascii	"\000\000\000\007\0370 @@@@@ \020\000\000\000"
+ 1855      1F302040 
+ 1855      40404040 
+ 1855      20100000 
+ 1855      00
+ 1856 0671 00000000 		.space	15
+ 1856      00000000 
+ 1856      00000000 
+ 1856      000000
+ 1857 0680 00F80122 		.ascii	"\000\370\001\"\240\242\242\"\376\"\2522\002\376\000"
+ 1857      A0A2A222 
+ 1857      FE22AA32 
+ 1857      02FE00
+ 1858 068f 0000     		.ascii	"\000\000"
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 48
+
+
+ 1859 0691 00000000 		.space	15
+ 1859      00000000 
+ 1859      00000000 
+ 1859      000000
+ 1860 06a0 00FF0010 		.ascii	"\000\377\000\020\023\012K \027\014\0238\200\377\000"
+ 1860      130A4B20 
+ 1860      170C1338 
+ 1860      80FF00
+ 1861 06af 0000     		.ascii	"\000\000"
+ 1862 06b1 00000000 		.space	15
+ 1862      00000000 
+ 1862      00000000 
+ 1862      000000
+ 1863 06c0 008060F8 		.ascii	"\000\200`\370\007\004\344\244\244\277\244\244\344\004"
+ 1863      0704E4A4 
+ 1863      A4BFA4A4 
+ 1863      E404
+ 1864 06ce 000000   		.ascii	"\000\000\000"
+ 1865 06d1 00000000 		.space	15
+ 1865      00000000 
+ 1865      00000000 
+ 1865      000000
+ 1866 06e0 010000FF 		.ascii	"\001\000\000\377@@\177JJJJJ\177@@\000\000"
+ 1866      40407F4A 
+ 1866      4A4A4A4A 
+ 1866      7F404000 
+ 1866      00
+ 1867 06f1 00000000 		.space	15
+ 1867      00000000 
+ 1867      00000000 
+ 1867      000000
+ 1868 0700 404042CC 		.ascii	"@@B\314\000@\240\236\202\202\202\236\240  \000\000"
+ 1868      0040A09E 
+ 1868      8282829E 
+ 1868      A0202000 
+ 1868      00
+ 1869 0711 00000000 		.space	15
+ 1869      00000000 
+ 1869      00000000 
+ 1869      000000
+ 1870 0720 0000003F 		.ascii	"\000\000\000?\220\210@C,\020(FA\200\200\000\000"
+ 1870      90884043 
+ 1870      2C102846 
+ 1870      41808000 
+ 1870      00
+ 1871 0731 00000000 		.space	15
+ 1871      00000000 
+ 1871      00000000 
+ 1871      000000
+ 1872 0740 001715D5 		.ascii	"\000\027\025\325UWU}UWU\325\025\027\000\000\000"
+ 1872      5557557D 
+ 1872      555755D5 
+ 1872      15170000 
+ 1872      00
+ 1873 0751 00000000 		.space	15
+ 1873      00000000 
+ 1873      00000000 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 49
+
+
+ 1873      000000
+ 1874 0760 4040407F 		.ascii	"@@@\177UUUUUUU\177@@@\000\000"
+ 1874      55555555 
+ 1874      5555557F 
+ 1874      40404000 
+ 1874      00
+ 1875 0771 00000000 		.space	15
+ 1875      00000000 
+ 1875      00000000 
+ 1875      000000
+ 1876 0780 00000808 		.ascii	"\000\000\010\010\010\010\010\010\010\010\010\010\010"
+ 1876      08080808 
+ 1876      08080808 
+ 1876      08
+ 1877 078d 00000000 		.ascii	"\000\000\000\000"
+ 1878 0791 00000000 		.space	15
+ 1878      00000000 
+ 1878      00000000 
+ 1878      000000
+ 1879 07a0 10101010 		.ascii	"\020\020\020\020\020\020\020\020\020\020\020\020\020"
+ 1879      10101010 
+ 1879      10101010 
+ 1879      10
+ 1880 07ad 10100000 		.ascii	"\020\020\000\000"
+ 1881 07b1 00000000 		.space	15
+ 1881      00000000 
+ 1881      00000000 
+ 1881      000000
+ 1882 07c0 000000F8 		.ascii	"\000\000\000\370\210\214\212\211\210\210\210\370\000"
+ 1882      888C8A89 
+ 1882      888888F8 
+ 1882      00
+ 1883 07cd 00000000 		.ascii	"\000\000\000\000"
+ 1884 07d1 00000000 		.space	15
+ 1884      00000000 
+ 1884      00000000 
+ 1884      000000
+ 1885 07e0 000000FF 		.ascii	"\000\000\000\377DDDDDDD\377\000\000\000\000\000"
+ 1885      44444444 
+ 1885      444444FF 
+ 1885      00000000 
+ 1885      00
+ 1886 07f1 00000000 		.space	15
+ 1886      00000000 
+ 1886      00000000 
+ 1886      000000
+ 1887 0800 00002424 		.ascii	"\000\000$$$$$\374\"\"\"#\"\000\000\000\000"
+ 1887      242424FC 
+ 1887      22222223 
+ 1887      22000000 
+ 1887      00
+ 1888 0811 00000000 		.space	15
+ 1888      00000000 
+ 1888      00000000 
+ 1888      000000
+ 1889 0820 02020202 		.ascii	"\002\002\002\002\002B\202\177\002\002\002\002\002\002"
+ 1889      0242827F 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 50
+
+
+ 1889      02020202 
+ 1889      0202
+ 1890 082e 020000   		.ascii	"\002\000\000"
+ 1891 0831 00000000 		.space	15
+ 1891      00000000 
+ 1891      00000000 
+ 1891      000000
+ 1892 0840 4044C444 		.ascii	"@D\304DDD@\020\020\377\020\020\020\360\000\000\000"
+ 1892      44444010 
+ 1892      10FF1010 
+ 1892      10F00000 
+ 1892      00
+ 1893 0851 00000000 		.space	15
+ 1893      00000000 
+ 1893      00000000 
+ 1893      000000
+ 1894 0860 103C1310 		.ascii	"\020<\023\020\024\270@0\016\001@\200@?\000\000\000"
+ 1894      14B84030 
+ 1894      0E014080 
+ 1894      403F0000 
+ 1894      00
+ 1895 0871 00000000 		.space	15
+ 1895      00000000 
+ 1895      00000000 
+ 1895      000000
+ 1896 0880 00202020 		.ascii	"\000   \240`\000\377`\200@ \030\000\000\000\000"
+ 1896      A06000FF 
+ 1896      60804020 
+ 1896      18000000 
+ 1896      00
+ 1897 0891 00000000 		.space	15
+ 1897      00000000 
+ 1897      00000000 
+ 1897      000000
+ 1898 08a0 20100806 		.ascii	" \020\010\006\001@\200\177\000\001\002\004\010\020\020"
+ 1898      0140807F 
+ 1898      00010204 
+ 1898      081010
+ 1899 08af 0000     		.ascii	"\000\000"
+ 1900 08b1 00000000 		.space	15
+ 1900      00000000 
+ 1900      00000000 
+ 1900      000000
+ 1901 08c0 008060F8 		.ascii	"\000\200`\370\007\020\220\020\021\026\020\020\320\020"
+ 1901      07109010 
+ 1901      11161010 
+ 1901      D010
+ 1902 08ce 000000   		.ascii	"\000\000\000"
+ 1903 08d1 00000000 		.space	15
+ 1903      00000000 
+ 1903      00000000 
+ 1903      000000
+ 1904 08e0 010000FF 		.ascii	"\001\000\000\377@@A^@@pNA@@\000\000"
+ 1904      4040415E 
+ 1904      4040704E 
+ 1904      41404000 
+ 1904      00
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 51
+
+
+ 1905 08f1 00000000 		.space	15
+ 1905      00000000 
+ 1905      00000000 
+ 1905      000000
+ 1906 0900 0040301E 		.ascii	"\000@0\036\020\020\020\377\020\020\020\020\020\000\000"
+ 1906      101010FF 
+ 1906      10101010 
+ 1906      100000
+ 1907 090f 0000     		.ascii	"\000\000"
+ 1908 0911 00000000 		.space	15
+ 1908      00000000 
+ 1908      00000000 
+ 1908      000000
+ 1909 0920 81814121 		.ascii	"\201\201A!\021\015\003\001\003\015\021!A\201\201\000"
+ 1909      110D0301 
+ 1909      030D1121 
+ 1909      41818100 
+ 1910 0930 00       		.ascii	"\000"
+ 1911 0931 00000000 		.space	15
+ 1911      00000000 
+ 1911      00000000 
+ 1911      000000
+ 1912 0940 00FE02FA 		.ascii	"\000\376\002\372\002\376@ \330\027\020\020\360\020\020"
+ 1912      02FE4020 
+ 1912      D8171010 
+ 1912      F01010
+ 1913 094f 0000     		.ascii	"\000\000"
+ 1914 0951 00000000 		.space	15
+ 1914      00000000 
+ 1914      00000000 
+ 1914      000000
+ 1915 0960 8047300F 		.ascii	"\200G0\017\020g\200@!\026\010\026!@\200\000\000"
+ 1915      10678040 
+ 1915      21160816 
+ 1915      21408000 
+ 1915      00
+ 1916 0971 00000000 		.space	15
+ 1916      00000000 
+ 1916      00000000 
+ 1916      000000
+ 1917 0980 0000F888 		.ascii	"\000\000\370\210\210\210\210\010\010\377\010\011\012"
+ 1917      88888808 
+ 1917      08FF0809 
+ 1917      0A
+ 1918 098d C8080000 		.ascii	"\310\010\000\000"
+ 1919 0991 00000000 		.space	15
+ 1919      00000000 
+ 1919      00000000 
+ 1919      000000
+ 1920 09a0 80601F00 		.ascii	"\200`\037\000\020 \037\200@!\026\030&A\370\000\000"
+ 1920      10201F80 
+ 1920      40211618 
+ 1920      2641F800 
+ 1920      00
+ 1921 09b1 00000000 		.space	15
+ 1921      00000000 
+ 1921      00000000 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 52
+
+
+ 1921      000000
+ 1922 09c0 080808F8 		.ascii	"\010\010\010\370\010\010\010\020\020\377\020\020\020"
+ 1922      08080810 
+ 1922      10FF1010 
+ 1922      10
+ 1923 09cd F0000000 		.ascii	"\360\000\000\000"
+ 1924 09d1 00000000 		.space	15
+ 1924      00000000 
+ 1924      00000000 
+ 1924      000000
+ 1925 09e0 1030101F 		.ascii	"\0200\020\037\010\210H0\016\001@\200@?\000\000\000"
+ 1925      08884830 
+ 1925      0E014080 
+ 1925      403F0000 
+ 1925      00
+ 1926 09f1 00000000 		.space	15
+ 1926      00000000 
+ 1926      00000000 
+ 1926      000000
+ 1927 0a00 40404244 		.ascii	"@@BDX\300@\177@\300PHF@@\000\000"
+ 1927      58C0407F 
+ 1927      40C05048 
+ 1927      46404000 
+ 1927      00
+ 1928 0a11 00000000 		.space	15
+ 1928      00000000 
+ 1928      00000000 
+ 1928      000000
+ 1929 0a20 80804020 		.ascii	"\200\200@ \030\007\000\000\000?@@@@x\000\000"
+ 1929      18070000 
+ 1929      003F4040 
+ 1929      40407800 
+ 1929      00
+ 1930 0a31 00000000 		.space	15
+ 1930      00000000 
+ 1930      00000000 
+ 1930      000000
+ 1931 0a40 00FE4242 		.ascii	"\000\376BBB\376\000B\242\236\202\242\302\276\000\000"
+ 1931      42FE0042 
+ 1931      A29E82A2 
+ 1931      C2BE0000 
+ 1932 0a50 00       		.ascii	"\000"
+ 1933 0a51 00000000 		.space	15
+ 1933      00000000 
+ 1933      00000000 
+ 1933      000000
+ 1934 0a60 806F0808 		.ascii	"\200o\010\010(\317\000\000/\310\010\010(\317\000\000"
+ 1934      28CF0000 
+ 1934      2FC80808 
+ 1934      28CF0000 
+ 1935 0a70 00       		.ascii	"\000"
+ 1936 0a71 00000000 		.space	15
+ 1936      00000000 
+ 1936      00000000 
+ 1936      000000
+ 1937 0a80 02E22222 		.ascii	"\002\342\"\">\000\200\236\222\222\362\222\222\236\200"
+ 1937      3E00809E 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 53
+
+
+ 1937      9292F292 
+ 1937      929E80
+ 1938 0a8f 0000     		.ascii	"\000\000"
+ 1939 0a91 00000000 		.space	15
+ 1939      00000000 
+ 1939      00000000 
+ 1939      000000
+ 1940 0aa0 00438242 		.ascii	"\000C\202B>@GDDD\177DDT\347\000\000"
+ 1940      3E404744 
+ 1940      44447F44 
+ 1940      4454E700 
+ 1940      00
+ 1941 0ab1 00000000 		.space	15
+ 1941      00000000 
+ 1941      00000000 
+ 1941      000000
+ 1942 0ac0 0000FC24 		.ascii	"\000\000\374$$$\374%&$\374$$$\004\000\000"
+ 1942      2424FC25 
+ 1942      2624FC24 
+ 1942      24240400 
+ 1942      00
+ 1943 0ad1 00000000 		.space	15
+ 1943      00000000 
+ 1943      00000000 
+ 1943      000000
+ 1944 0ae0 40308F80 		.ascii	"@0\217\200\204LU%%%UL\200\200\200\000\000"
+ 1944      844C5525 
+ 1944      2525554C 
+ 1944      80808000 
+ 1944      00
+ 1945 0af1 00000000 		.space	15
+ 1945      00000000 
+ 1945      00000000 
+ 1945      000000
+ 1946 0b00 00000000 		.ascii	"\000\000\000\000\000\000\300?\300\000\000\000\000\000"
+ 1946      0000C03F 
+ 1946      C0000000 
+ 1946      0000
+ 1947 0b0e 000000   		.ascii	"\000\000\000"
+ 1948 0b11 00000000 		.space	15
+ 1948      00000000 
+ 1948      00000000 
+ 1948      000000
+ 1949 0b20 80402010 		.ascii	"\200@ \020\014\003\000\000\000\003\014\020 @\200\000"
+ 1949      0C030000 
+ 1949      00030C10 
+ 1949      20408000 
+ 1950 0b30 00       		.ascii	"\000"
+ 1951 0b31 00000000 		.space	15
+ 1951      00000000 
+ 1951      00000000 
+ 1951      000000
+ 1952 0b40 90523410 		.ascii	"\220R4\020\377\0204R\200p\217\010\010\370\010\000\000"
+ 1952      FF103452 
+ 1952      80708F08 
+ 1952      08F80800 
+ 1952      00
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 54
+
+
+ 1953 0b51 00000000 		.space	15
+ 1953      00000000 
+ 1953      00000000 
+ 1953      000000
+ 1954 0b60 829A5663 		.ascii	"\202\232Vc\"R\216\000\200@3\0143@\200\000\000"
+ 1954      22528E00 
+ 1954      8040330C 
+ 1954      33408000 
+ 1954      00
+ 1955 0b71 00000000 		.space	15
+ 1955      00000000 
+ 1955      00000000 
+ 1955      000000
+ 1956 0b80 00004040 		.ascii	"\000\000@@@@@\377@@@@@\000\000\000\000"
+ 1956      404040FF 
+ 1956      40404040 
+ 1956      40000000 
+ 1956      00
+ 1957 0b91 00000000 		.space	15
+ 1957      00000000 
+ 1957      00000000 
+ 1957      000000
+ 1958 0ba0 40404040 		.ascii	"@@@@@@@\177@@@@@@@\000\000"
+ 1958      4040407F 
+ 1958      40404040 
+ 1958      40404000 
+ 1958      00
+ 1959 0bb1 00000000 		.space	15
+ 1959      00000000 
+ 1959      00000000 
+ 1959      000000
+ 1960 0bc0 1010FF10 		.ascii	"\020\020\377\020\000\202\272\352\272\203\272\352\272"
+ 1960      0082BAEA 
+ 1960      BA83BAEA 
+ 1960      BA
+ 1961 0bcd 82000000 		.ascii	"\202\000\000\000"
+ 1962 0bd1 00000000 		.space	15
+ 1962      00000000 
+ 1962      00000000 
+ 1962      000000
+ 1963 0be0 08180F04 		.ascii	"\010\030\017\004HJ*\377\212J\032/Z\212\210\000\000"
+ 1963      484A2AFF 
+ 1963      8A4A1A2F 
+ 1963      5A8A8800 
+ 1963      00
+ 1964 0bf1 00000000 		.space	15
+ 1964      00000000 
+ 1964      00000000 
+ 1964      000000
+ 1965 0c00 0000FE22 		.ascii	"\000\000\376\"\"\"\"\376\"\"\"\"\376\000\000\000\000"
+ 1965      222222FE 
+ 1965      22222222 
+ 1965      FE000000 
+ 1965      00
+ 1966 0c11 00000000 		.space	15
+ 1966      00000000 
+ 1966      00000000 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 55
+
+
+ 1966      000000
+ 1967 0c20 00000702 		.ascii	"\000\000\007\002\002\002\002\377\002\002\002\002\007"
+ 1967      020202FF 
+ 1967      02020202 
+ 1967      07
+ 1968 0c2d 00000000 		.ascii	"\000\000\000\000"
+ 1969 0c31 00000000 		.space	15
+ 1969      00000000 
+ 1969      00000000 
+ 1969      000000
+ 1970 0c40 F212FE12 		.ascii	"\362\022\376\022\376\022\362\000\204O$\024$O\204\000"
+ 1970      FE12F200 
+ 1970      844F2414 
+ 1970      244F8400 
+ 1971 0c50 00       		.ascii	"\000"
+ 1972 0c51 00000000 		.space	15
+ 1972      00000000 
+ 1972      00000000 
+ 1972      000000
+ 1973 0c60 FF4A4948 		.ascii	"\377JIHII\377\000@II\177II@\000\000"
+ 1973      4949FF00 
+ 1973      4049497F 
+ 1973      49494000 
+ 1973      00
+ 1974 0c71 00000000 		.space	15
+ 1974      00000000 
+ 1974      00000000 
+ 1974      000000
+ 1975 0c80 1060028C 		.ascii	"\020`\002\214 \030\010\3108\317\010\010(\230\000\000"
+ 1975      201808C8 
+ 1975      38CF0808 
+ 1975      28980000 
+ 1976 0c90 00       		.ascii	"\000"
+ 1977 0c91 00000000 		.space	15
+ 1977      00000000 
+ 1977      00000000 
+ 1977      000000
+ 1978 0ca0 04047E01 		.ascii	"\004\004~\001\004\002\001\377@!\006\012\021 @\000\000"
+ 1978      040201FF 
+ 1978      4021060A 
+ 1978      11204000 
+ 1978      00
+ 1979 0cb1 00000000 		.space	15
+ 1979      00000000 
+ 1979      00000000 
+ 1979      000000
+ 1980 0cc0 0000FC24 		.ascii	"\000\000\374$$$\374%&$\374$$$\004\000\000"
+ 1980      2424FC25 
+ 1980      2624FC24 
+ 1980      24240400 
+ 1980      00
+ 1981 0cd1 00000000 		.space	15
+ 1981      00000000 
+ 1981      00000000 
+ 1981      000000
+ 1982 0ce0 40308F80 		.ascii	"@0\217\200\204LU%%%UL\200\200\200\000\000"
+ 1982      844C5525 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 56
+
+
+ 1982      2525554C 
+ 1982      80808000 
+ 1982      00
+ 1983 0cf1 00000000 		.space	15
+ 1983      00000000 
+ 1983      00000000 
+ 1983      000000
+ 1984 0d00 0000007F 		.ascii	"\000\000\000\177IIIIIII\177\000\000\000\000\000"
+ 1984      49494949 
+ 1984      4949497F 
+ 1984      00000000 
+ 1984      00
+ 1985 0d11 00000000 		.space	15
+ 1985      00000000 
+ 1985      00000000 
+ 1985      000000
+ 1986 0d20 8141211D 		.ascii	"\201A!\035!A\201\377\211\211\211\211\211\201\201\000"
+ 1986      214181FF 
+ 1986      89898989 
+ 1986      89818100 
+ 1987 0d30 00       		.ascii	"\000"
+ 1988 0d31 00000000 		.space	15
+ 1988      00000000 
+ 1988      00000000 
+ 1988      000000
+ 1989 0d40 00028282 		.ascii	"\000\002\202\202B\"\022\372\006\"\"BB\202\000\000\000"
+ 1989      422212FA 
+ 1989      06222242 
+ 1989      42820000 
+ 1989      00
+ 1990 0d51 00000000 		.space	15
+ 1990      00000000 
+ 1990      00000000 
+ 1990      000000
+ 1991 0d60 010100FC 		.ascii	"\001\001\000\374DDDEDDD\374\000\000\001\000\000"
+ 1991      44444445 
+ 1991      444444FC 
+ 1991      00000100 
+ 1991      00
+ 1992 0d71 00000000 		.space	15
+ 1992      00000000 
+ 1992      00000000 
+ 1992      000000
+ 1993 0d80 20180AAA 		.ascii	" \030\012\252\252\252\012\376\012\252\252\252\012(\030"
+ 1993      AAAA0AFE 
+ 1993      0AAAAAAA 
+ 1993      0A2818
+ 1994 0d8f 0000     		.ascii	"\000\000"
+ 1995 0d91 00000000 		.space	15
+ 1995      00000000 
+ 1995      00000000 
+ 1995      000000
+ 1996 0da0 0202FA0A 		.ascii	"\002\002\372\012\012z\016\012z\012J\212z\002\002\000"
+ 1996      0A7A0E0A 
+ 1996      7A0A4A8A 
+ 1996      7A020200 
+ 1997 0db0 00       		.ascii	"\000"
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 57
+
+
+ 1998 0db1 00000000 		.space	15
+ 1998      00000000 
+ 1998      00000000 
+ 1998      000000
+ 1999 0dc0 0002F292 		.ascii	"\000\002\362\222\222\376\222\222\222\376\222\222\362"
+ 1999      92FE9292 
+ 1999      92FE9292 
+ 1999      F2
+ 2000 0dcd 02000000 		.ascii	"\002\000\000\000"
+ 2001 0dd1 00000000 		.space	15
+ 2001      00000000 
+ 2001      00000000 
+ 2001      000000
+ 2002 0de0 00028292 		.ascii	"\000\002\202\222\232Vc\"2JFB\202\002\000\000\000"
+ 2002      9A566322 
+ 2002      324A4642 
+ 2002      82020000 
+ 2002      00
+ 2003 0df1 00000000 		.space	15
+ 2003      00000000 
+ 2003      00000000 
+ 2003      000000
+ 2004 0e00 02FE9292 		.ascii	"\002\376\222\222\376\002\000\020\021\026\360\024\023"
+ 2004      FE020010 
+ 2004      1116F014 
+ 2004      13
+ 2005 0e0d 10000000 		.ascii	"\020\000\000\000"
+ 2006 0e11 00000000 		.space	15
+ 2006      00000000 
+ 2006      00000000 
+ 2006      000000
+ 2007 0e20 101F0808 		.ascii	"\020\037\010\010\377\004\201A1\015\003\0151A\201\000"
+ 2007      FF048141 
+ 2007      310D030D 
+ 2007      31418100 
+ 2008 0e30 00       		.ascii	"\000"
+ 2009 0e31 00000000 		.space	15
+ 2009      00000000 
+ 2009      00000000 
+ 2009      000000
+ 2010 0e40 00FE0222 		.ascii	"\000\376\002\"B\202r\002\"B\202r\002\376\000\000\000"
+ 2010      42827202 
+ 2010      22428272 
+ 2010      02FE0000 
+ 2010      00
+ 2011 0e51 00000000 		.space	15
+ 2011      00000000 
+ 2011      00000000 
+ 2011      000000
+ 2012 0e60 00FF1008 		.ascii	"\000\377\020\010\006\001\016\020\010\006\001N\200\177"
+ 2012      06010E10 
+ 2012      0806014E 
+ 2012      807F
+ 2013 0e6e 000000   		.ascii	"\000\000\000"
+ 2014 0e71 00000000 		.space	15
+ 2014      00000000 
+ 2014      00000000 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 58
+
+
+ 2014      000000
+ 2015 0e80 00003834 		.ascii	"\000\00084\002\202\302|8\000\000\000\000\000\000\000"
+ 2015      0282C27C 
+ 2015      38000000 
+ 2015      00000000 
+ 2016 0e90 00       		.ascii	"\000"
+ 2017 0e91 00000000 		.space	15
+ 2017      00000000 
+ 2017      00000000 
+ 2017      000000
+ 2018 0ea0 00000000 		.ascii	"\000\000\000\000\00077\000\000\000\000\000\000\000\000"
+ 2018      00373700 
+ 2018      00000000 
+ 2018      000000
+ 2019 0eaf 0000     		.ascii	"\000\000"
+ 2020 0eb1 00000000 		.space	15
+ 2020      00000000 
+ 2020      00000000 
+ 2020      000000
+ 2021 0ec0 1088C433 		.ascii	"\020\210\3043\200\236\220\237\220\236 \330\027\360\020"
+ 2021      809E909F 
+ 2021      909E20D8 
+ 2021      17F010
+ 2022 0ecf 0000     		.ascii	"\000\000"
+ 2023 0ed1 00000000 		.space	15
+ 2023      00000000 
+ 2023      00000000 
+ 2023      000000
+ 2024 0ee0 0100FF80 		.ascii	"\001\000\377\200@>\002\002>\020\210g\030g\200\000\000"
+ 2024      403E0202 
+ 2024      3E108867 
+ 2024      18678000 
+ 2024      00
+ 2025 0ef1 00000000 		.space	15
+ 2025      00000000 
+ 2025      00000000 
+ 2025      000000
+ 2026 0f00 008060F8 		.ascii	"\000\200`\370\007\000\004$$%&$$$\004\000\000"
+ 2026      07000424 
+ 2026      24252624 
+ 2026      24240400 
+ 2026      00
+ 2027 0f11 00000000 		.space	15
+ 2027      00000000 
+ 2027      00000000 
+ 2027      000000
+ 2028 0f20 010000FF 		.ascii	"\001\000\000\377\000\000\000\371IIIII\371\000\000\000"
+ 2028      000000F9 
+ 2028      49494949 
+ 2028      49F90000 
+ 2028      00
+ 2029 0f31 00000000 		.space	15
+ 2029      00000000 
+ 2029      00000000 
+ 2029      000000
+ 2030 0f40 101010FF 		.ascii	"\020\020\020\377\020\220\000\376\221\200\377\200\222"
+ 2030      109000FE 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 59
+
+
+ 2030      9180FF80 
+ 2030      92
+ 2031 0f4d FE000000 		.ascii	"\376\000\000\000"
+ 2032 0f51 00000000 		.space	15
+ 2032      00000000 
+ 2032      00000000 
+ 2032      000000
+ 2033 0f60 0444827F 		.ascii	"\004D\202\177\001\000\200\202F*\023*F\202\200\000\000"
+ 2033      01008082 
+ 2033      462A132A 
+ 2033      46828000 
+ 2033      00
+ 2034 0f71 00000000 		.space	15
+ 2034      00000000 
+ 2034      00000000 
+ 2034      000000
+ 2035 0f80 80602424 		.ascii	"\200`$$$\244d?$$\244$$\240`\000\000"
+ 2035      24A4643F 
+ 2035      2424A424 
+ 2035      24A06000 
+ 2035      00
+ 2036 0f91 00000000 		.space	15
+ 2036      00000000 
+ 2036      00000000 
+ 2036      000000
+ 2037 0fa0 00804829 		.ascii	"\000\200H)\011M\215{\013\011(L\230\000\000\000\000"
+ 2037      094D8D7B 
+ 2037      0B09284C 
+ 2037      98000000 
+ 2037      00
+ 2038 0fb1 00000000 		.space	15
+ 2038      00000000 
+ 2038      00000000 
+ 2038      000000
+ 2039 0fc0 0000FE82 		.ascii	"\000\000\376\202\202\202\202\376\202\202\202\202\376"
+ 2039      828282FE 
+ 2039      82828282 
+ 2039      FE
+ 2040 0fcd 00000000 		.ascii	"\000\000\000\000"
+ 2041 0fd1 00000000 		.space	15
+ 2041      00000000 
+ 2041      00000000 
+ 2041      000000
+ 2042 0fe0 00003F40 		.ascii	"\000\000?@@@@@@@@@A@x\000\000"
+ 2042      40404040 
+ 2042      40404040 
+ 2042      41407800 
+ 2042      00
+ 2043 0ff1 00000000 		.space	15
+ 2043      00000000 
+ 2043      00000000 
+ 2043      000000
+ 2044 1000 1060028C 		.ascii	"\020`\002\214\000\020\020\020\020\377\020\020\020\020"
+ 2044      00101010 
+ 2044      10FF1010 
+ 2044      1010
+ 2045 100e 000000   		.ascii	"\000\000\000"
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 60
+
+
+ 2046 1011 00000000 		.space	15
+ 2046      00000000 
+ 2046      00000000 
+ 2046      000000
+ 2047 1020 04047E01 		.ascii	"\004\004~\001A\341QIECAQa\301\001\000\000"
+ 2047      41E15149 
+ 2047      45434151 
+ 2047      61C10100 
+ 2047      00
+ 2048 1031 00000000 		.space	15
+ 2048      00000000 
+ 2048      00000000 
+ 2048      000000
+ 2049 1040 40404242 		.ascii	"@@BBBB\302BBBBBB@@\000\000"
+ 2049      4242C242 
+ 2049      42424242 
+ 2049      42404000 
+ 2049      00
+ 2050 1051 00000000 		.space	15
+ 2050      00000000 
+ 2050      00000000 
+ 2050      000000
+ 2051 1060 00207028 		.ascii	"\000 p($#   $(0\340\000\000\000\000"
+ 2051      24232020 
+ 2051      20242830 
+ 2051      E0000000 
+ 2051      00
+ 2052 1071 00000000 		.space	15
+ 2052      00000000 
+ 2052      00000000 
+ 2052      000000
+ 2053 1080 00804020 		.ascii	"\000\200@ \030\006\200\000\007\030 @\200\000\000\000"
+ 2053      18068000 
+ 2053      07182040 
+ 2053      80000000 
+ 2054 1090 00       		.ascii	"\000"
+ 2055 1091 00000000 		.space	15
+ 2055      00000000 
+ 2055      00000000 
+ 2055      000000
+ 2056 10a0 01002070 		.ascii	"\001\000 p(&!  $8`\000\001\001\000\000"
+ 2056      28262120 
+ 2056      20243860 
+ 2056      00010100 
+ 2056      00
+ 2057 10b1 00000000 		.space	15
+ 2057      00000000 
+ 2057      00000000 
+ 2057      000000
+ 2058 10c0 80804020 		.ascii	"\200\200@ \320\010\004\003\004\010\320 @\200\200\000"
+ 2058      D0080403 
+ 2058      0408D020 
+ 2058      40808000 
+ 2059 10d0 00       		.ascii	"\000"
+ 2060 10d1 00000000 		.space	15
+ 2060      00000000 
+ 2060      00000000 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 61
+
+
+ 2060      000000
+ 2061 10e0 80402018 		.ascii	"\200@ \030\007\010\260@ \030\007\030 @\200\000\000"
+ 2061      0708B040 
+ 2061      20180718 
+ 2061      20408000 
+ 2061      00
+ 2062 10f1 00000000 		.space	15
+ 2062      00000000 
+ 2062      00000000 
+ 2062      000000
+ 2063 1100 808080BE 		.ascii	"\200\200\200\276\242\242\242\242\242\242\242\276\200"
+ 2063      A2A2A2A2 
+ 2063      A2A2A2BE 
+ 2063      80
+ 2064 110d 80800000 		.ascii	"\200\200\000\000"
+ 2065 1111 00000000 		.space	15
+ 2065      00000000 
+ 2065      00000000 
+ 2065      000000
+ 2066 1120 00000006 		.ascii	"\000\000\000\006\005\004\004\004D\204D<\000\000\000"
+ 2066      05040404 
+ 2066      4484443C 
+ 2066      000000
+ 2067 112f 0000     		.ascii	"\000\000"
+ 2068 1131 00000000 		.space	15
+ 2068      00000000 
+ 2068      00000000 
+ 2068      000000
+ 2069 1140 404042CC 		.ascii	"@@B\314\000\200\210\210\377\210\210\377\210\210\200"
+ 2069      00808888 
+ 2069      FF8888FF 
+ 2069      888880
+ 2070 114f 0000     		.ascii	"\000\000"
+ 2071 1151 00000000 		.space	15
+ 2071      00000000 
+ 2071      00000000 
+ 2071      000000
+ 2072 1160 0040201F 		.ascii	"\000@ \037 @PLC@@_@@@\000\000"
+ 2072      2040504C 
+ 2072      4340405F 
+ 2072      40404000 
+ 2072      00
+ 2073 1171 00000000 		.space	15
+ 2073      00000000 
+ 2073      00000000 
+ 2073      000000
+ 2074 1180 001088C4 		.ascii	"\000\020\210\3043\000@BBB\302BBB@\000\000"
+ 2074      33004042 
+ 2074      4242C242 
+ 2074      42424000 
+ 2074      00
+ 2075 1191 00000000 		.space	15
+ 2075      00000000 
+ 2075      00000000 
+ 2075      000000
+ 2076 11a0 020100FF 		.ascii	"\002\001\000\377\000\000\000\000@\200\177\000\000\000"
+ 2076      00000000 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 62
+
+
+ 2076      40807F00 
+ 2076      0000
+ 2077 11ae 000000   		.ascii	"\000\000\000"
+ 2078 11b1 00000000 		.space	15
+ 2078      00000000 
+ 2078      00000000 
+ 2078      000000
+ 2079 11c0 F212FE12 		.ascii	"\362\022\376\022\376\022\362\000\204\204\204\204\374"
+ 2079      FE12F200 
+ 2079      84848484 
+ 2079      FC
+ 2080 11cd 00000000 		.ascii	"\000\000\000\000"
+ 2081 11d1 00000000 		.space	15
+ 2081      00000000 
+ 2081      00000000 
+ 2081      000000
+ 2082 11e0 FF4A4948 		.ascii	"\377JIHII\377\000?@@@A@p\000\000"
+ 2082      4949FF00 
+ 2082      3F404040 
+ 2082      41407000 
+ 2082      00
+ 2083 11f1 00000000 		.space	15
+ 2083      00000000 
+ 2083      00000000 
+ 2083      000000
+ 2084 1200 00FE0222 		.ascii	"\000\376\002\"B\202r\002\"B\202r\002\376\000\000\000"
+ 2084      42827202 
+ 2084      22428272 
+ 2084      02FE0000 
+ 2084      00
+ 2085 1211 00000000 		.space	15
+ 2085      00000000 
+ 2085      00000000 
+ 2085      000000
+ 2086 1220 00FF1008 		.ascii	"\000\377\020\010\006\001\016\020\010\006\001N\200\177"
+ 2086      06010E10 
+ 2086      0806014E 
+ 2086      807F
+ 2087 122e 000000   		.ascii	"\000\000\000"
+ 2088 1231 00000000 		.space	15
+ 2088      00000000 
+ 2088      00000000 
+ 2088      000000
+ 2089 1240 000000BE 		.ascii	"\000\000\000\276***\352***>\000\000\000\000\000"
+ 2089      2A2A2AEA 
+ 2089      2A2A2A3E 
+ 2089      00000000 
+ 2089      00
+ 2090 1251 00000000 		.space	15
+ 2090      00000000 
+ 2090      00000000 
+ 2090      000000
+ 2091 1260 00444249 		.ascii	"\000DBIIII\177IIIIA@\000\000\000"
+ 2091      4949497F 
+ 2091      49494949 
+ 2091      41400000 
+ 2091      00
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 63
+
+
+ 2092 1271 00000000 		.space	15
+ 2092      00000000 
+ 2092      00000000 
+ 2092      000000
+ 2093 1280 0004FF24 		.ascii	"\000\004\377$$$\377\004\000\376\"\"\"\376\000\000\000"
+ 2093      2424FF04 
+ 2093      00FE2222 
+ 2093      22FE0000 
+ 2093      00
+ 2094 1291 00000000 		.space	15
+ 2094      00000000 
+ 2094      00000000 
+ 2094      000000
+ 2095 12a0 88482F09 		.ascii	"\210H/\011\011\031\257H0\017\002B\202\177\000\000\000"
+ 2095      0919AF48 
+ 2095      300F0242 
+ 2095      827F0000 
+ 2095      00
+ 2096 12b1 00000000 		.space	15
+ 2096      00000000 
+ 2096      00000000 
+ 2096      000000
+ 2097 12c0 80808080 		.ascii	"\200\200\200\200\200\200\200\200\200\200\200\200\200"
+ 2097      80808080 
+ 2097      80808080 
+ 2097      80
+ 2098 12cd 80800000 		.ascii	"\200\200\000\000"
+ 2099 12d1 00000000 		.space	15
+ 2099      00000000 
+ 2099      00000000 
+ 2099      000000
+ 2100 12e0 00000000 		.ascii	"\000\000\000\000\000\000\000\000\000\000\000\000\000"
+ 2100      00000000 
+ 2100      00000000 
+ 2100      00
+ 2101 12ed 00000000 		.ascii	"\000\000\000\000"
+ 2102 12f1 00000000 		.space	15
+ 2102      00000000 
+ 2102      00000000 
+ 2102      000000
+ 2103 1300 00000808 		.ascii	"\000\000\010\010\010\010\010\010\010\010\010\010\010"
+ 2103      08080808 
+ 2103      08080808 
+ 2103      08
+ 2104 130d 00000000 		.ascii	"\000\000\000\000"
+ 2105 1311 00000000 		.space	15
+ 2105      00000000 
+ 2105      00000000 
+ 2105      000000
+ 2106 1320 10101010 		.ascii	"\020\020\020\020\020\020\020\020\020\020\020\020\020"
+ 2106      10101010 
+ 2106      10101010 
+ 2106      10
+ 2107 132d 10100000 		.ascii	"\020\020\000\000"
+ 2108 1331 00000000 		.space	15
+ 2108      00000000 
+ 2108      00000000 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 64
+
+
+ 2108      000000
+ 2109 1340 00048484 		.ascii	"\000\004\204\204\204\204\204\204\204\204\204\204\204"
+ 2109      84848484 
+ 2109      84848484 
+ 2109      84
+ 2110 134d 04000000 		.ascii	"\004\000\000\000"
+ 2111 1351 00000000 		.space	15
+ 2111      00000000 
+ 2111      00000000 
+ 2111      000000
+ 2112 1360 20202020 		.ascii	"               \000\000"
+ 2112      20202020 
+ 2112      20202020 
+ 2112      20202000 
+ 2112      00
+ 2113 1371 00000000 		.space	15
+ 2113      00000000 
+ 2113      00000000 
+ 2113      000000
+ 2114 1380 00FC0404 		.ascii	"\000\374\004\004\004\374\004\004\004\374\004\004\004"
+ 2114      04FC0404 
+ 2114      04FC0404 
+ 2114      04
+ 2115 138d FC000000 		.ascii	"\374\000\000\000"
+ 2116 1391 00000000 		.space	15
+ 2116      00000000 
+ 2116      00000000 
+ 2116      000000
+ 2117 13a0 007F2824 		.ascii	"\000\177($#    !\"\"\"\177\000\000\000"
+ 2117      23202020 
+ 2117      20212222 
+ 2117      227F0000 
+ 2117      00
+ 2118 13b1 00000000 		.space	15
+ 2118      00000000 
+ 2118      00000000 
+ 2118      000000
+ 2119 13c0 00024242 		.ascii	"\000\002BBB\302~BBBB\302\002\002\000\000\000"
+ 2119      42C27E42 
+ 2119      424242C2 
+ 2119      02020000 
+ 2119      00
+ 2120 13d1 00000000 		.space	15
+ 2120      00000000 
+ 2120      00000000 
+ 2120      000000
+ 2121 13e0 40404040 		.ascii	"@@@@xG@@@@@\177@@@\000\000"
+ 2121      78474040 
+ 2121      4040407F 
+ 2121      40404000 
+ 2121      00
+ 2122 13f1 00000000 		.space	15
+ 2122      00000000 
+ 2122      00000000 
+ 2122      000000
+ 2123 1400 20202020 		.ascii	"      !\",      \000\000"
+ 2123      20202122 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 65
+
+
+ 2123      2C202020 
+ 2123      20202000 
+ 2123      00
+ 2124 1411 00000000 		.space	15
+ 2124      00000000 
+ 2124      00000000 
+ 2124      000000
+ 2125 1420 00402010 		.ascii	"\000@ \020\014\003\000\000\000\001\002\004\030`\000"
+ 2125      0C030000 
+ 2125      00010204 
+ 2125      186000
+ 2126 142f 0000     		.ascii	"\000\000"
+ 2127 1431 00000000 		.space	15
+ 2127      00000000 
+ 2127      00000000 
+ 2127      000000
+ 2128 1440 40404242 		.ascii	"@@BBBBB\376BBBBB@@\000\000"
+ 2128      424242FE 
+ 2128      42424242 
+ 2128      42404000 
+ 2128      00
+ 2129 1451 00000000 		.space	15
+ 2129      00000000 
+ 2129      00000000 
+ 2129      000000
+ 2130 1460 80804020 		.ascii	"\200\200@ \020\014\003\000\003\014\020 @\200\200\000"
+ 2130      100C0300 
+ 2130      030C1020 
+ 2130      40808000 
+ 2131 1470 00       		.ascii	"\000"
+ 2132 1471 00000000 		.space	15
+ 2132      00000000 
+ 2132      00000000 
+ 2132      000000
+ 2133 1480 40404244 		.ascii	"@@BDX\300@\177@\300PHF@@\000\000"
+ 2133      58C0407F 
+ 2133      40C05048 
+ 2133      46404000 
+ 2133      00
+ 2134 1491 00000000 		.space	15
+ 2134      00000000 
+ 2134      00000000 
+ 2134      000000
+ 2135 14a0 80804020 		.ascii	"\200\200@ \030\007\000\000\000?@@@@x\000\000"
+ 2135      18070000 
+ 2135      003F4040 
+ 2135      40407800 
+ 2135      00
+ 2136 14b1 00000000 		.space	15
+ 2136      00000000 
+ 2136      00000000 
+ 2136      000000
+ 2137 14c0 02E22222 		.ascii	"\002\342\"\">\000\200\236\222\222\362\222\222\236\200"
+ 2137      3E00809E 
+ 2137      9292F292 
+ 2137      929E80
+ 2138 14cf 0000     		.ascii	"\000\000"
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 66
+
+
+ 2139 14d1 00000000 		.space	15
+ 2139      00000000 
+ 2139      00000000 
+ 2139      000000
+ 2140 14e0 00438242 		.ascii	"\000C\202B>@GDDD\177DDT\347\000\000"
+ 2140      3E404744 
+ 2140      44447F44 
+ 2140      4454E700 
+ 2140      00
+ 2141 14f1 00000000 		.space	15
+ 2141      00000000 
+ 2141      00000000 
+ 2141      000000
+ 2142 1500 08A4A3AA 		.ascii	"\010\244\243\252\252\352\252\252\252\252*\352\002\002"
+ 2142      AAEAAAAA 
+ 2142      AAAA2AEA 
+ 2142      0202
+ 2143 150e 000000   		.ascii	"\000\000\000"
+ 2144 1511 00000000 		.space	15
+ 2144      00000000 
+ 2144      00000000 
+ 2144      000000
+ 2145 1520 0485945C 		.ascii	"\004\205\224\\f$TL\204\005\000\0170@\370\000\000"
+ 2145      6624544C 
+ 2145      8405000F 
+ 2145      3040F800 
+ 2145      00
+ 2146 1531 00000000 		.space	15
+ 2146      00000000 
+ 2146      00000000 
+ 2146      000000
+ 2147 1540 20104C47 		.ascii	" \020LGTTTTTTT\324\004\004\000\000\000"
+ 2147      54545454 
+ 2147      545454D4 
+ 2147      04040000 
+ 2147      00
+ 2148 1551 00000000 		.space	15
+ 2148      00000000 
+ 2148      00000000 
+ 2148      000000
+ 2149 1560 00000000 		.ascii	"\000\000\000\000\000\000\000\000\000\000\000\0170@\360"
+ 2149      00000000 
+ 2149      0000000F 
+ 2149      3040F0
+ 2150 156f 0000     		.ascii	"\000\000"
+ 2151 1571 00000000 		.space	15
+ 2151      00000000 
+ 2151      00000000 
+ 2151      000000
+ 2152 1580 1060028C 		.ascii	"\020`\002\214 \030\010\3108\317\010\010(\230\000\000"
+ 2152      201808C8 
+ 2152      38CF0808 
+ 2152      28980000 
+ 2153 1590 00       		.ascii	"\000"
+ 2154 1591 00000000 		.space	15
+ 2154      00000000 
+ 2154      00000000 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 67
+
+
+ 2154      000000
+ 2155 15a0 04047E01 		.ascii	"\004\004~\001\004\002\001\377@!\006\012\021 @\000\000"
+ 2155      040201FF 
+ 2155      4021060A 
+ 2155      11204000 
+ 2155      00
+ 2156 15b1 00000000 		.space	15
+ 2156      00000000 
+ 2156      00000000 
+ 2156      000000
+ 2157 15c0 0000FC24 		.ascii	"\000\000\374$$$\374%&$\374$$$\004\000\000"
+ 2157      2424FC25 
+ 2157      2624FC24 
+ 2157      24240400 
+ 2157      00
+ 2158 15d1 00000000 		.space	15
+ 2158      00000000 
+ 2158      00000000 
+ 2158      000000
+ 2159 15e0 40308F80 		.ascii	"@0\217\200\204LU%%%UL\200\200\200\000\000"
+ 2159      844C5525 
+ 2159      2525554C 
+ 2159      80808000 
+ 2159      00
+ 2160 15f1 00000000 		.space	15
+ 2160      00000000 
+ 2160      00000000 
+ 2160      000000
+ 2161 1600 08488808 		.ascii	"\010H\210\010\3108\000\000\374\006\025D\204|\000\000"
+ 2161      C8380000 
+ 2161      FC061544 
+ 2161      847C0000 
+ 2162 1610 00       		.ascii	"\000"
+ 2163 1611 00000000 		.space	15
+ 2163      00000000 
+ 2163      00000000 
+ 2163      000000
+ 2164 1620 20100C03 		.ascii	" \020\014\003\004\030\000\020\023\022\022R\222B>\000"
+ 2164      04180010 
+ 2164      13121252 
+ 2164      92423E00 
+ 2165 1630 00       		.ascii	"\000"
+ 2166 1631 00000000 		.space	15
+ 2166      00000000 
+ 2166      00000000 
+ 2166      000000
+ 2167 1640 20201010 		.ascii	"  \020\020($\"\341\"$(\020\020  \000\000"
+ 2167      282422E1 
+ 2167      22242810 
+ 2167      10202000 
+ 2167      00
+ 2168 1651 00000000 		.space	15
+ 2168      00000000 
+ 2168      00000000 
+ 2168      000000
+ 2169 1660 000001F9 		.ascii	"\000\000\001\371IIIOIII\371\001\000\000\000\000"
+ 2169      4949494F 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 68
+
+
+ 2169      494949F9 
+ 2169      01000000 
+ 2169      00
+ 2170 1671 00000000 		.space	15
+ 2170      00000000 
+ 2170      00000000 
+ 2170      000000
+ 2171 1680 00080889 		.ascii	"\000\010\010\211\312(\230\000\000\377 @\200\000\000"
+ 2171      CA289800 
+ 2171      00FF2040 
+ 2171      800000
+ 2172 168f 0000     		.ascii	"\000\000"
+ 2173 1691 00000000 		.space	15
+ 2173      00000000 
+ 2173      00000000 
+ 2173      000000
+ 2174 16a0 00020100 		.ascii	"\000\002\001\000\377\001\006\000\000\377\000\000\000"
+ 2174      FF010600 
+ 2174      00FF0000 
+ 2174      00
+ 2175 16ad 03000000 		.ascii	"\003\000\000\000"
+ 2176 16b1 00000000 		.space	15
+ 2176      00000000 
+ 2176      00000000 
+ 2176      000000
+ 2177 16c0 40404244 		.ascii	"@@BDX\300@\177@\300PHF@@\000\000"
+ 2177      58C0407F 
+ 2177      40C05048 
+ 2177      46404000 
+ 2177      00
+ 2178 16d1 00000000 		.space	15
+ 2178      00000000 
+ 2178      00000000 
+ 2178      000000
+ 2179 16e0 80804020 		.ascii	"\200\200@ \030\007\000\000\000?@@@@x\000\000"
+ 2179      18070000 
+ 2179      003F4040 
+ 2179      40407800 
+ 2179      00
+ 2180 16f1 00000000 		.space	15
+ 2180      00000000 
+ 2180      00000000 
+ 2180      000000
+ 2181 1700 00002232 		.ascii	"\000\000\"2*\246\242b!\021\011\201\001\000\000\000\000"
+ 2181      2AA6A262 
+ 2181      21110981 
+ 2181      01000000 
+ 2181      00
+ 2182 1711 00000000 		.space	15
+ 2182      00000000 
+ 2182      00000000 
+ 2182      000000
+ 2183 1720 00422213 		.ascii	"\000B\"\023\013B\202~\002\002\012\022#F\000\000\000"
+ 2183      0B42827E 
+ 2183      02020A12 
+ 2183      23460000 
+ 2183      00
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 69
+
+
+ 2184 1731 00000000 		.space	15
+ 2184      00000000 
+ 2184      00000000 
+ 2184      000000
+ 2185 1740 2030AC63 		.ascii	" 0\254c0\000\210\310\250\231\216\210\250\310\210\000"
+ 2185      300088C8 
+ 2185      A8998E88 
+ 2185      A8C88800 
+ 2186 1750 00       		.ascii	"\000"
+ 2187 1751 00000000 		.space	15
+ 2187      00000000 
+ 2187      00000000 
+ 2187      000000
+ 2188 1760 22672212 		.ascii	"\"g\"\022\022\200@0\017\000\000?@@q\000\000"
+ 2188      12804030 
+ 2188      0F00003F 
+ 2188      40407100 
+ 2188      00
+ 2189 1771 00000000 		.space	15
+ 2189      00000000 
+ 2189      00000000 
+ 2189      000000
+ 2190 1780 0004FF24 		.ascii	"\000\004\377$$$\377\004\000\376\"\"\"\376\000\000\000"
+ 2190      2424FF04 
+ 2190      00FE2222 
+ 2190      22FE0000 
+ 2190      00
+ 2191 1791 00000000 		.space	15
+ 2191      00000000 
+ 2191      00000000 
+ 2191      000000
+ 2192 17a0 88482F09 		.ascii	"\210H/\011\011\031\257H0\017\002B\202\177\000\000\000"
+ 2192      0919AF48 
+ 2192      300F0242 
+ 2192      827F0000 
+ 2192      00
+ 2193 17b1 00000000 		.space	15
+ 2193      00000000 
+ 2193      00000000 
+ 2193      000000
+ 2194 17c0 80808080 		.ascii	"\200\200\200\200\200\200\200\200\200\200\200\200\200"
+ 2194      80808080 
+ 2194      80808080 
+ 2194      80
+ 2195 17cd 80800000 		.ascii	"\200\200\000\000"
+ 2196 17d1 00000000 		.space	15
+ 2196      00000000 
+ 2196      00000000 
+ 2196      000000
+ 2197 17e0 00000000 		.ascii	"\000\000\000\000\000\000\000\000\000\000\000\000\000"
+ 2197      00000000 
+ 2197      00000000 
+ 2197      00
+ 2198 17ed 00000000 		.ascii	"\000\000\000\000"
+ 2199 17f1 00000000 		.space	15
+ 2199      00000000 
+ 2199      00000000 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 70
+
+
+ 2199      000000
+ 2200 1800 00000808 		.ascii	"\000\000\010\010\010\010\010\010\010\010\010\010\010"
+ 2200      08080808 
+ 2200      08080808 
+ 2200      08
+ 2201 180d 00000000 		.ascii	"\000\000\000\000"
+ 2202 1811 00000000 		.space	15
+ 2202      00000000 
+ 2202      00000000 
+ 2202      000000
+ 2203 1820 10101010 		.ascii	"\020\020\020\020\020\020\020\020\020\020\020\020\020"
+ 2203      10101010 
+ 2203      10101010 
+ 2203      10
+ 2204 182d 10100000 		.ascii	"\020\020\000\000"
+ 2205 1831 00000000 		.space	15
+ 2205      00000000 
+ 2205      00000000 
+ 2205      000000
+ 2206 1840 00048484 		.ascii	"\000\004\204\204\204\204\204\204\204\204\204\204\204"
+ 2206      84848484 
+ 2206      84848484 
+ 2206      84
+ 2207 184d 04000000 		.ascii	"\004\000\000\000"
+ 2208 1851 00000000 		.space	15
+ 2208      00000000 
+ 2208      00000000 
+ 2208      000000
+ 2209 1860 20202020 		.ascii	"               \000\000"
+ 2209      20202020 
+ 2209      20202020 
+ 2209      20202000 
+ 2209      00
+ 2210 1871 00000000 		.space	15
+ 2210      00000000 
+ 2210      00000000 
+ 2210      000000
+ 2211 1880 00FC0404 		.ascii	"\000\374\004\004\004\374\004\004\004\374\004\004\004"
+ 2211      04FC0404 
+ 2211      04FC0404 
+ 2211      04
+ 2212 188d FC000000 		.ascii	"\374\000\000\000"
+ 2213 1891 00000000 		.space	15
+ 2213      00000000 
+ 2213      00000000 
+ 2213      000000
+ 2214 18a0 007F2824 		.ascii	"\000\177($#    !\"\"\"\177\000\000\000"
+ 2214      23202020 
+ 2214      20212222 
+ 2214      227F0000 
+ 2214      00
+ 2215 18b1 00000000 		.space	15
+ 2215      00000000 
+ 2215      00000000 
+ 2215      000000
+ 2216 18c0 00024242 		.ascii	"\000\002BBB\302~BBBB\302\002\002\000\000\000"
+ 2216      42C27E42 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 71
+
+
+ 2216      424242C2 
+ 2216      02020000 
+ 2216      00
+ 2217 18d1 00000000 		.space	15
+ 2217      00000000 
+ 2217      00000000 
+ 2217      000000
+ 2218 18e0 40404040 		.ascii	"@@@@xG@@@@@\177@@@\000\000"
+ 2218      78474040 
+ 2218      4040407F 
+ 2218      40404000 
+ 2218      00
+ 2219 18f1 00000000 		.space	15
+ 2219      00000000 
+ 2219      00000000 
+ 2219      000000
+ 2220 1900 20202020 		.ascii	"      !\",      \000\000"
+ 2220      20202122 
+ 2220      2C202020 
+ 2220      20202000 
+ 2220      00
+ 2221 1911 00000000 		.space	15
+ 2221      00000000 
+ 2221      00000000 
+ 2221      000000
+ 2222 1920 00402010 		.ascii	"\000@ \020\014\003\000\000\000\001\002\004\030`\000"
+ 2222      0C030000 
+ 2222      00010204 
+ 2222      186000
+ 2223 192f 0000     		.ascii	"\000\000"
+ 2224 1931 00000000 		.space	15
+ 2224      00000000 
+ 2224      00000000 
+ 2224      000000
+ 2225 1940 000000FE 		.ascii	"\000\000\000\376\202\202\202\202\202\202\202\376\000"
+ 2225      82828282 
+ 2225      828282FE 
+ 2225      00
+ 2226 194d 00000000 		.ascii	"\000\000\000\000"
+ 2227 1951 00000000 		.space	15
+ 2227      00000000 
+ 2227      00000000 
+ 2227      000000
+ 2228 1960 000000FF 		.ascii	"\000\000\000\377@@@@@@@\377\000\000\000\000\000"
+ 2228      40404040 
+ 2228      404040FF 
+ 2228      00000000 
+ 2228      00
+ 2229 1971 00000000 		.space	15
+ 2229      00000000 
+ 2229      00000000 
+ 2229      000000
+ 2230 1980 000000BE 		.ascii	"\000\000\000\276***\352***>\000\000\000\000\000"
+ 2230      2A2A2AEA 
+ 2230      2A2A2A3E 
+ 2230      00000000 
+ 2230      00
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 72
+
+
+ 2231 1991 00000000 		.space	15
+ 2231      00000000 
+ 2231      00000000 
+ 2231      000000
+ 2232 19a0 00444249 		.ascii	"\000DBIIII\177IIIIA@\000\000\000"
+ 2232      4949497F 
+ 2232      49494949 
+ 2232      41400000 
+ 2232      00
+ 2233 19b1 00000000 		.space	15
+ 2233      00000000 
+ 2233      00000000 
+ 2233      000000
+ 2234 19c0 08488808 		.ascii	"\010H\210\010\3108\000\000\374\006\025D\204|\000\000"
+ 2234      C8380000 
+ 2234      FC061544 
+ 2234      847C0000 
+ 2235 19d0 00       		.ascii	"\000"
+ 2236 19d1 00000000 		.space	15
+ 2236      00000000 
+ 2236      00000000 
+ 2236      000000
+ 2237 19e0 20100C03 		.ascii	" \020\014\003\004\030\000\020\023\022\022R\222B>\000"
+ 2237      04180010 
+ 2237      13121252 
+ 2237      92423E00 
+ 2238 19f0 00       		.ascii	"\000"
+ 2239 19f1 00000000 		.space	15
+ 2239      00000000 
+ 2239      00000000 
+ 2239      000000
+ 2240 1a00 407C407F 		.ascii	"@|@\177HHH \020\014#\314\020 @\000\000"
+ 2240      48484820 
+ 2240      100C23CC 
+ 2240      10204000 
+ 2240      00
+ 2241 1a11 00000000 		.space	15
+ 2241      00000000 
+ 2241      00000000 
+ 2241      000000
+ 2242 1a20 7F484443 		.ascii	"\177HDC$(\377\001\011\021!\321\015\003\000\000\000"
+ 2242      2428FF01 
+ 2242      091121D1 
+ 2242      0D030000 
+ 2242      00
+ 2243 1a31 00000000 		.space	15
+ 2243      00000000 
+ 2243      00000000 
+ 2243      000000
+ 2244 1a40 80804020 		.ascii	"\200\200@ \020\010\004\303\004\010\020 @\200\200\000"
+ 2244      100804C3 
+ 2244      04081020 
+ 2244      40808000 
+ 2245 1a50 00       		.ascii	"\000"
+ 2246 1a51 00000000 		.space	15
+ 2246      00000000 
+ 2246      00000000 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 73
+
+
+ 2246      000000
+ 2247 1a60 00000000 		.ascii	"\000\000\000\000\000\000\000\377\000\000\000\000\000"
+ 2247      000000FF 
+ 2247      00000000 
+ 2247      00
+ 2248 1a6d 00000000 		.ascii	"\000\000\000\000"
+ 2249 1a71 00000000 		.space	15
+ 2249      00000000 
+ 2249      00000000 
+ 2249      000000
+ 2250 1a80 000000FE 		.ascii	"\000\000\000\376\"\"\"\"\"\"\"\"\376\000\000\000\000"
+ 2250      22222222 
+ 2250      22222222 
+ 2250      FE000000 
+ 2250      00
+ 2251 1a91 00000000 		.space	15
+ 2251      00000000 
+ 2251      00000000 
+ 2251      000000
+ 2252 1aa0 8040300F 		.ascii	"\200@0\017\002\002\002\002\002\002B\202\177\000\000"
+ 2252      02020202 
+ 2252      02024282 
+ 2252      7F0000
+ 2253 1aaf 0000     		.ascii	"\000\000"
+ 2254 1ab1 00000000 		.space	15
+ 2254      00000000 
+ 2254      00000000 
+ 2254      000000
+ 2255 1ac0 008060F8 		.ascii	"\000\200`\370\007\200@\260\216\200\200\207\230`\200"
+ 2255      078040B0 
+ 2255      8E808087 
+ 2255      986080
+ 2256 1acf 0000     		.ascii	"\000\000"
+ 2257 1ad1 00000000 		.space	15
+ 2257      00000000 
+ 2257      00000000 
+ 2257      000000
+ 2258 1ae0 010000FF 		.ascii	"\001\000\000\377\000\200@0\017\000@\200\177\000\000"
+ 2258      00804030 
+ 2258      0F004080 
+ 2258      7F0000
+ 2259 1aef 0000     		.ascii	"\000\000"
+ 2260 1af1 00000000 		.space	15
+ 2260      00000000 
+ 2260      00000000 
+ 2260      000000
+ 2261 1b00 1010D0FF 		.ascii	"\020\020\320\377\220\024\344\257\244\244\244\257\344"
+ 2261      9014E4AF 
+ 2261      A4A4A4AF 
+ 2261      E4
+ 2262 1b0d 04000000 		.ascii	"\004\000\000\000"
+ 2263 1b11 00000000 		.space	15
+ 2263      00000000 
+ 2263      00000000 
+ 2263      000000
+ 2264 1b20 040300FF 		.ascii	"\004\003\000\377\000\211K*\032\016\032*K\210\200\000"
+ 2264      00894B2A 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 74
+
+
+ 2264      1A0E1A2A 
+ 2264      4B888000 
+ 2265 1b30 00       		.ascii	"\000"
+ 2266 1b31 00000000 		.space	15
+ 2266      00000000 
+ 2266      00000000 
+ 2266      000000
+ 2267 1b40 10109090 		.ascii	"\020\020\220\220\220\220\220\020\020\377\020\020\021"
+ 2267      90909010 
+ 2267      10FF1010 
+ 2267      11
+ 2268 1b4d 16100000 		.ascii	"\026\020\000\000"
+ 2269 1b51 00000000 		.space	15
+ 2269      00000000 
+ 2269      00000000 
+ 2269      000000
+ 2270 1b60 00206020 		.ascii	"\000 ` ?\020\020\020\000\003\014\020 @\370\000\000"
+ 2270      3F101010 
+ 2270      00030C10 
+ 2270      2040F800 
+ 2270      00
+ 2271 1b71 00000000 		.space	15
+ 2271      00000000 
+ 2271      00000000 
+ 2271      000000
+ 2272 1b80 807000FF 		.ascii	"\200p\000\377 \020\004\004\004\004\374\004\004\004\004"
+ 2272      20100404 
+ 2272      0404FC04 
+ 2272      040404
+ 2273 1b8f 0000     		.ascii	"\000\000"
+ 2274 1b91 00000000 		.space	15
+ 2274      00000000 
+ 2274      00000000 
+ 2274      000000
+ 2275 1ba0 80601807 		.ascii	"\200`\030\007\0100\000\000@\200\177\000\000\000\000"
+ 2275      08300000 
+ 2275      40807F00 
+ 2275      000000
+ 2276 1baf 0000     		.ascii	"\000\000"
+ 2277 1bb1 00000000 		.space	15
+ 2277      00000000 
+ 2277      00000000 
+ 2277      000000
+ 2278 1bc0 40404244 		.ascii	"@@BDX\300@\177@\300PHF@@\000\000"
+ 2278      58C0407F 
+ 2278      40C05048 
+ 2278      46404000 
+ 2278      00
+ 2279 1bd1 00000000 		.space	15
+ 2279      00000000 
+ 2279      00000000 
+ 2279      000000
+ 2280 1be0 80804020 		.ascii	"\200\200@ \030\007\000\000\000?@@@@x\000\000"
+ 2280      18070000 
+ 2280      003F4040 
+ 2280      40407800 
+ 2280      00
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 75
+
+
+ 2281 1bf1 00000000 		.space	15
+ 2281      00000000 
+ 2281      00000000 
+ 2281      000000
+ 2282 1c00 101010FF 		.ascii	"\020\020\020\377\020\220\004\004\004\004\374\004\004"
+ 2282      10900404 
+ 2282      0404FC04 
+ 2282      04
+ 2283 1c0d 04040000 		.ascii	"\004\004\000\000"
+ 2284 1c11 00000000 		.space	15
+ 2284      00000000 
+ 2284      00000000 
+ 2284      000000
+ 2285 1c20 0444827F 		.ascii	"\004D\202\177\001\000\000\000@\200\177\000\000\000\000"
+ 2285      01000000 
+ 2285      40807F00 
+ 2285      000000
+ 2286 1c2f 0000     		.ascii	"\000\000"
+ 2287 1c31 00000000 		.space	15
+ 2287      00000000 
+ 2287      00000000 
+ 2287      000000
+ 2288 1c40 80828282 		.ascii	"\200\202\202\202\376\202\202\202\202\202\376\202\202"
+ 2288      FE828282 
+ 2288      8282FE82 
+ 2288      82
+ 2289 1c4d 82800000 		.ascii	"\202\200\000\000"
+ 2290 1c51 00000000 		.space	15
+ 2290      00000000 
+ 2290      00000000 
+ 2290      000000
+ 2291 1c60 00804030 		.ascii	"\000\200@0\017\000\000\000\000\000\377\000\000\000\000"
+ 2291      0F000000 
+ 2291      0000FF00 
+ 2291      000000
+ 2292 1c6f 0000     		.ascii	"\000\000"
+ 2293 1c71 00000000 		.space	15
+ 2293      00000000 
+ 2293      00000000 
+ 2293      000000
+ 2294 1c80 00001011 		.ascii	"\000\000\020\021\026\020\020\360\020\020\024\023\020"
+ 2294      161010F0 
+ 2294      10101413 
+ 2294      10
+ 2295 1c8d 00000000 		.ascii	"\000\000\000\000"
+ 2296 1c91 00000000 		.space	15
+ 2296      00000000 
+ 2296      00000000 
+ 2296      000000
+ 2297 1ca0 81814141 		.ascii	"\201\201AA!\021\015\003\015\021!AA\201\201\000\000"
+ 2297      21110D03 
+ 2297      0D112141 
+ 2297      41818100 
+ 2297      00
+ 2298 1cb1 00000000 		.space	15
+ 2298      00000000 
+ 2298      00000000 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 76
+
+
+ 2298      000000
+ 2299 1cc0 00F80122 		.ascii	"\000\370\001\" \"\"\242\372\"\"\"\002\376\000\000\000"
+ 2299      202222A2 
+ 2299      FA222222 
+ 2299      02FE0000 
+ 2299      00
+ 2300 1cd1 00000000 		.space	15
+ 2300      00000000 
+ 2300      00000000 
+ 2300      000000
+ 2301 1ce0 00FF0008 		.ascii	"\000\377\000\010\004\002\021 \037\000\000@\200\177\000"
+ 2301      04021120 
+ 2301      1F000040 
+ 2301      807F00
+ 2302 1cef 0000     		.ascii	"\000\000"
+ 2303 1cf1 00000000 		.space	15
+ 2303      00000000 
+ 2303      00000000 
+ 2303      000000
+ 2304 1d00 101010FF 		.ascii	"\020\020\020\377\020\020\360\000\000\370\010\010\010"
+ 2304      1010F000 
+ 2304      00F80808 
+ 2304      08
+ 2305 1d0d F8000000 		.ascii	"\370\000\000\000"
+ 2306 1d11 00000000 		.space	15
+ 2306      00000000 
+ 2306      00000000 
+ 2306      000000
+ 2307 1d20 8040300F 		.ascii	"\200@0\017@\200\177\000\000\177   \177\000\000\000"
+ 2307      40807F00 
+ 2307      007F2020 
+ 2307      207F0000 
+ 2307      00
+ 2308 1d31 00000000 		.space	15
+ 2308      00000000 
+ 2308      00000000 
+ 2308      000000
+ 2309 1d40 080888FF 		.ascii	"\010\010\210\377HH\000\010H\377\010\010\370\000\000"
+ 2309      48480008 
+ 2309      48FF0808 
+ 2309      F80000
+ 2310 1d4f 0000     		.ascii	"\000\000"
+ 2311 1d51 00000000 		.space	15
+ 2311      00000000 
+ 2311      00000000 
+ 2311      000000
+ 2312 1d60 81650807 		.ascii	"\201e\010\007 \300\010\004#\300\003\000#\304\017\000"
+ 2312      20C00804 
+ 2312      23C00300 
+ 2312      23C40F00 
+ 2313 1d70 00       		.ascii	"\000"
+ 2314 1d71 00000000 		.space	15
+ 2314      00000000 
+ 2314      00000000 
+ 2314      000000
+ 2315 1d80 40504E48 		.ascii	"@PNHH\377HHH@\370\000\000\377\000\000\000"
+ 2315      48FF4848 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 77
+
+
+ 2315      4840F800 
+ 2315      00FF0000 
+ 2315      00
+ 2316 1d91 00000000 		.space	15
+ 2316      00000000 
+ 2316      00000000 
+ 2316      000000
+ 2317 1da0 00003E02 		.ascii	"\000\000>\002\002\377\022\"\036\000\017@\200\177\000"
+ 2317      02FF1222 
+ 2317      1E000F40 
+ 2317      807F00
+ 2318 1daf 0000     		.ascii	"\000\000"
+ 2319 1db1 00000000 		.space	15
+ 2319      00000000 
+ 2319      00000000 
+ 2319      000000
+ 2320 1dc0 00020CC0 		.ascii	"\000\002\014\300\000@ \020\014#\314\020 @@\000\000"
+ 2320      00402010 
+ 2320      0C23CC10 
+ 2320      20404000 
+ 2320      00
+ 2321 1dd1 00000000 		.space	15
+ 2321      00000000 
+ 2321      00000000 
+ 2321      000000
+ 2322 1de0 02027F00 		.ascii	"\002\002\177\000\000\000\001\011\021!\321\015\003\000"
+ 2322      00000109 
+ 2322      1121D10D 
+ 2322      0300
+ 2323 1dee 000000   		.ascii	"\000\000\000"
+ 2324 1df1 00000000 		.space	15
+ 2324      00000000 
+ 2324      00000000 
+ 2324      000000
+ 2325 1e00 00FE225A 		.ascii	"\000\376\"Z\206 \020($\343$(\020  \000\000"
+ 2325      86201028 
+ 2325      24E32428 
+ 2325      10202000 
+ 2325      00
+ 2326 1e11 00000000 		.space	15
+ 2326      00000000 
+ 2326      00000000 
+ 2326      000000
+ 2327 1e20 00FF0408 		.ascii	"\000\377\004\010'\021\015A\201\177\001\005\0111\000"
+ 2327      27110D41 
+ 2327      817F0105 
+ 2327      093100
+ 2328 1e2f 0000     		.ascii	"\000\000"
+ 2329 1e31 00000000 		.space	15
+ 2329      00000000 
+ 2329      00000000 
+ 2329      000000
+ 2330 1e40 1060028C 		.ascii	"\020`\002\214\000\376\222\222\222\222\222\222\376\000"
+ 2330      00FE9292 
+ 2330      92929292 
+ 2330      FE00
+ 2331 1e4e 000000   		.ascii	"\000\000\000"
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 78
+
+
+ 2332 1e51 00000000 		.space	15
+ 2332      00000000 
+ 2332      00000000 
+ 2332      000000
+ 2333 1e60 04047E01 		.ascii	"\004\004~\001DHP\177@@\177PHD@\000\000"
+ 2333      4448507F 
+ 2333      40407F50 
+ 2333      48444000 
+ 2333      00
+ 2334 1e71 00000000 		.space	15
+ 2334      00000000 
+ 2334      00000000 
+ 2334      000000
+ 2335 1e80 80828282 		.ascii	"\200\202\202\202\376\202\202\202\202\202\376\202\202"
+ 2335      FE828282 
+ 2335      8282FE82 
+ 2335      82
+ 2336 1e8d 82800000 		.ascii	"\202\200\000\000"
+ 2337 1e91 00000000 		.space	15
+ 2337      00000000 
+ 2337      00000000 
+ 2337      000000
+ 2338 1ea0 00804030 		.ascii	"\000\200@0\017\000\000\000\000\000\377\000\000\000\000"
+ 2338      0F000000 
+ 2338      0000FF00 
+ 2338      000000
+ 2339 1eaf 0000     		.ascii	"\000\000"
+ 2340 1eb1 00000000 		.space	15
+ 2340      00000000 
+ 2340      00000000 
+ 2340      000000
+ 2341 1ec0 00001011 		.ascii	"\000\000\020\021\026\020\020\360\020\020\024\023\020"
+ 2341      161010F0 
+ 2341      10101413 
+ 2341      10
+ 2342 1ecd 00000000 		.ascii	"\000\000\000\000"
+ 2343 1ed1 00000000 		.space	15
+ 2343      00000000 
+ 2343      00000000 
+ 2343      000000
+ 2344 1ee0 81814141 		.ascii	"\201\201AA!\021\015\003\015\021!AA\201\201\000\000"
+ 2344      21110D03 
+ 2344      0D112141 
+ 2344      41818100 
+ 2344      00
+ 2345 1ef1 00000000 		.space	15
+ 2345      00000000 
+ 2345      00000000 
+ 2345      000000
+ 2346 1f00 00000000 		.ascii	"\000\000\000\000\000\000\377@@@@@@\000\000\000\000"
+ 2346      0000FF40 
+ 2346      40404040 
+ 2346      40000000 
+ 2346      00
+ 2347 1f11 00000000 		.space	15
+ 2347      00000000 
+ 2347      00000000 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 79
+
+
+ 2347      000000
+ 2348 1f20 40404040 		.ascii	"@@@@@@\177@@@@@@@@\000\000"
+ 2348      40407F40 
+ 2348      40404040 
+ 2348      40404000 
+ 2348      00
+ 2349 1f31 00000000 		.space	15
+ 2349      00000000 
+ 2349      00000000 
+ 2349      000000
+ 2350 1f40 00FE225A 		.ascii	"\000\376\"Z\206\000\376\222\222\222\222\222\376\000"
+ 2350      8600FE92 
+ 2350      92929292 
+ 2350      FE00
+ 2351 1f4e 000000   		.ascii	"\000\000\000"
+ 2352 1f51 00000000 		.space	15
+ 2352      00000000 
+ 2352      00000000 
+ 2352      000000
+ 2353 1f60 00FF0408 		.ascii	"\000\377\004\010\007\000\377@ \003\014\024\"A@\000\000"
+ 2353      0700FF40 
+ 2353      20030C14 
+ 2353      22414000 
+ 2353      00
+ 2354 1f71 00000000 		.space	15
+ 2354      00000000 
+ 2354      00000000 
+ 2354      000000
+ 2355 1f80 02020202 		.ascii	"\002\002\002\002\002\002\376\002\002B\202\002\002\002"
+ 2355      0202FE02 
+ 2355      02428202 
+ 2355      0202
+ 2356 1f8e 020000   		.ascii	"\002\000\000"
+ 2357 1f91 00000000 		.space	15
+ 2357      00000000 
+ 2357      00000000 
+ 2357      000000
+ 2358 1fa0 00000000 		.ascii	"\000\000\000\000\000\000\377\000\000\000\000\001\006"
+ 2358      0000FF00 
+ 2358      00000001 
+ 2358      06
+ 2359 1fad 00000000 		.ascii	"\000\000\000\000"
+ 2360 1fb1 00000000 		.space	15
+ 2360      00000000 
+ 2360      00000000 
+ 2360      000000
+ 2361 1fc0 00FE225A 		.ascii	"\000\376\"Z\206\000\376\222\222\222\222\222\376\000"
+ 2361      8600FE92 
+ 2361      92929292 
+ 2361      FE00
+ 2362 1fce 000000   		.ascii	"\000\000\000"
+ 2363 1fd1 00000000 		.space	15
+ 2363      00000000 
+ 2363      00000000 
+ 2363      000000
+ 2364 1fe0 00FF0408 		.ascii	"\000\377\004\010\007\000\377@ \003\014\024\"A@\000\000"
+ 2364      0700FF40 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 80
+
+
+ 2364      20030C14 
+ 2364      22414000 
+ 2364      00
+ 2365 1ff1 00000000 		.space	15
+ 2365      00000000 
+ 2365      00000000 
+ 2365      000000
+ 2366              		.global	F8X16
+ 2367              		.section	.rodata.F8X16,"a"
+ 2368              		.align	2
+ 2371              	F8X16:
+ 2372 0000 00000000 		.ascii	"\000\000\000\000\000\000\000\000\000\000\000\000\000"
+ 2372      00000000 
+ 2372      00000000 
+ 2372      00
+ 2373 000d 00000000 		.ascii	"\000\000\000\000\000\000\370\000\000\000\000\000\000"
+ 2373      0000F800 
+ 2373      00000000 
+ 2373      00
+ 2374 001a 00333000 		.ascii	"\00030\000\000\000\000\020\014\006\020\014\006\000\000"
+ 2374      00000010 
+ 2374      0C06100C 
+ 2374      060000
+ 2375 0029 00000000 		.ascii	"\000\000\000\000\000\000\000@\300x@\300x@\000\004?\004"
+ 2375      00000040 
+ 2375      C07840C0 
+ 2375      78400004 
+ 2375      3F04
+ 2376 003b 043F0404 		.ascii	"\004?\004\004\000\000p\210\374\0100\000\000\000\030"
+ 2376      00007088 
+ 2376      FC083000 
+ 2376      000018
+ 2377 004a 20FF211E 		.ascii	" \377!\036\000\000\360\010\360\000\340\030\000\000\000"
+ 2377      0000F008 
+ 2377      F000E018 
+ 2377      000000
+ 2378 0059 211C031E 		.ascii	"!\034\003\036!\036\000\000\360\010\210p\000\000\000"
+ 2378      211E0000 
+ 2378      F0088870 
+ 2378      000000
+ 2379 0068 1E212324 		.ascii	"\036!#$\031'!\020\020\026\016\000\000\000\000\000\000"
+ 2379      19272110 
+ 2379      10160E00 
+ 2379      00000000 
+ 2379      00
+ 2380 0079 00000000 		.ascii	"\000\000\000\000\000\000\000\000\000\000\340\030\004"
+ 2380      00000000 
+ 2380      0000E018 
+ 2380      04
+ 2381 0086 02000000 		.ascii	"\002\000\000\000\000\007\030 @\000\000\002\004\030\340"
+ 2381      00071820 
+ 2381      40000002 
+ 2381      0418E0
+ 2382 0095 00000000 		.ascii	"\000\000\000\000@ \030\007\000\000\000@@\200\360\200"
+ 2382      40201807 
+ 2382      00000040 
+ 2382      4080F080 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 81
+
+
+ 2383 00a5 40400002 		.ascii	"@@\000\002\002\001\017\001\002\002\000\000\000\000\360"
+ 2383      02010F01 
+ 2383      02020000 
+ 2383      0000F0
+ 2384 00b4 00000000 		.ascii	"\000\000\000\000\001\001\001\037\001\001\001\000\000"
+ 2384      0101011F 
+ 2384      01010100 
+ 2384      00
+ 2385 00c1 00000000 		.ascii	"\000\000\000\000\000\000\000\200\260p\000\000\000\000"
+ 2385      00000080 
+ 2385      B0700000 
+ 2385      0000
+ 2386 00cf 00000000 		.ascii	"\000\000\000\000\000\000\000\000\000\000\001\001\001"
+ 2386      00000000 
+ 2386      00000101 
+ 2386      01
+ 2387 00dc 01010101 		.ascii	"\001\001\001\001\000\000\000\000\000\000\000\000\000"
+ 2387      00000000 
+ 2387      00000000 
+ 2387      00
+ 2388 00e9 30300000 		.ascii	"00\000\000\000\000\000\000\000\000\000\200`\030\004"
+ 2388      00000000 
+ 2388      00000080 
+ 2388      601804
+ 2389 00f8 00601806 		.ascii	"\000`\030\006\001\000\000\000\000\340\020\010\010\020"
+ 2389      01000000 
+ 2389      00E01008 
+ 2389      0810
+ 2390 0106 E000000F 		.ascii	"\340\000\000\017\020  \020\017\000\000\020\020\370\000"
+ 2390      10202010 
+ 2390      0F000010 
+ 2390      10F800
+ 2391 0115 00000000 		.ascii	"\000\000\000\000  ?  \000\000\000p\010\010\010\210p"
+ 2391      20203F20 
+ 2391      20000000 
+ 2391      70080808 
+ 2391      8870
+ 2392 0127 00003028 		.ascii	"\000\0000($\"!0\000\0000\010\210\210H0\000\000\030 "
+ 2392      24222130 
+ 2392      00003008 
+ 2392      88884830 
+ 2392      00001820 
+ 2393 013b 2020110E 		.ascii	"  \021\016\000\000\000\300 \020\370\000\000\000\007"
+ 2393      000000C0 
+ 2393      2010F800 
+ 2393      000007
+ 2394 014a 0424243F 		.ascii	"\004$$?$\000\000\370\010\210\210\010\010\000\000\031"
+ 2394      240000F8 
+ 2394      08888808 
+ 2394      08000019 
+ 2395 015a 21202011 		.ascii	"!  \021\016\000\000\340\020\210\210\030\000\000\000"
+ 2395      0E0000E0 
+ 2395      10888818 
+ 2395      000000
+ 2396 0169 0F112020 		.ascii	"\017\021  \021\016\000\0008\010\010\3108\010\000\000"
+ 2396      110E0000 
+ 2396      380808C8 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 82
+
+
+ 2396      38080000 
+ 2397 0179 00003F00 		.ascii	"\000\000?\000\000\000\000\000p\210\010\010\210p\000"
+ 2397      00000000 
+ 2397      70880808 
+ 2397      887000
+ 2398 0188 001C2221 		.ascii	"\000\034\"!!\"\034\000\000\340\020\010\010\020\340\000"
+ 2398      21221C00 
+ 2398      00E01008 
+ 2398      0810E000 
+ 2399 0198 00003122 		.ascii	"\000\0001\"\"\021\017\000\000\000\000\300\300\000\000"
+ 2399      22110F00 
+ 2399      000000C0 
+ 2399      C00000
+ 2400 01a7 00000000 		.ascii	"\000\000\000\00000\000\000\000\000\000\000\200\000\000"
+ 2400      30300000 
+ 2400      00000000 
+ 2400      800000
+ 2401 01b6 00000000 		.ascii	"\000\000\000\000\200`\000\000\000\000\000\000\200@ "
+ 2401      80600000 
+ 2401      00000000 
+ 2401      804020
+ 2402 01c5 10080000 		.ascii	"\020\010\000\000\001\002\004\010\020 \000@@@@@@@\000"
+ 2402      01020408 
+ 2402      10200040 
+ 2402      40404040 
+ 2402      404000
+ 2403 01d8 04040404 		.ascii	"\004\004\004\004\004\004\004\000\000\010\020 @\200\000"
+ 2403      04040400 
+ 2403      00081020 
+ 2403      408000
+ 2404 01e7 00002010 		.ascii	"\000\000 \020\010\004\002\001\000\000pH\010\010\010"
+ 2404      08040201 
+ 2404      00007048 
+ 2404      080808
+ 2405 01f6 F0000000 		.ascii	"\360\000\000\000\00006\001\000\000\3000\310(\350\020"
+ 2405      00303601 
+ 2405      0000C030 
+ 2405      C828E810 
+ 2406 0206 E0000718 		.ascii	"\340\000\007\030'$#\024\013\000\000\000\3008\340\000"
+ 2406      27242314 
+ 2406      0B000000 
+ 2406      C038E000 
+ 2407 0216 0000203C 		.ascii	"\000\000 <#\002\002'8 \010\370\210\210\210p\000\000"
+ 2407      23020227 
+ 2407      382008F8 
+ 2407      88888870 
+ 2407      0000
+ 2408 0228 203F2020 		.ascii	" ?   \021\016\000\3000\010\010\010\0108\000\007\030"
+ 2408      20110E00 
+ 2408      C0300808 
+ 2408      08083800 
+ 2408      0718
+ 2409 023a 20202010 		.ascii	"   \020\010\000\010\370\010\010\010\020\340\000 ?  "
+ 2409      080008F8 
+ 2409      08080810 
+ 2409      E000203F 
+ 2409      2020
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 83
+
+
+ 2410 024c 20100F00 		.ascii	" \020\017\000\010\370\210\210\350\010\020\000 ?  # "
+ 2410      08F88888 
+ 2410      E8081000 
+ 2410      203F2020 
+ 2410      2320
+ 2411 025e 180008F8 		.ascii	"\030\000\010\370\210\210\350\010\020\000 ? \000\003"
+ 2411      8888E808 
+ 2411      1000203F 
+ 2411      200003
+ 2412 026d 000000C0 		.ascii	"\000\000\000\3000\010\010\0108\000\000\007\030  \"\036"
+ 2412      30080808 
+ 2412      38000007 
+ 2412      18202022 
+ 2412      1E
+ 2413 027e 020008F8 		.ascii	"\002\000\010\370\010\000\000\010\370\010 ?!\001\001"
+ 2413      08000008 
+ 2413      F808203F 
+ 2413      210101
+ 2414 028d 213F2000 		.ascii	"!? \000\010\010\370\010\010\000\000\000  ?  \000\000"
+ 2414      0808F808 
+ 2414      08000000 
+ 2414      20203F20 
+ 2414      200000
+ 2415 02a0 00000808 		.ascii	"\000\000\010\010\370\010\010\000\300\200\200\200\177"
+ 2415      F8080800 
+ 2415      C0808080 
+ 2415      7F
+ 2416 02ad 00000008 		.ascii	"\000\000\000\010\370\210\300(\030\010\000 ? \001&8 "
+ 2416      F888C028 
+ 2416      18080020 
+ 2416      3F200126 
+ 2416      3820
+ 2417 02bf 0008F808 		.ascii	"\000\010\370\010\000\000\000\000\000 ?    0\000\010"
+ 2417      00000000 
+ 2417      00203F20 
+ 2417      20202030 
+ 2417      0008
+ 2418 02d1 F8F800F8 		.ascii	"\370\370\000\370\370\010\000 ?\000?\000? \000\010\370"
+ 2418      F8080020 
+ 2418      3F003F00 
+ 2418      3F200008 
+ 2418      F8
+ 2419 02e2 30C00008 		.ascii	"0\300\000\010\370\010 ? \000\007\030?\000\340\020\010"
+ 2419      F808203F 
+ 2419      20000718 
+ 2419      3F00E010 
+ 2419      08
+ 2420 02f3 080810E0 		.ascii	"\010\010\020\340\000\017\020   \020\017\000\010\370"
+ 2420      000F1020 
+ 2420      2020100F 
+ 2420      0008F8
+ 2421 0302 08080808 		.ascii	"\010\010\010\010\360\000 ?!\001\001\001\000\000\340"
+ 2421      F000203F 
+ 2421      21010101 
+ 2421      0000E0
+ 2422 0311 10080808 		.ascii	"\020\010\010\010\020\340\000\017\030$$8PO\000\010\370"
+ 2422      10E0000F 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 84
+
+
+ 2422      18242438 
+ 2422      504F0008 
+ 2422      F8
+ 2423 0322 88888888 		.ascii	"\210\210\210\210p\000 ? \000\003\0140 \000p\210\010"
+ 2423      7000203F 
+ 2423      2000030C 
+ 2423      30200070 
+ 2423      8808
+ 2424 0334 08083800 		.ascii	"\010\0108\000\0008 !!\"\034\000\030\010\010\370\010"
+ 2424      00382021 
+ 2424      21221C00 
+ 2424      180808F8 
+ 2424      08
+ 2425 0345 08180000 		.ascii	"\010\030\000\000\000 ? \000\000\000\010\370\010\000"
+ 2425      00203F20 
+ 2425      00000008 
+ 2425      F80800
+ 2426 0354 0008F808 		.ascii	"\000\010\370\010\000\037    \037\000\010x\210\000\000"
+ 2426      001F2020 
+ 2426      20201F00 
+ 2426      08788800 
+ 2426      00
+ 2427 0365 C8380800 		.ascii	"\3108\010\000\000\0078\016\001\000\000\370\010\000\370"
+ 2427      0007380E 
+ 2427      010000F8 
+ 2427      0800F8
+ 2428 0374 0008F800 		.ascii	"\000\010\370\000\003<\007\000\007<\003\000\010\030h"
+ 2428      033C0700 
+ 2428      073C0300 
+ 2428      081868
+ 2429 0383 80806818 		.ascii	"\200\200h\030\010 0,\003\003,0 \0108\310\000\3108\010"
+ 2429      0820302C 
+ 2429      03032C30 
+ 2429      200838C8 
+ 2429      00C83808 
+ 2430 0397 00000020 		.ascii	"\000\000\000 ? \000\000\000\020\010\010\010\3108\010"
+ 2430      3F200000 
+ 2430      00100808 
+ 2430      08C83808 
+ 2431 03a7 00203826 		.ascii	"\000 8&!  \030\000\000\000\000\376\002\002\002\000\000"
+ 2431      21202018 
+ 2431      00000000 
+ 2431      FE020202 
+ 2431      0000
+ 2432 03b9 00007F40 		.ascii	"\000\000\177@@@\000\000\0140\300\000\000\000\000\000"
+ 2432      40400000 
+ 2432      0C30C000 
+ 2432      00000000 
+ 2433 03c9 00000106 		.ascii	"\000\000\001\0068\300\000\000\002\002\002\376\000\000"
+ 2433      38C00000 
+ 2433      020202FE 
+ 2433      0000
+ 2434 03d7 00004040 		.ascii	"\000\000@@@\177\000\000\000\000\000\004\002\002\002"
+ 2434      407F0000 
+ 2434      00000004 
+ 2434      020202
+ 2435 03e6 04000000 		.ascii	"\004\000\000\000\000\000\000\000\000\000\000\000\000"
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 85
+
+
+ 2435      00000000 
+ 2435      00000000 
+ 2435      00
+ 2436 03f3 00000000 		.ascii	"\000\000\000\000\000\200\200\200\200\200\200\200\200"
+ 2436      00808080 
+ 2436      80808080 
+ 2436      80
+ 2437 0400 00020204 		.ascii	"\000\002\002\004\000\000\000\000\000\000\000\000\000"
+ 2437      00000000 
+ 2437      00000000 
+ 2437      00
+ 2438 040d 00000000 		.ascii	"\000\000\000\000\000\200\200\200\200\000\000\000\031"
+ 2438      00808080 
+ 2438      80000000 
+ 2438      19
+ 2439 041a 24222222 		.ascii	"$\"\"\"? \010\370\000\200\200\000\000\000\000?\021 "
+ 2439      3F2008F8 
+ 2439      00808000 
+ 2439      0000003F 
+ 2439      1120
+ 2440 042c 20110E00 		.ascii	" \021\016\000\000\000\000\200\200\200\000\000\000\016"
+ 2440      00000080 
+ 2440      80800000 
+ 2440      000E
+ 2441 043a 11202020 		.ascii	"\021   \021\000\000\000\000\200\200\210\370\000\000"
+ 2441      11000000 
+ 2441      00808088 
+ 2441      F80000
+ 2442 0449 0E112020 		.ascii	"\016\021  \020? \000\000\200\200\200\200\000\000\000"
+ 2442      103F2000 
+ 2442      00808080 
+ 2442      80000000 
+ 2443 0459 1F222222 		.ascii	"\037\"\"\"\"\023\000\000\200\200\360\210\210\210\030"
+ 2443      22130000 
+ 2443      8080F088 
+ 2443      888818
+ 2444 0468 0020203F 		.ascii	"\000  ?  \000\000\000\000\200\200\200\200\200\000\000"
+ 2444      20200000 
+ 2444      00008080 
+ 2444      80808000 
+ 2444      00
+ 2445 0479 6B949494 		.ascii	"k\224\224\224\223`\000\010\370\000\200\200\200\000\000"
+ 2445      93600008 
+ 2445      F8008080 
+ 2445      800000
+ 2446 0488 203F2100 		.ascii	" ?!\000\000 ? \000\200\230\230\000\000\000\000\000 "
+ 2446      00203F20 
+ 2446      00809898 
+ 2446      00000000 
+ 2446      0020
+ 2447 049a 203F2020 		.ascii	" ?  \000\000\000\000\000\200\230\230\000\000\000\300"
+ 2447      00000000 
+ 2447      00809898 
+ 2447      000000C0 
+ 2448 04aa 8080807F 		.ascii	"\200\200\200\177\000\000\010\370\000\000\200\200\200"
+ 2448      000008F8 
+ 2448      00008080 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 86
+
+
+ 2448      80
+ 2449 04b7 00203F24 		.ascii	"\000 ?$\002-0 \000\000\010\010\370\000\000\000\000\000"
+ 2449      022D3020 
+ 2449      00000808 
+ 2449      F8000000 
+ 2449      0000
+ 2450 04c9 20203F20 		.ascii	"  ?  \000\000\200\200\200\200\200\200\200\000 ? \000"
+ 2450      20000080 
+ 2450      80808080 
+ 2450      80800020 
+ 2450      3F2000
+ 2451 04dc 3F20003F 		.ascii	"? \000?\200\200\000\200\200\200\000\000 ?!\000\000 "
+ 2451      80800080 
+ 2451      80800000 
+ 2451      203F2100 
+ 2451      0020
+ 2452 04ee 3F200000 		.ascii	"? \000\000\200\200\200\200\000\000\000\037    \037\000"
+ 2452      80808080 
+ 2452      0000001F 
+ 2452      20202020 
+ 2452      1F00
+ 2453 0500 80800080 		.ascii	"\200\200\000\200\200\000\000\000\200\377\241  \021\016"
+ 2453      80000000 
+ 2453      80FFA120 
+ 2453      20110E
+ 2454 050f 00000000 		.ascii	"\000\000\000\000\200\200\200\200\000\000\016\021  \240"
+ 2454      80808080 
+ 2454      00000E11 
+ 2454      2020A0
+ 2455 051e FF808080 		.ascii	"\377\200\200\200\200\000\200\200\200\000  ?! \000\001"
+ 2455      80008080 
+ 2455      80002020 
+ 2455      3F212000 
+ 2455      01
+ 2456 052f 00000080 		.ascii	"\000\000\000\200\200\200\200\200\000\0003$$$$\031\000"
+ 2456      80808080 
+ 2456      00003324 
+ 2456      24242419 
+ 2456      00
+ 2457 0540 008080E0 		.ascii	"\000\200\200\340\200\200\000\000\000\000\000\037  \000"
+ 2457      80800000 
+ 2457      0000001F 
+ 2457      202000
+ 2458 054f 00808000 		.ascii	"\000\200\200\000\000\000\200\200\000\000\037   \020"
+ 2458      00008080 
+ 2458      00001F20 
+ 2458      202010
+ 2459 055e 3F208080 		.ascii	"? \200\200\200\000\000\200\200\200\000\001\0160\010"
+ 2459      80000080 
+ 2459      80800001 
+ 2459      0E3008
+ 2460 056d 06010080 		.ascii	"\006\001\000\200\200\000\200\000\200\200\200\0170\014"
+ 2460      80008000 
+ 2460      8080800F 
+ 2460      300C
+ 2461 057b 030C300F 		.ascii	"\003\0140\017\000\000\200\200\000\200\200\200\000\000"
+ 2461      00008080 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 87
+
+
+ 2461      00808080 
+ 2461      0000
+ 2462 0589 20312E0E 		.ascii	" 1.\0161 \000\200\200\200\000\000\200\200\200\200\201"
+ 2462      31200080 
+ 2462      80800000 
+ 2462      80808080 
+ 2462      81
+ 2463 059a 8E701806 		.ascii	"\216p\030\006\001\000\000\200\200\200\200\200\200\000"
+ 2463      01000080 
+ 2463      80808080 
+ 2463      8000
+ 2464 05a8 0021302C 		.ascii	"\000!0,\"!0\000\000\000\000\000\200|\002\002\000\000"
+ 2464      22213000 
+ 2464      00000000 
+ 2464      807C0202 
+ 2464      0000
+ 2465 05ba 0000003F 		.ascii	"\000\000\000?@@\000\000\000\000\377\000\000\000\000"
+ 2465      40400000 
+ 2465      0000FF00 
+ 2465      000000
+ 2466 05c9 000000FF 		.ascii	"\000\000\000\377\000\000\000\000\002\002|\200\000\000"
+ 2466      00000000 
+ 2466      02027C80 
+ 2466      0000
+ 2467 05d7 00004040 		.ascii	"\000\000@@?\000\000\000\000\000\006\001\001\002\002"
+ 2467      3F000000 
+ 2467      00000601 
+ 2467      010202
+ 2468 05e6 04040000 		.ascii	"\004\004\000\000\000\000\000\000\000\000"
+ 2468      00000000 
+ 2468      0000
+ 2469              		.global	F6x8
+ 2470              		.section	.rodata.F6x8,"a"
+ 2471              		.align	2
+ 2474              	F6x8:
+ 2475 0000 00000000 		.ascii	"\000\000\000\000\000\000"
+ 2475      0000
+ 2476 0006 0000002F 		.ascii	"\000\000\000/\000\000"
+ 2476      0000
+ 2477 000c 00000700 		.ascii	"\000\000\007\000\007\000"
+ 2477      0700
+ 2478 0012 00147F14 		.ascii	"\000\024\177\024\177\024"
+ 2478      7F14
+ 2479 0018 00242A7F 		.ascii	"\000$*\177*\022"
+ 2479      2A12
+ 2480 001e 00626408 		.ascii	"\000bd\010\023#"
+ 2480      1323
+ 2481 0024 00364955 		.ascii	"\0006IU\"P"
+ 2481      2250
+ 2482 002a 00000503 		.ascii	"\000\000\005\003\000\000"
+ 2482      0000
+ 2483 0030 00001C22 		.ascii	"\000\000\034\"A\000"
+ 2483      4100
+ 2484 0036 00004122 		.ascii	"\000\000A\"\034\000"
+ 2484      1C00
+ 2485 003c 0014083E 		.ascii	"\000\024\010>\010\024"
+ 2485      0814
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 88
+
+
+ 2486 0042 0008083E 		.ascii	"\000\010\010>\010\010"
+ 2486      0808
+ 2487 0048 000000A0 		.ascii	"\000\000\000\240`\000"
+ 2487      6000
+ 2488 004e 00080808 		.ascii	"\000\010\010\010\010\010"
+ 2488      0808
+ 2489 0054 00006060 		.ascii	"\000\000``\000\000"
+ 2489      0000
+ 2490 005a 00201008 		.ascii	"\000 \020\010\004\002"
+ 2490      0402
+ 2491 0060 003E5149 		.ascii	"\000>QIE>"
+ 2491      453E
+ 2492 0066 0000427F 		.ascii	"\000\000B\177@\000"
+ 2492      4000
+ 2493 006c 00426151 		.ascii	"\000BaQIF"
+ 2493      4946
+ 2494 0072 00214145 		.ascii	"\000!AEK1"
+ 2494      4B31
+ 2495 0078 00181412 		.ascii	"\000\030\024\022\177\020"
+ 2495      7F10
+ 2496 007e 00274545 		.ascii	"\000'EEE9"
+ 2496      4539
+ 2497 0084 003C4A49 		.ascii	"\000<JII0"
+ 2497      4930
+ 2498 008a 00017109 		.ascii	"\000\001q\011\005\003"
+ 2498      0503
+ 2499 0090 00364949 		.ascii	"\0006III6"
+ 2499      4936
+ 2500 0096 00064949 		.ascii	"\000\006II)\036"
+ 2500      291E
+ 2501 009c 00003636 		.ascii	"\000\00066\000\000"
+ 2501      0000
+ 2502 00a2 00005636 		.ascii	"\000\000V6\000\000"
+ 2502      0000
+ 2503 00a8 00081422 		.ascii	"\000\010\024\"A\000"
+ 2503      4100
+ 2504 00ae 00141414 		.ascii	"\000\024\024\024\024\024"
+ 2504      1414
+ 2505 00b4 00004122 		.ascii	"\000\000A\"\024\010"
+ 2505      1408
+ 2506 00ba 00020151 		.ascii	"\000\002\001Q\011\006"
+ 2506      0906
+ 2507 00c0 00324959 		.ascii	"\0002IYQ>"
+ 2507      513E
+ 2508 00c6 007C1211 		.ascii	"\000|\022\021\022|"
+ 2508      127C
+ 2509 00cc 007F4949 		.ascii	"\000\177III6"
+ 2509      4936
+ 2510 00d2 003E4141 		.ascii	"\000>AAA\""
+ 2510      4122
+ 2511 00d8 007F4141 		.ascii	"\000\177AA\"\034"
+ 2511      221C
+ 2512 00de 007F4949 		.ascii	"\000\177IIIA"
+ 2512      4941
+ 2513 00e4 007F0909 		.ascii	"\000\177\011\011\011\001"
+ 2513      0901
+ 2514 00ea 003E4149 		.ascii	"\000>AIIz"
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 89
+
+
+ 2514      497A
+ 2515 00f0 007F0808 		.ascii	"\000\177\010\010\010\177"
+ 2515      087F
+ 2516 00f6 0000417F 		.ascii	"\000\000A\177A\000"
+ 2516      4100
+ 2517 00fc 00204041 		.ascii	"\000 @A?\001"
+ 2517      3F01
+ 2518 0102 007F0814 		.ascii	"\000\177\010\024\"A"
+ 2518      2241
+ 2519 0108 007F4040 		.ascii	"\000\177@@@@"
+ 2519      4040
+ 2520 010e 007F020C 		.ascii	"\000\177\002\014\002\177"
+ 2520      027F
+ 2521 0114 007F0408 		.ascii	"\000\177\004\010\020\177"
+ 2521      107F
+ 2522 011a 003E4141 		.ascii	"\000>AAA>"
+ 2522      413E
+ 2523 0120 007F0909 		.ascii	"\000\177\011\011\011\006"
+ 2523      0906
+ 2524 0126 003E4151 		.ascii	"\000>AQ!^"
+ 2524      215E
+ 2525 012c 007F0919 		.ascii	"\000\177\011\031)F"
+ 2525      2946
+ 2526 0132 00464949 		.ascii	"\000FIII1"
+ 2526      4931
+ 2527 0138 0001017F 		.ascii	"\000\001\001\177\001\001"
+ 2527      0101
+ 2528 013e 003F4040 		.ascii	"\000?@@@?"
+ 2528      403F
+ 2529 0144 001F2040 		.ascii	"\000\037 @ \037"
+ 2529      201F
+ 2530 014a 003F4038 		.ascii	"\000?@8@?"
+ 2530      403F
+ 2531 0150 00631408 		.ascii	"\000c\024\010\024c"
+ 2531      1463
+ 2532 0156 00070870 		.ascii	"\000\007\010p\010\007"
+ 2532      0807
+ 2533 015c 00615149 		.ascii	"\000aQIEC"
+ 2533      4543
+ 2534 0162 00007F41 		.ascii	"\000\000\177AA\000"
+ 2534      4100
+ 2535 0168 00552A55 		.ascii	"\000U*U*U"
+ 2535      2A55
+ 2536 016e 00004141 		.ascii	"\000\000AA\177\000"
+ 2536      7F00
+ 2537 0174 00040201 		.ascii	"\000\004\002\001\002\004"
+ 2537      0204
+ 2538 017a 00404040 		.ascii	"\000@@@@@"
+ 2538      4040
+ 2539 0180 00000102 		.ascii	"\000\000\001\002\004\000"
+ 2539      0400
+ 2540 0186 00205454 		.ascii	"\000 TTTx"
+ 2540      5478
+ 2541 018c 007F4844 		.ascii	"\000\177HDD8"
+ 2541      4438
+ 2542 0192 00384444 		.ascii	"\0008DDD "
+ 2542      4420
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 90
+
+
+ 2543 0198 00384444 		.ascii	"\0008DDH\177"
+ 2543      487F
+ 2544 019e 00385454 		.ascii	"\0008TTT\030"
+ 2544      5418
+ 2545 01a4 00087E09 		.ascii	"\000\010~\011\001\002"
+ 2545      0102
+ 2546 01aa 0018A4A4 		.ascii	"\000\030\244\244\244|"
+ 2546      A47C
+ 2547 01b0 007F0804 		.ascii	"\000\177\010\004\004x"
+ 2547      0478
+ 2548 01b6 0000447D 		.ascii	"\000\000D}@\000"
+ 2548      4000
+ 2549 01bc 00408084 		.ascii	"\000@\200\204}\000"
+ 2549      7D00
+ 2550 01c2 007F1028 		.ascii	"\000\177\020(D\000"
+ 2550      4400
+ 2551 01c8 0000417F 		.ascii	"\000\000A\177@\000"
+ 2551      4000
+ 2552 01ce 007C0418 		.ascii	"\000|\004\030\004x"
+ 2552      0478
+ 2553 01d4 007C0804 		.ascii	"\000|\010\004\004x"
+ 2553      0478
+ 2554 01da 00384444 		.ascii	"\0008DDD8"
+ 2554      4438
+ 2555 01e0 00FC2424 		.ascii	"\000\374$$$\030"
+ 2555      2418
+ 2556 01e6 00182424 		.ascii	"\000\030$$\030\374"
+ 2556      18FC
+ 2557 01ec 007C0804 		.ascii	"\000|\010\004\004\010"
+ 2557      0408
+ 2558 01f2 00485454 		.ascii	"\000HTTT "
+ 2558      5420
+ 2559 01f8 00043F44 		.ascii	"\000\004?D@ "
+ 2559      4020
+ 2560 01fe 003C4040 		.ascii	"\000<@@ |"
+ 2560      207C
+ 2561 0204 001C2040 		.ascii	"\000\034 @ \034"
+ 2561      201C
+ 2562 020a 003C4030 		.ascii	"\000<@0@<"
+ 2562      403C
+ 2563 0210 00442810 		.ascii	"\000D(\020(D"
+ 2563      2844
+ 2564 0216 001CA0A0 		.ascii	"\000\034\240\240\240|"
+ 2564      A07C
+ 2565 021c 00446454 		.ascii	"\000DdTLD"
+ 2565      4C44
+ 2566 0222 14141414 		.ascii	"\024\024\024\024\024\024"
+ 2566      1414
+ 2567              		.text
+ 2568              	.Letext0:
+ 2569              		.file 2 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 2570              		.file 3 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 2571              		.file 4 "USER/stm32f10x.h"
+ 2572              		.file 5 "STM32F10x_FWLib/inc/stm32f10x_gpio.h"
+ 2573              		.file 6 "HARDWARE/OLED/oledfont.h"
+ 2574              		.file 7 "SYSTEM/delay/delay.h"
+ 2575              		.file 8 "STM32F10x_FWLib/inc/stm32f10x_rcc.h"
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 91
+
+
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 92
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 oled.c
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:19     .text.IIC_Start1:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:25     .text.IIC_Start1:00000000 IIC_Start1
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:62     .text.IIC_Start1:00000030 $d
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:67     .text.IIC_Stop1:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:73     .text.IIC_Stop1:00000000 IIC_Stop1
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:105    .text.IIC_Stop1:00000024 $d
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:110    .text.IIC_Wait_Ack1:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:116    .text.IIC_Wait_Ack1:00000000 IIC_Wait_Ack1
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:143    .text.IIC_Wait_Ack1:0000001c $d
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:148    .text.Write_IIC_Byte:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:154    .text.Write_IIC_Byte:00000000 Write_IIC_Byte
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:244    .text.Write_IIC_Byte:00000054 $d
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:249    .text.Write_IIC_Command:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:255    .text.Write_IIC_Command:00000000 Write_IIC_Command
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:303    .text.Write_IIC_Data:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:309    .text.Write_IIC_Data:00000000 Write_IIC_Data
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:357    .text.OLED_WR_Byte:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:363    .text.OLED_WR_Byte:00000000 OLED_WR_Byte
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:402    .text.fill_picture:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:408    .text.fill_picture:00000000 fill_picture
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:487    .text.Delay_50ms:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:493    .text.Delay_50ms:00000000 Delay_50ms
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:529    .text.Delay_1ms:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:535    .text.Delay_1ms:00000000 Delay_1ms
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:580    .text.OLED_Set_Pos:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:586    .text.OLED_Set_Pos:00000000 OLED_Set_Pos
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:631    .text.OLED_Display_On:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:637    .text.OLED_Display_On:00000000 OLED_Display_On
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:669    .text.OLED_Display_Off:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:675    .text.OLED_Display_Off:00000000 OLED_Display_Off
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:707    .text.OLED_Clear:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:713    .text.OLED_Clear:00000000 OLED_Clear
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:792    .text.OLED_On:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:798    .text.OLED_On:00000000 OLED_On
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:874    .text.OLED_ShowChar:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:880    .text.OLED_ShowChar:00000000 OLED_ShowChar
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:1036   .text.OLED_ShowChar:00000090 $d
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:2371   .rodata.F8X16:00000000 F8X16
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:2474   .rodata.F6x8:00000000 F6x8
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:1042   .text.oled_pow:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:1048   .text.oled_pow:00000000 oled_pow
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:1091   .text.OLED_ShowNum:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:1097   .text.OLED_ShowNum:00000000 OLED_ShowNum
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:1229   .text.OLED_ShowNum:0000008c $d
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:1234   .text.OLED_ShowString:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:1240   .text.OLED_ShowString:00000000 OLED_ShowString
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:1321   .text.OLED_ShowCHinese:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:1327   .text.OLED_ShowCHinese:00000000 OLED_ShowCHinese
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:1423   .text.OLED_ShowCHinese:00000050 $d
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:1729   .data.Hzk:00000000 Hzk
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:1428   .text.OLED_DrawBMP:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:1434   .text.OLED_DrawBMP:00000000 OLED_DrawBMP
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:1521   .text.OLED_Init:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:1527   .text.OLED_Init:00000000 OLED_Init
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:1720   .text.OLED_Init:00000114 $d
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cczfNEmN.s 			page 93
+
+
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:1726   .data.Hzk:00000000 $d
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:2368   .rodata.F8X16:00000000 $d
+C:\Users\31687\AppData\Local\Temp\cczfNEmN.s:2471   .rodata.F6x8:00000000 $d
+
+UNDEFINED SYMBOLS
+GPIO_SetBits
+GPIO_ResetBits
+RCC_APB2PeriphClockCmd
+GPIO_Init
+delay_ms

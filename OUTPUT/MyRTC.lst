@@ -1,0 +1,662 @@
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s 			page 1
+
+
+   1              		.cpu cortex-m3
+   2              		.arch armv7-m
+   3              		.fpu softvfp
+   4              		.eabi_attribute 20, 1
+   5              		.eabi_attribute 21, 1
+   6              		.eabi_attribute 23, 3
+   7              		.eabi_attribute 24, 1
+   8              		.eabi_attribute 25, 1
+   9              		.eabi_attribute 26, 1
+  10              		.eabi_attribute 30, 1
+  11              		.eabi_attribute 34, 1
+  12              		.eabi_attribute 18, 4
+  13              		.file	"MyRTC.c"
+  14              		.text
+  15              	.Ltext0:
+  16              		.cfi_sections	.debug_frame
+  17              		.file 1 "HARDWARE/rtc/MyRTC.c"
+  18              		.section	.text.MyRTC_SetTime,"ax",%progbits
+  19              		.align	1
+  20              		.global	MyRTC_SetTime
+  21              		.syntax unified
+  22              		.thumb
+  23              		.thumb_func
+  25              	MyRTC_SetTime:
+  26              	.LFB30:
+   1:HARDWARE/rtc/MyRTC.c **** /**
+   2:HARDWARE/rtc/MyRTC.c ****  * MyRTC.c
+   3:HARDWARE/rtc/MyRTC.c ****  * RTC实时时钟驱动实现文件
+   4:HARDWARE/rtc/MyRTC.c ****  * 功能：实现RTC初始化、时间设置和读取函数
+   5:HARDWARE/rtc/MyRTC.c ****  * 版本：V1.0
+   6:HARDWARE/rtc/MyRTC.c ****  * 测试硬件：STM32F103RCT6
+   7:HARDWARE/rtc/MyRTC.c ****  * 作者：蔬菜恒温库监控系统开发团队
+   8:HARDWARE/rtc/MyRTC.c ****  * 创建日期：2026-03-08
+   9:HARDWARE/rtc/MyRTC.c ****  * 项目：蔬菜恒温库监控系统
+  10:HARDWARE/rtc/MyRTC.c ****  */
+  11:HARDWARE/rtc/MyRTC.c **** 
+  12:HARDWARE/rtc/MyRTC.c **** #include "stm32f10x.h"                  // Device header
+  13:HARDWARE/rtc/MyRTC.c **** #include "MyRTC.h"
+  14:HARDWARE/rtc/MyRTC.c **** #include <time.h>
+  15:HARDWARE/rtc/MyRTC.c **** 
+  16:HARDWARE/rtc/MyRTC.c **** /**
+  17:HARDWARE/rtc/MyRTC.c ****  * @brief 时间设置数组
+  18:HARDWARE/rtc/MyRTC.c ****  * @note 格式：[年, 月, 日, 时, 分, 秒]
+  19:HARDWARE/rtc/MyRTC.c ****  * @value 初始值：2025年2月11日 22:00:54
+  20:HARDWARE/rtc/MyRTC.c ****  */
+  21:HARDWARE/rtc/MyRTC.c **** uint16_t Set_time[6] = {2025, 2, 11, 22, 00, 54};
+  22:HARDWARE/rtc/MyRTC.c **** 
+  23:HARDWARE/rtc/MyRTC.c **** /**
+  24:HARDWARE/rtc/MyRTC.c ****  * @brief 时间读取数组
+  25:HARDWARE/rtc/MyRTC.c ****  * @note 格式：[年, 月, 日, 时, 分, 秒]
+  26:HARDWARE/rtc/MyRTC.c ****  * @value 初始值：全0
+  27:HARDWARE/rtc/MyRTC.c ****  */
+  28:HARDWARE/rtc/MyRTC.c **** uint16_t Read_time[6] = {0000, 00, 00, 00, 00, 00};
+  29:HARDWARE/rtc/MyRTC.c **** 
+  30:HARDWARE/rtc/MyRTC.c **** /**
+  31:HARDWARE/rtc/MyRTC.c ****  * @brief 日历结构体实例
+  32:HARDWARE/rtc/MyRTC.c ****  * @note 存储当前时间和日期
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s 			page 2
+
+
+  33:HARDWARE/rtc/MyRTC.c ****  */
+  34:HARDWARE/rtc/MyRTC.c **** _calendar_obj calendar;                            //时钟结构体 
+  35:HARDWARE/rtc/MyRTC.c **** 
+  36:HARDWARE/rtc/MyRTC.c **** /**
+  37:HARDWARE/rtc/MyRTC.c ****  * @brief 闹钟1结构体
+  38:HARDWARE/rtc/MyRTC.c ****  * @note 存储闹钟1的时间设置，初始小时为8点
+  39:HARDWARE/rtc/MyRTC.c ****  */
+  40:HARDWARE/rtc/MyRTC.c **** _calendar_obj Alarm1 = {8};  //闹钟结构体
+  41:HARDWARE/rtc/MyRTC.c **** 
+  42:HARDWARE/rtc/MyRTC.c **** /**
+  43:HARDWARE/rtc/MyRTC.c ****  * @brief 闹钟2结构体
+  44:HARDWARE/rtc/MyRTC.c ****  * @note 存储闹钟2的时间设置，初始小时为12点
+  45:HARDWARE/rtc/MyRTC.c ****  */
+  46:HARDWARE/rtc/MyRTC.c **** _calendar_obj Alarm2 = {12};  //闹钟结构体
+  47:HARDWARE/rtc/MyRTC.c **** 
+  48:HARDWARE/rtc/MyRTC.c **** /**
+  49:HARDWARE/rtc/MyRTC.c ****  * @brief 闹钟3结构体
+  50:HARDWARE/rtc/MyRTC.c ****  * @note 存储闹钟3的时间设置，初始小时为20点
+  51:HARDWARE/rtc/MyRTC.c ****  */
+  52:HARDWARE/rtc/MyRTC.c **** _calendar_obj Alarm3 = {20};  //闹钟结构体
+  53:HARDWARE/rtc/MyRTC.c **** 
+  54:HARDWARE/rtc/MyRTC.c **** /**
+  55:HARDWARE/rtc/MyRTC.c ****  * @brief 初始化RTC
+  56:HARDWARE/rtc/MyRTC.c ****  * @param 无
+  57:HARDWARE/rtc/MyRTC.c ****  * @return 无
+  58:HARDWARE/rtc/MyRTC.c ****  * @note 使用LSE作为RTC时钟源
+  59:HARDWARE/rtc/MyRTC.c ****  *       首次初始化时设置时间，之后从备份寄存器恢复
+  60:HARDWARE/rtc/MyRTC.c ****  */
+  61:HARDWARE/rtc/MyRTC.c **** void MyRTC_Init(void)
+  62:HARDWARE/rtc/MyRTC.c **** {
+  63:HARDWARE/rtc/MyRTC.c **** 	// 使能PWR和BKP时钟
+  64:HARDWARE/rtc/MyRTC.c **** 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);
+  65:HARDWARE/rtc/MyRTC.c **** 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_BKP, ENABLE);
+  66:HARDWARE/rtc/MyRTC.c **** 	
+  67:HARDWARE/rtc/MyRTC.c **** 	// 允许访问备份寄存器
+  68:HARDWARE/rtc/MyRTC.c **** 	PWR_BackupAccessCmd(ENABLE);
+  69:HARDWARE/rtc/MyRTC.c **** 	
+  70:HARDWARE/rtc/MyRTC.c **** 	// 检查是否首次初始化
+  71:HARDWARE/rtc/MyRTC.c **** 	if (BKP_ReadBackupRegister(BKP_DR1) != 0xA5A5)
+  72:HARDWARE/rtc/MyRTC.c **** 	{
+  73:HARDWARE/rtc/MyRTC.c **** 		// 复位备份寄存器
+  74:HARDWARE/rtc/MyRTC.c **** 		BKP_DeInit();
+  75:HARDWARE/rtc/MyRTC.c **** 	
+  76:HARDWARE/rtc/MyRTC.c **** 		// 使能LSE（外部低速晶振）
+  77:HARDWARE/rtc/MyRTC.c **** 		RCC_LSEConfig(RCC_LSE_ON);
+  78:HARDWARE/rtc/MyRTC.c **** 		// 等待LSE稳定
+  79:HARDWARE/rtc/MyRTC.c **** 		while (RCC_GetFlagStatus(RCC_FLAG_LSERDY) == RESET);
+  80:HARDWARE/rtc/MyRTC.c **** 		
+  81:HARDWARE/rtc/MyRTC.c **** 		// 设置RTC时钟源为LSE
+  82:HARDWARE/rtc/MyRTC.c **** 		RCC_RTCCLKConfig(RCC_RTCCLKSource_LSE);
+  83:HARDWARE/rtc/MyRTC.c **** 		// 使能RTC时钟
+  84:HARDWARE/rtc/MyRTC.c **** 		RCC_RTCCLKCmd(ENABLE);
+  85:HARDWARE/rtc/MyRTC.c **** 		
+  86:HARDWARE/rtc/MyRTC.c **** 		// 等待RTC寄存器同步
+  87:HARDWARE/rtc/MyRTC.c **** 		RTC_WaitForSynchro();
+  88:HARDWARE/rtc/MyRTC.c **** 		// 等待上一次操作完成
+  89:HARDWARE/rtc/MyRTC.c **** 		RTC_WaitForLastTask();
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s 			page 3
+
+
+  90:HARDWARE/rtc/MyRTC.c **** 		
+  91:HARDWARE/rtc/MyRTC.c **** 		// 设置RTC预分频器（32768Hz / 32768 = 1Hz）
+  92:HARDWARE/rtc/MyRTC.c **** 		RTC_SetPrescaler(32767);
+  93:HARDWARE/rtc/MyRTC.c **** 		// 等待上一次操作完成
+  94:HARDWARE/rtc/MyRTC.c **** 		RTC_WaitForLastTask();
+  95:HARDWARE/rtc/MyRTC.c **** 		
+  96:HARDWARE/rtc/MyRTC.c **** 		// 设置时间
+  97:HARDWARE/rtc/MyRTC.c **** 		MyRTC_SetTime();
+  98:HARDWARE/rtc/MyRTC.c **** 		
+  99:HARDWARE/rtc/MyRTC.c **** 		// 写入备份寄存器，标记已初始化
+ 100:HARDWARE/rtc/MyRTC.c **** 		BKP_WriteBackupRegister(BKP_DR1, 0xA5A5);
+ 101:HARDWARE/rtc/MyRTC.c **** 	}
+ 102:HARDWARE/rtc/MyRTC.c **** 	else
+ 103:HARDWARE/rtc/MyRTC.c **** 	{
+ 104:HARDWARE/rtc/MyRTC.c **** 		// 等待RTC寄存器同步
+ 105:HARDWARE/rtc/MyRTC.c **** 		RTC_WaitForSynchro();
+ 106:HARDWARE/rtc/MyRTC.c **** 		// 等待上一次操作完成
+ 107:HARDWARE/rtc/MyRTC.c **** 		RTC_WaitForLastTask();
+ 108:HARDWARE/rtc/MyRTC.c **** 	}
+ 109:HARDWARE/rtc/MyRTC.c **** }
+ 110:HARDWARE/rtc/MyRTC.c **** 
+ 111:HARDWARE/rtc/MyRTC.c **** /**
+ 112:HARDWARE/rtc/MyRTC.c ****  * @brief 初始化RTC（使用LSI时钟源）
+ 113:HARDWARE/rtc/MyRTC.c ****  * @param 无
+ 114:HARDWARE/rtc/MyRTC.c ****  * @return 无
+ 115:HARDWARE/rtc/MyRTC.c ****  * @note 此函数已被注释，使用LSE作为时钟源
+ 116:HARDWARE/rtc/MyRTC.c ****  */
+ 117:HARDWARE/rtc/MyRTC.c **** /*
+ 118:HARDWARE/rtc/MyRTC.c **** void MyRTC_Init(void)
+ 119:HARDWARE/rtc/MyRTC.c **** {
+ 120:HARDWARE/rtc/MyRTC.c **** 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);
+ 121:HARDWARE/rtc/MyRTC.c **** 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_BKP, ENABLE);
+ 122:HARDWARE/rtc/MyRTC.c **** 	
+ 123:HARDWARE/rtc/MyRTC.c **** 	PWR_BackupAccessCmd(ENABLE);
+ 124:HARDWARE/rtc/MyRTC.c **** 	
+ 125:HARDWARE/rtc/MyRTC.c **** 	if (BKP_ReadBackupRegister(BKP_DR1) != 0xA5A5)
+ 126:HARDWARE/rtc/MyRTC.c **** 	{
+ 127:HARDWARE/rtc/MyRTC.c **** 		BKP_DeInit();
+ 128:HARDWARE/rtc/MyRTC.c **** 	
+ 129:HARDWARE/rtc/MyRTC.c **** 		RCC_LSICmd(ENABLE);
+ 130:HARDWARE/rtc/MyRTC.c **** 		while (RCC_GetFlagStatus(RCC_FLAG_LSIRDY) == RESET);
+ 131:HARDWARE/rtc/MyRTC.c **** 		
+ 132:HARDWARE/rtc/MyRTC.c **** 		RCC_RTCCLKConfig(RCC_RTCCLKSource_LSI);
+ 133:HARDWARE/rtc/MyRTC.c **** 		RCC_RTCCLKCmd(ENABLE);
+ 134:HARDWARE/rtc/MyRTC.c **** 		
+ 135:HARDWARE/rtc/MyRTC.c **** 		RTC_WaitForSynchro();
+ 136:HARDWARE/rtc/MyRTC.c **** 		RTC_WaitForLastTask();
+ 137:HARDWARE/rtc/MyRTC.c **** 		
+ 138:HARDWARE/rtc/MyRTC.c **** 		RTC_SetPrescaler(40000 - 1);
+ 139:HARDWARE/rtc/MyRTC.c **** 		RTC_WaitForLastTask();
+ 140:HARDWARE/rtc/MyRTC.c **** 		
+ 141:HARDWARE/rtc/MyRTC.c **** 		MyRTC_SetTime();
+ 142:HARDWARE/rtc/MyRTC.c **** 		
+ 143:HARDWARE/rtc/MyRTC.c **** 		BKP_WriteBackupRegister(BKP_DR1, 0xA5A5);
+ 144:HARDWARE/rtc/MyRTC.c **** 	}
+ 145:HARDWARE/rtc/MyRTC.c **** 	else
+ 146:HARDWARE/rtc/MyRTC.c **** 	{
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s 			page 4
+
+
+ 147:HARDWARE/rtc/MyRTC.c **** 		RCC_LSICmd(ENABLE);
+ 148:HARDWARE/rtc/MyRTC.c **** 		while (RCC_GetFlagStatus(RCC_FLAG_LSIRDY) == RESET);
+ 149:HARDWARE/rtc/MyRTC.c **** 		
+ 150:HARDWARE/rtc/MyRTC.c **** 		RCC_RTCCLKConfig(RCC_RTCCLKSource_LSI);
+ 151:HARDWARE/rtc/MyRTC.c **** 		RCC_RTCCLKCmd(ENABLE);
+ 152:HARDWARE/rtc/MyRTC.c **** 		
+ 153:HARDWARE/rtc/MyRTC.c **** 		RTC_WaitForSynchro();
+ 154:HARDWARE/rtc/MyRTC.c **** 		RTC_WaitForLastTask();
+ 155:HARDWARE/rtc/MyRTC.c **** 	}
+ 156:HARDWARE/rtc/MyRTC.c **** }
+ 157:HARDWARE/rtc/MyRTC.c **** */
+ 158:HARDWARE/rtc/MyRTC.c **** 
+ 159:HARDWARE/rtc/MyRTC.c **** /**
+ 160:HARDWARE/rtc/MyRTC.c ****  * @brief 设置RTC时间
+ 161:HARDWARE/rtc/MyRTC.c ****  * @param 无
+ 162:HARDWARE/rtc/MyRTC.c ****  * @return 无
+ 163:HARDWARE/rtc/MyRTC.c ****  * @note 使用Set_time数组中的值设置时间
+ 164:HARDWARE/rtc/MyRTC.c ****  *       计算从1970年1月1日到设置时间的秒数，并减去8小时的时区偏移
+ 165:HARDWARE/rtc/MyRTC.c ****  */
+ 166:HARDWARE/rtc/MyRTC.c **** void MyRTC_SetTime(void)
+ 167:HARDWARE/rtc/MyRTC.c **** {
+  27              		.loc 1 167 1 view -0
+  28              		.cfi_startproc
+  29              		@ args = 0, pretend = 0, frame = 40
+  30              		@ frame_needed = 0, uses_anonymous_args = 0
+  31 0000 00B5     		push	{lr}
+  32              	.LCFI0:
+  33              		.cfi_def_cfa_offset 4
+  34              		.cfi_offset 14, -4
+  35 0002 8BB0     		sub	sp, sp, #44
+  36              	.LCFI1:
+  37              		.cfi_def_cfa_offset 48
+ 168:HARDWARE/rtc/MyRTC.c **** 	time_t time_cnt;        // 时间计数器
+  38              		.loc 1 168 2 view .LVU1
+ 169:HARDWARE/rtc/MyRTC.c **** 	struct tm time_date;    // 时间结构体
+  39              		.loc 1 169 2 view .LVU2
+ 170:HARDWARE/rtc/MyRTC.c **** 	
+ 171:HARDWARE/rtc/MyRTC.c **** 	// 填充时间结构体
+ 172:HARDWARE/rtc/MyRTC.c **** 	time_date.tm_year = Set_time[0] - 1900;  // 年份从1900开始
+  40              		.loc 1 172 2 view .LVU3
+  41              		.loc 1 172 30 is_stmt 0 view .LVU4
+  42 0004 0D4B     		ldr	r3, .L3
+  43 0006 1A88     		ldrh	r2, [r3]
+  44              		.loc 1 172 34 view .LVU5
+  45 0008 A2F26C72 		subw	r2, r2, #1900
+  46              		.loc 1 172 20 view .LVU6
+  47 000c 0692     		str	r2, [sp, #24]
+ 173:HARDWARE/rtc/MyRTC.c **** 	time_date.tm_mon = Set_time[1] - 1;      // 月份从0开始
+  48              		.loc 1 173 2 is_stmt 1 view .LVU7
+  49              		.loc 1 173 29 is_stmt 0 view .LVU8
+  50 000e 5A88     		ldrh	r2, [r3, #2]
+  51              		.loc 1 173 33 view .LVU9
+  52 0010 013A     		subs	r2, r2, #1
+  53              		.loc 1 173 19 view .LVU10
+  54 0012 0592     		str	r2, [sp, #20]
+ 174:HARDWARE/rtc/MyRTC.c **** 	time_date.tm_mday = Set_time[2];         // 日期
+  55              		.loc 1 174 2 is_stmt 1 view .LVU11
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s 			page 5
+
+
+  56              		.loc 1 174 30 is_stmt 0 view .LVU12
+  57 0014 9A88     		ldrh	r2, [r3, #4]
+  58              		.loc 1 174 20 view .LVU13
+  59 0016 0492     		str	r2, [sp, #16]
+ 175:HARDWARE/rtc/MyRTC.c **** 	time_date.tm_hour = Set_time[3];         // 小时
+  60              		.loc 1 175 2 is_stmt 1 view .LVU14
+  61              		.loc 1 175 30 is_stmt 0 view .LVU15
+  62 0018 DA88     		ldrh	r2, [r3, #6]
+  63              		.loc 1 175 20 view .LVU16
+  64 001a 0392     		str	r2, [sp, #12]
+ 176:HARDWARE/rtc/MyRTC.c **** 	time_date.tm_min = Set_time[4];          // 分钟
+  65              		.loc 1 176 2 is_stmt 1 view .LVU17
+  66              		.loc 1 176 29 is_stmt 0 view .LVU18
+  67 001c 1A89     		ldrh	r2, [r3, #8]
+  68              		.loc 1 176 19 view .LVU19
+  69 001e 0292     		str	r2, [sp, #8]
+ 177:HARDWARE/rtc/MyRTC.c **** 	time_date.tm_sec = Set_time[5];          // 秒钟
+  70              		.loc 1 177 2 is_stmt 1 view .LVU20
+  71              		.loc 1 177 29 is_stmt 0 view .LVU21
+  72 0020 5B89     		ldrh	r3, [r3, #10]
+  73              		.loc 1 177 19 view .LVU22
+  74 0022 0193     		str	r3, [sp, #4]
+ 178:HARDWARE/rtc/MyRTC.c **** 	
+ 179:HARDWARE/rtc/MyRTC.c **** 	// 计算时间戳并减去8小时时区偏移
+ 180:HARDWARE/rtc/MyRTC.c **** 	time_cnt = mktime(&time_date) - 8 * 60 * 60;
+  75              		.loc 1 180 2 is_stmt 1 view .LVU23
+  76              		.loc 1 180 13 is_stmt 0 view .LVU24
+  77 0024 01A8     		add	r0, sp, #4
+  78 0026 FFF7FEFF 		bl	mktime
+  79              	.LVL0:
+ 181:HARDWARE/rtc/MyRTC.c **** 	
+ 182:HARDWARE/rtc/MyRTC.c **** 	// 设置RTC计数器
+ 183:HARDWARE/rtc/MyRTC.c **** 	RTC_SetCounter(time_cnt);
+  80              		.loc 1 183 2 is_stmt 1 view .LVU25
+  81 002a A0F5E140 		sub	r0, r0, #28800
+  82              		.loc 1 183 2 is_stmt 0 view .LVU26
+  83 002e FFF7FEFF 		bl	RTC_SetCounter
+  84              	.LVL1:
+ 184:HARDWARE/rtc/MyRTC.c **** 	// 等待操作完成
+ 185:HARDWARE/rtc/MyRTC.c **** 	RTC_WaitForLastTask();
+  85              		.loc 1 185 2 is_stmt 1 view .LVU27
+  86 0032 FFF7FEFF 		bl	RTC_WaitForLastTask
+  87              	.LVL2:
+ 186:HARDWARE/rtc/MyRTC.c **** }
+  88              		.loc 1 186 1 is_stmt 0 view .LVU28
+  89 0036 0BB0     		add	sp, sp, #44
+  90              	.LCFI2:
+  91              		.cfi_def_cfa_offset 4
+  92              		@ sp needed
+  93 0038 5DF804FB 		ldr	pc, [sp], #4
+  94              	.L4:
+  95              		.align	2
+  96              	.L3:
+  97 003c 00000000 		.word	Set_time
+  98              		.cfi_endproc
+  99              	.LFE30:
+ 101              		.section	.text.MyRTC_Init,"ax",%progbits
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s 			page 6
+
+
+ 102              		.align	1
+ 103              		.global	MyRTC_Init
+ 104              		.syntax unified
+ 105              		.thumb
+ 106              		.thumb_func
+ 108              	MyRTC_Init:
+ 109              	.LFB29:
+  62:HARDWARE/rtc/MyRTC.c **** 	// 使能PWR和BKP时钟
+ 110              		.loc 1 62 1 is_stmt 1 view -0
+ 111              		.cfi_startproc
+ 112              		@ args = 0, pretend = 0, frame = 0
+ 113              		@ frame_needed = 0, uses_anonymous_args = 0
+ 114 0000 08B5     		push	{r3, lr}
+ 115              	.LCFI3:
+ 116              		.cfi_def_cfa_offset 8
+ 117              		.cfi_offset 3, -8
+ 118              		.cfi_offset 14, -4
+  64:HARDWARE/rtc/MyRTC.c **** 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_BKP, ENABLE);
+ 119              		.loc 1 64 2 view .LVU30
+ 120 0002 0121     		movs	r1, #1
+ 121 0004 4FF08050 		mov	r0, #268435456
+ 122 0008 FFF7FEFF 		bl	RCC_APB1PeriphClockCmd
+ 123              	.LVL3:
+  65:HARDWARE/rtc/MyRTC.c **** 	
+ 124              		.loc 1 65 2 view .LVU31
+ 125 000c 0121     		movs	r1, #1
+ 126 000e 4FF00060 		mov	r0, #134217728
+ 127 0012 FFF7FEFF 		bl	RCC_APB1PeriphClockCmd
+ 128              	.LVL4:
+  68:HARDWARE/rtc/MyRTC.c **** 	
+ 129              		.loc 1 68 2 view .LVU32
+ 130 0016 0120     		movs	r0, #1
+ 131 0018 FFF7FEFF 		bl	PWR_BackupAccessCmd
+ 132              	.LVL5:
+  71:HARDWARE/rtc/MyRTC.c **** 	{
+ 133              		.loc 1 71 2 view .LVU33
+  71:HARDWARE/rtc/MyRTC.c **** 	{
+ 134              		.loc 1 71 6 is_stmt 0 view .LVU34
+ 135 001c 0420     		movs	r0, #4
+ 136 001e FFF7FEFF 		bl	BKP_ReadBackupRegister
+ 137              	.LVL6:
+  71:HARDWARE/rtc/MyRTC.c **** 	{
+ 138              		.loc 1 71 5 discriminator 1 view .LVU35
+ 139 0022 4AF2A553 		movw	r3, #42405
+ 140 0026 9842     		cmp	r0, r3
+ 141 0028 22D0     		beq	.L6
+  74:HARDWARE/rtc/MyRTC.c **** 	
+ 142              		.loc 1 74 3 is_stmt 1 view .LVU36
+ 143 002a FFF7FEFF 		bl	BKP_DeInit
+ 144              	.LVL7:
+  77:HARDWARE/rtc/MyRTC.c **** 		// 等待LSE稳定
+ 145              		.loc 1 77 3 view .LVU37
+ 146 002e 0120     		movs	r0, #1
+ 147 0030 FFF7FEFF 		bl	RCC_LSEConfig
+ 148              	.LVL8:
+  79:HARDWARE/rtc/MyRTC.c **** 		
+ 149              		.loc 1 79 3 view .LVU38
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s 			page 7
+
+
+ 150              	.L7:
+  79:HARDWARE/rtc/MyRTC.c **** 		
+ 151              		.loc 1 79 45 discriminator 1 view .LVU39
+  79:HARDWARE/rtc/MyRTC.c **** 		
+ 152              		.loc 1 79 10 is_stmt 0 discriminator 1 view .LVU40
+ 153 0034 4120     		movs	r0, #65
+ 154 0036 FFF7FEFF 		bl	RCC_GetFlagStatus
+ 155              	.LVL9:
+  79:HARDWARE/rtc/MyRTC.c **** 		
+ 156              		.loc 1 79 45 discriminator 1 view .LVU41
+ 157 003a 0028     		cmp	r0, #0
+ 158 003c FAD0     		beq	.L7
+  82:HARDWARE/rtc/MyRTC.c **** 		// 使能RTC时钟
+ 159              		.loc 1 82 3 is_stmt 1 view .LVU42
+ 160 003e 4FF48070 		mov	r0, #256
+ 161 0042 FFF7FEFF 		bl	RCC_RTCCLKConfig
+ 162              	.LVL10:
+  84:HARDWARE/rtc/MyRTC.c **** 		
+ 163              		.loc 1 84 3 view .LVU43
+ 164 0046 0120     		movs	r0, #1
+ 165 0048 FFF7FEFF 		bl	RCC_RTCCLKCmd
+ 166              	.LVL11:
+  87:HARDWARE/rtc/MyRTC.c **** 		// 等待上一次操作完成
+ 167              		.loc 1 87 3 view .LVU44
+ 168 004c FFF7FEFF 		bl	RTC_WaitForSynchro
+ 169              	.LVL12:
+  89:HARDWARE/rtc/MyRTC.c **** 		
+ 170              		.loc 1 89 3 view .LVU45
+ 171 0050 FFF7FEFF 		bl	RTC_WaitForLastTask
+ 172              	.LVL13:
+  92:HARDWARE/rtc/MyRTC.c **** 		// 等待上一次操作完成
+ 173              		.loc 1 92 3 view .LVU46
+ 174 0054 47F6FF70 		movw	r0, #32767
+ 175 0058 FFF7FEFF 		bl	RTC_SetPrescaler
+ 176              	.LVL14:
+  94:HARDWARE/rtc/MyRTC.c **** 		
+ 177              		.loc 1 94 3 view .LVU47
+ 178 005c FFF7FEFF 		bl	RTC_WaitForLastTask
+ 179              	.LVL15:
+  97:HARDWARE/rtc/MyRTC.c **** 		
+ 180              		.loc 1 97 3 view .LVU48
+ 181 0060 FFF7FEFF 		bl	MyRTC_SetTime
+ 182              	.LVL16:
+ 100:HARDWARE/rtc/MyRTC.c **** 	}
+ 183              		.loc 1 100 3 view .LVU49
+ 184 0064 4AF2A551 		movw	r1, #42405
+ 185 0068 0420     		movs	r0, #4
+ 186 006a FFF7FEFF 		bl	BKP_WriteBackupRegister
+ 187              	.LVL17:
+ 188              	.L5:
+ 109:HARDWARE/rtc/MyRTC.c **** 
+ 189              		.loc 1 109 1 is_stmt 0 view .LVU50
+ 190 006e 08BD     		pop	{r3, pc}
+ 191              	.L6:
+ 105:HARDWARE/rtc/MyRTC.c **** 		// 等待上一次操作完成
+ 192              		.loc 1 105 3 is_stmt 1 view .LVU51
+ 193 0070 FFF7FEFF 		bl	RTC_WaitForSynchro
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s 			page 8
+
+
+ 194              	.LVL18:
+ 107:HARDWARE/rtc/MyRTC.c **** 	}
+ 195              		.loc 1 107 3 view .LVU52
+ 196 0074 FFF7FEFF 		bl	RTC_WaitForLastTask
+ 197              	.LVL19:
+ 109:HARDWARE/rtc/MyRTC.c **** 
+ 198              		.loc 1 109 1 is_stmt 0 view .LVU53
+ 199 0078 F9E7     		b	.L5
+ 200              		.cfi_endproc
+ 201              	.LFE29:
+ 203              		.section	.text.MyRTC_ReadTime,"ax",%progbits
+ 204              		.align	1
+ 205              		.global	MyRTC_ReadTime
+ 206              		.syntax unified
+ 207              		.thumb
+ 208              		.thumb_func
+ 210              	MyRTC_ReadTime:
+ 211              	.LFB31:
+ 187:HARDWARE/rtc/MyRTC.c **** 
+ 188:HARDWARE/rtc/MyRTC.c **** /**
+ 189:HARDWARE/rtc/MyRTC.c ****  * @brief 读取RTC时间
+ 190:HARDWARE/rtc/MyRTC.c ****  * @param 无
+ 191:HARDWARE/rtc/MyRTC.c ****  * @return 无
+ 192:HARDWARE/rtc/MyRTC.c ****  * @note 读取RTC计数器的值，加上8小时时区偏移，转换为本地时间
+ 193:HARDWARE/rtc/MyRTC.c ****  *       结果存储在Read_time数组中
+ 194:HARDWARE/rtc/MyRTC.c ****  */
+ 195:HARDWARE/rtc/MyRTC.c **** void MyRTC_ReadTime(void)
+ 196:HARDWARE/rtc/MyRTC.c **** {
+ 212              		.loc 1 196 1 is_stmt 1 view -0
+ 213              		.cfi_startproc
+ 214              		@ args = 0, pretend = 0, frame = 48
+ 215              		@ frame_needed = 0, uses_anonymous_args = 0
+ 216 0000 00B5     		push	{lr}
+ 217              	.LCFI4:
+ 218              		.cfi_def_cfa_offset 4
+ 219              		.cfi_offset 14, -4
+ 220 0002 8DB0     		sub	sp, sp, #52
+ 221              	.LCFI5:
+ 222              		.cfi_def_cfa_offset 56
+ 197:HARDWARE/rtc/MyRTC.c **** 	time_t time_cnt;        // 时间计数器
+ 223              		.loc 1 197 2 view .LVU55
+ 198:HARDWARE/rtc/MyRTC.c **** 	struct tm time_date;    // 时间结构体
+ 224              		.loc 1 198 2 view .LVU56
+ 199:HARDWARE/rtc/MyRTC.c **** 	
+ 200:HARDWARE/rtc/MyRTC.c **** 	// 读取RTC计数器并加上8小时时区偏移
+ 201:HARDWARE/rtc/MyRTC.c **** 	time_cnt = RTC_GetCounter() + 8 * 60 * 60;
+ 225              		.loc 1 201 2 view .LVU57
+ 226              		.loc 1 201 13 is_stmt 0 view .LVU58
+ 227 0004 FFF7FEFF 		bl	RTC_GetCounter
+ 228              	.LVL20:
+ 229              		.loc 1 201 30 discriminator 1 view .LVU59
+ 230 0008 00F5E140 		add	r0, r0, #28800
+ 231              		.loc 1 201 11 discriminator 1 view .LVU60
+ 232 000c 0A90     		str	r0, [sp, #40]
+ 233 000e 0023     		movs	r3, #0
+ 234 0010 0B93     		str	r3, [sp, #44]
+ 202:HARDWARE/rtc/MyRTC.c **** 	
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s 			page 9
+
+
+ 203:HARDWARE/rtc/MyRTC.c **** 	// 转换为本地时间
+ 204:HARDWARE/rtc/MyRTC.c **** 	time_date = *localtime(&time_cnt);
+ 235              		.loc 1 204 2 is_stmt 1 view .LVU61
+ 236              		.loc 1 204 15 is_stmt 0 view .LVU62
+ 237 0012 0AA8     		add	r0, sp, #40
+ 238 0014 FFF7FEFF 		bl	localtime
+ 239              	.LVL21:
+ 240              		.loc 1 204 12 discriminator 1 view .LVU63
+ 241 0018 0DF1040E 		add	lr, sp, #4
+ 242 001c 8446     		mov	ip, r0
+ 243 001e BCE80F00 		ldmia	ip!, {r0, r1, r2, r3}
+ 244 0022 AEE80F00 		stmia	lr!, {r0, r1, r2, r3}
+ 245 0026 BCE80F00 		ldmia	ip!, {r0, r1, r2, r3}
+ 246 002a AEE80F00 		stmia	lr!, {r0, r1, r2, r3}
+ 247 002e DCF80030 		ldr	r3, [ip]
+ 248 0032 CEF80030 		str	r3, [lr]
+ 205:HARDWARE/rtc/MyRTC.c **** 	
+ 206:HARDWARE/rtc/MyRTC.c **** 	// 填充Read_time数组
+ 207:HARDWARE/rtc/MyRTC.c **** 	Read_time[0] = time_date.tm_year + 1900;  // 年份
+ 249              		.loc 1 207 2 is_stmt 1 view .LVU64
+ 250              		.loc 1 207 35 is_stmt 0 view .LVU65
+ 251 0036 01F26C72 		addw	r2, r1, #1900
+ 252              		.loc 1 207 15 view .LVU66
+ 253 003a 084B     		ldr	r3, .L12
+ 254 003c 1A80     		strh	r2, [r3]	@ movhi
+ 208:HARDWARE/rtc/MyRTC.c **** 	Read_time[1] = time_date.tm_mon + 1;      // 月份
+ 255              		.loc 1 208 2 is_stmt 1 view .LVU67
+ 256              		.loc 1 208 26 is_stmt 0 view .LVU68
+ 257 003e 0246     		mov	r2, r0
+ 258              		.loc 1 208 34 view .LVU69
+ 259 0040 0132     		adds	r2, r2, #1
+ 260              		.loc 1 208 15 view .LVU70
+ 261 0042 5A80     		strh	r2, [r3, #2]	@ movhi
+ 209:HARDWARE/rtc/MyRTC.c **** 	Read_time[2] = time_date.tm_mday;         // 日期
+ 262              		.loc 1 209 2 is_stmt 1 view .LVU71
+ 263              		.loc 1 209 26 is_stmt 0 view .LVU72
+ 264 0044 049A     		ldr	r2, [sp, #16]
+ 265              		.loc 1 209 15 view .LVU73
+ 266 0046 9A80     		strh	r2, [r3, #4]	@ movhi
+ 210:HARDWARE/rtc/MyRTC.c **** 	Read_time[3] = time_date.tm_hour;         // 小时
+ 267              		.loc 1 210 2 is_stmt 1 view .LVU74
+ 268              		.loc 1 210 26 is_stmt 0 view .LVU75
+ 269 0048 039A     		ldr	r2, [sp, #12]
+ 270              		.loc 1 210 15 view .LVU76
+ 271 004a DA80     		strh	r2, [r3, #6]	@ movhi
+ 211:HARDWARE/rtc/MyRTC.c **** 	Read_time[4] = time_date.tm_min;          // 分钟
+ 272              		.loc 1 211 2 is_stmt 1 view .LVU77
+ 273              		.loc 1 211 26 is_stmt 0 view .LVU78
+ 274 004c 029A     		ldr	r2, [sp, #8]
+ 275              		.loc 1 211 15 view .LVU79
+ 276 004e 1A81     		strh	r2, [r3, #8]	@ movhi
+ 212:HARDWARE/rtc/MyRTC.c **** 	Read_time[5] = time_date.tm_sec;          // 秒钟
+ 277              		.loc 1 212 2 is_stmt 1 view .LVU80
+ 278              		.loc 1 212 26 is_stmt 0 view .LVU81
+ 279 0050 019A     		ldr	r2, [sp, #4]
+ 280              		.loc 1 212 15 view .LVU82
+ 281 0052 5A81     		strh	r2, [r3, #10]	@ movhi
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s 			page 10
+
+
+ 213:HARDWARE/rtc/MyRTC.c **** }
+ 282              		.loc 1 213 1 view .LVU83
+ 283 0054 0DB0     		add	sp, sp, #52
+ 284              	.LCFI6:
+ 285              		.cfi_def_cfa_offset 4
+ 286              		@ sp needed
+ 287 0056 5DF804FB 		ldr	pc, [sp], #4
+ 288              	.L13:
+ 289 005a 00BF     		.align	2
+ 290              	.L12:
+ 291 005c 00000000 		.word	Read_time
+ 292              		.cfi_endproc
+ 293              	.LFE31:
+ 295              		.global	Alarm3
+ 296              		.section	.data.Alarm3,"aw"
+ 297              		.align	2
+ 300              	Alarm3:
+ 301 0000 14       		.byte	20
+ 302 0001 00000000 		.space	9
+ 302      00000000 
+ 302      00
+ 303              		.global	Alarm2
+ 304              		.section	.data.Alarm2,"aw"
+ 305              		.align	2
+ 308              	Alarm2:
+ 309 0000 0C       		.byte	12
+ 310 0001 00000000 		.space	9
+ 310      00000000 
+ 310      00
+ 311              		.global	Alarm1
+ 312              		.section	.data.Alarm1,"aw"
+ 313              		.align	2
+ 316              	Alarm1:
+ 317 0000 08       		.byte	8
+ 318 0001 00000000 		.space	9
+ 318      00000000 
+ 318      00
+ 319              		.global	calendar
+ 320              		.section	.bss.calendar,"aw",%nobits
+ 321              		.align	2
+ 324              	calendar:
+ 325 0000 00000000 		.space	10
+ 325      00000000 
+ 325      0000
+ 326              		.global	Read_time
+ 327              		.section	.bss.Read_time,"aw",%nobits
+ 328              		.align	2
+ 331              	Read_time:
+ 332 0000 00000000 		.space	12
+ 332      00000000 
+ 332      00000000 
+ 333              		.global	Set_time
+ 334              		.section	.data.Set_time,"aw"
+ 335              		.align	2
+ 338              	Set_time:
+ 339 0000 E907     		.short	2025
+ 340 0002 0200     		.short	2
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s 			page 11
+
+
+ 341 0004 0B00     		.short	11
+ 342 0006 1600     		.short	22
+ 343 0008 0000     		.short	0
+ 344 000a 3600     		.short	54
+ 345              		.text
+ 346              	.Letext0:
+ 347              		.file 2 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 348              		.file 3 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 349              		.file 4 "USER/stm32f10x.h"
+ 350              		.file 5 "HARDWARE/rtc/MyRTC.h"
+ 351              		.file 6 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 352              		.file 7 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 353              		.file 8 "STM32F10x_FWLib/inc/stm32f10x_rtc.h"
+ 354              		.file 9 "STM32F10x_FWLib/inc/stm32f10x_bkp.h"
+ 355              		.file 10 "STM32F10x_FWLib/inc/stm32f10x_rcc.h"
+ 356              		.file 11 "STM32F10x_FWLib/inc/stm32f10x_pwr.h"
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s 			page 12
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 MyRTC.c
+C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s:19     .text.MyRTC_SetTime:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s:25     .text.MyRTC_SetTime:00000000 MyRTC_SetTime
+C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s:97     .text.MyRTC_SetTime:0000003c $d
+C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s:338    .data.Set_time:00000000 Set_time
+C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s:102    .text.MyRTC_Init:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s:108    .text.MyRTC_Init:00000000 MyRTC_Init
+C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s:204    .text.MyRTC_ReadTime:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s:210    .text.MyRTC_ReadTime:00000000 MyRTC_ReadTime
+C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s:291    .text.MyRTC_ReadTime:0000005c $d
+C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s:331    .bss.Read_time:00000000 Read_time
+C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s:300    .data.Alarm3:00000000 Alarm3
+C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s:297    .data.Alarm3:00000000 $d
+C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s:308    .data.Alarm2:00000000 Alarm2
+C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s:305    .data.Alarm2:00000000 $d
+C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s:316    .data.Alarm1:00000000 Alarm1
+C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s:313    .data.Alarm1:00000000 $d
+C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s:324    .bss.calendar:00000000 calendar
+C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s:321    .bss.calendar:00000000 $d
+C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s:328    .bss.Read_time:00000000 $d
+C:\Users\31687\AppData\Local\Temp\cc3eyOtn.s:335    .data.Set_time:00000000 $d
+
+UNDEFINED SYMBOLS
+mktime
+RTC_SetCounter
+RTC_WaitForLastTask
+RCC_APB1PeriphClockCmd
+PWR_BackupAccessCmd
+BKP_ReadBackupRegister
+BKP_DeInit
+RCC_LSEConfig
+RCC_GetFlagStatus
+RCC_RTCCLKConfig
+RCC_RTCCLKCmd
+RTC_WaitForSynchro
+RTC_SetPrescaler
+BKP_WriteBackupRegister
+RTC_GetCounter
+localtime

@@ -1,0 +1,400 @@
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cciIAxYh.s 			page 1
+
+
+   1              		.cpu cortex-m3
+   2              		.arch armv7-m
+   3              		.fpu softvfp
+   4              		.eabi_attribute 20, 1
+   5              		.eabi_attribute 21, 1
+   6              		.eabi_attribute 23, 3
+   7              		.eabi_attribute 24, 1
+   8              		.eabi_attribute 25, 1
+   9              		.eabi_attribute 26, 1
+  10              		.eabi_attribute 30, 1
+  11              		.eabi_attribute 34, 1
+  12              		.eabi_attribute 18, 4
+  13              		.file	"Key.c"
+  14              		.text
+  15              	.Ltext0:
+  16              		.cfi_sections	.debug_frame
+  17              		.file 1 "HARDWARE/KEY/Key.c"
+  18              		.section	.text.Key_Init,"ax",%progbits
+  19              		.align	1
+  20              		.global	Key_Init
+  21              		.syntax unified
+  22              		.thumb
+  23              		.thumb_func
+  25              	Key_Init:
+  26              	.LFB29:
+   1:HARDWARE/KEY/Key.c **** /**
+   2:HARDWARE/KEY/Key.c ****  * Key.c
+   3:HARDWARE/KEY/Key.c ****  * 按键驱动文件
+   4:HARDWARE/KEY/Key.c ****  * 功能：实现按键的初始化和扫描
+   5:HARDWARE/KEY/Key.c ****  * 版本：V1.0
+   6:HARDWARE/KEY/Key.c ****  * MCU：STM32F103C8T6
+   7:HARDWARE/KEY/Key.c ****  * 作者：蔬菜恒温库监控系统
+   8:HARDWARE/KEY/Key.c ****  * 日期：2026-03-08
+   9:HARDWARE/KEY/Key.c ****  */
+  10:HARDWARE/KEY/Key.c **** 
+  11:HARDWARE/KEY/Key.c **** #include "stm32f10x.h"                  // Device header
+  12:HARDWARE/KEY/Key.c **** #include "delay.h"
+  13:HARDWARE/KEY/Key.c **** #include "Key.h"
+  14:HARDWARE/KEY/Key.c **** 
+  15:HARDWARE/KEY/Key.c **** /**
+  16:HARDWARE/KEY/Key.c ****  * 按键初始化函数
+  17:HARDWARE/KEY/Key.c ****  * 功能：初始化按键对应的GPIO引脚
+  18:HARDWARE/KEY/Key.c ****  * @param 无
+  19:HARDWARE/KEY/Key.c ****  * @retval 无
+  20:HARDWARE/KEY/Key.c ****  * @note 使用GPIOB的4、5、6、7引脚作为按键输入
+  21:HARDWARE/KEY/Key.c ****  */
+  22:HARDWARE/KEY/Key.c **** void Key_Init(void)
+  23:HARDWARE/KEY/Key.c **** {
+  27              		.loc 1 23 1 view -0
+  28              		.cfi_startproc
+  29              		@ args = 0, pretend = 0, frame = 8
+  30              		@ frame_needed = 0, uses_anonymous_args = 0
+  31 0000 00B5     		push	{lr}
+  32              	.LCFI0:
+  33              		.cfi_def_cfa_offset 4
+  34              		.cfi_offset 14, -4
+  35 0002 83B0     		sub	sp, sp, #12
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cciIAxYh.s 			page 2
+
+
+  36              	.LCFI1:
+  37              		.cfi_def_cfa_offset 16
+  24:HARDWARE/KEY/Key.c ****   	GPIO_InitTypeDef GPIO_InitStructure;
+  38              		.loc 1 24 4 view .LVU1
+  25:HARDWARE/KEY/Key.c ****   
+  26:HARDWARE/KEY/Key.c **** 	// 使能GPIOB时钟
+  27:HARDWARE/KEY/Key.c **** 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+  39              		.loc 1 27 2 view .LVU2
+  40 0004 0121     		movs	r1, #1
+  41 0006 0820     		movs	r0, #8
+  42 0008 FFF7FEFF 		bl	RCC_APB2PeriphClockCmd
+  43              	.LVL0:
+  28:HARDWARE/KEY/Key.c ****   
+  29:HARDWARE/KEY/Key.c **** 	// 禁用JTAG功能，释放PB3、PB4、PA15引脚
+  30:HARDWARE/KEY/Key.c ****   GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE);
+  44              		.loc 1 30 3 view .LVU3
+  45 000c 0121     		movs	r1, #1
+  46 000e 0848     		ldr	r0, .L3
+  47 0010 FFF7FEFF 		bl	GPIO_PinRemapConfig
+  48              	.LVL1:
+  31:HARDWARE/KEY/Key.c ****   
+  32:HARDWARE/KEY/Key.c **** 	// 配置GPIO为上拉输入模式
+  33:HARDWARE/KEY/Key.c ****   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;  // 上拉输入
+  49              		.loc 1 33 3 view .LVU4
+  50              		.loc 1 33 32 is_stmt 0 view .LVU5
+  51 0014 4823     		movs	r3, #72
+  52 0016 8DF80730 		strb	r3, [sp, #7]
+  34:HARDWARE/KEY/Key.c **** 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5 | GPIO_Pin_6 | GPIO_Pin_7;  // PB4-PB7
+  53              		.loc 1 34 2 is_stmt 1 view .LVU6
+  54              		.loc 1 34 30 is_stmt 0 view .LVU7
+  55 001a F023     		movs	r3, #240
+  56 001c ADF80430 		strh	r3, [sp, #4]	@ movhi
+  35:HARDWARE/KEY/Key.c **** 	GPIO_Init(GPIOB, &GPIO_InitStructure);
+  57              		.loc 1 35 2 is_stmt 1 view .LVU8
+  58 0020 01A9     		add	r1, sp, #4
+  59 0022 0448     		ldr	r0, .L3+4
+  60 0024 FFF7FEFF 		bl	GPIO_Init
+  61              	.LVL2:
+  36:HARDWARE/KEY/Key.c **** }
+  62              		.loc 1 36 1 is_stmt 0 view .LVU9
+  63 0028 03B0     		add	sp, sp, #12
+  64              	.LCFI2:
+  65              		.cfi_def_cfa_offset 4
+  66              		@ sp needed
+  67 002a 5DF804FB 		ldr	pc, [sp], #4
+  68              	.L4:
+  69 002e 00BF     		.align	2
+  70              	.L3:
+  71 0030 00023000 		.word	3146240
+  72 0034 000C0140 		.word	1073810432
+  73              		.cfi_endproc
+  74              	.LFE29:
+  76              		.section	.text.KEY_Scan,"ax",%progbits
+  77              		.align	1
+  78              		.global	KEY_Scan
+  79              		.syntax unified
+  80              		.thumb
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cciIAxYh.s 			page 3
+
+
+  81              		.thumb_func
+  83              	KEY_Scan:
+  84              	.LVL3:
+  85              	.LFB30:
+  37:HARDWARE/KEY/Key.c **** 
+  38:HARDWARE/KEY/Key.c **** /**
+  39:HARDWARE/KEY/Key.c ****  * 按键扫描函数
+  40:HARDWARE/KEY/Key.c ****  * 功能：扫描按键状态，返回按键值
+  41:HARDWARE/KEY/Key.c ****  * @param mode 扫描模式：0-不支持连续按，1-支持连续按
+  42:HARDWARE/KEY/Key.c ****  * @retval 0-无按键按下
+  43:HARDWARE/KEY/Key.c ****  * @retval KEY1_PRES-KEY1按键按下
+  44:HARDWARE/KEY/Key.c ****  * @retval KEY2_PRES-KEY2按键按下
+  45:HARDWARE/KEY/Key.c ****  * @retval KEY3_PRES-KEY3按键按下
+  46:HARDWARE/KEY/Key.c ****  * @retval KEY4_PRES-KEY4按键按下
+  47:HARDWARE/KEY/Key.c ****  * @note 按键优先级：KEY1 > KEY2 > KEY3 > KEY4
+  48:HARDWARE/KEY/Key.c ****  */
+  49:HARDWARE/KEY/Key.c **** u8 KEY_Scan(u8 mode)
+  50:HARDWARE/KEY/Key.c **** { 
+  86              		.loc 1 50 1 is_stmt 1 view -0
+  87              		.cfi_startproc
+  88              		@ args = 0, pretend = 0, frame = 0
+  89              		@ frame_needed = 0, uses_anonymous_args = 0
+  90              		.loc 1 50 1 is_stmt 0 view .LVU11
+  91 0000 08B5     		push	{r3, lr}
+  92              	.LCFI3:
+  93              		.cfi_def_cfa_offset 8
+  94              		.cfi_offset 3, -8
+  95              		.cfi_offset 14, -4
+  51:HARDWARE/KEY/Key.c **** 	static u8 key_up = 1;  // 按键松开标志
+  96              		.loc 1 51 2 is_stmt 1 view .LVU12
+  52:HARDWARE/KEY/Key.c **** 	
+  53:HARDWARE/KEY/Key.c **** 	if(mode) key_up = 1;  // 支持连续按
+  97              		.loc 1 53 2 view .LVU13
+  98              		.loc 1 53 4 is_stmt 0 view .LVU14
+  99 0002 10B1     		cbz	r0, .L6
+ 100              		.loc 1 53 11 is_stmt 1 discriminator 1 view .LVU15
+ 101              		.loc 1 53 18 is_stmt 0 discriminator 1 view .LVU16
+ 102 0004 2B4B     		ldr	r3, .L23
+ 103 0006 0122     		movs	r2, #1
+ 104 0008 1A70     		strb	r2, [r3]
+ 105              	.L6:
+  54:HARDWARE/KEY/Key.c ****   	
+  55:HARDWARE/KEY/Key.c **** 	// 检测按键是否按下
+  56:HARDWARE/KEY/Key.c **** 	if(key_up && (KEY1 == 0 || KEY2 == 0 || KEY3 == 0 || KEY4 == 0))
+ 106              		.loc 1 56 2 is_stmt 1 view .LVU17
+ 107              		.loc 1 56 5 is_stmt 0 view .LVU18
+ 108 000a 2A4B     		ldr	r3, .L23
+ 109 000c 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 110              		.loc 1 56 4 view .LVU19
+ 111 000e 3BB3     		cbz	r3, .L7
+ 112              		.loc 1 56 16 discriminator 1 view .LVU20
+ 113 0010 294B     		ldr	r3, .L23+4
+ 114 0012 D3F81031 		ldr	r3, [r3, #272]
+ 115              		.loc 1 56 12 discriminator 1 view .LVU21
+ 116 0016 5BB1     		cbz	r3, .L8
+ 117              		.loc 1 56 29 discriminator 2 view .LVU22
+ 118 0018 274B     		ldr	r3, .L23+4
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cciIAxYh.s 			page 4
+
+
+ 119 001a D3F81431 		ldr	r3, [r3, #276]
+ 120              		.loc 1 56 26 discriminator 2 view .LVU23
+ 121 001e 3BB1     		cbz	r3, .L8
+ 122              		.loc 1 56 42 discriminator 3 view .LVU24
+ 123 0020 254B     		ldr	r3, .L23+4
+ 124 0022 D3F81831 		ldr	r3, [r3, #280]
+ 125              		.loc 1 56 39 discriminator 3 view .LVU25
+ 126 0026 1BB1     		cbz	r3, .L8
+ 127              		.loc 1 56 55 discriminator 4 view .LVU26
+ 128 0028 234B     		ldr	r3, .L23+4
+ 129 002a D3F81C31 		ldr	r3, [r3, #284]
+ 130              		.loc 1 56 52 discriminator 4 view .LVU27
+ 131 002e BBB9     		cbnz	r3, .L7
+ 132              	.L8:
+  57:HARDWARE/KEY/Key.c **** 	{
+  58:HARDWARE/KEY/Key.c **** 		delay_ms(10);  // 消抖
+ 133              		.loc 1 58 3 is_stmt 1 view .LVU28
+ 134 0030 0A20     		movs	r0, #10
+ 135              	.LVL4:
+ 136              		.loc 1 58 3 is_stmt 0 view .LVU29
+ 137 0032 FFF7FEFF 		bl	delay_ms
+ 138              	.LVL5:
+  59:HARDWARE/KEY/Key.c **** 		key_up = 0;
+ 139              		.loc 1 59 3 is_stmt 1 view .LVU30
+ 140              		.loc 1 59 10 is_stmt 0 view .LVU31
+ 141 0036 1F4B     		ldr	r3, .L23
+ 142 0038 0022     		movs	r2, #0
+ 143 003a 1A70     		strb	r2, [r3]
+  60:HARDWARE/KEY/Key.c **** 		
+  61:HARDWARE/KEY/Key.c **** 		// 检测具体是哪个按键按下
+  62:HARDWARE/KEY/Key.c **** 		if(KEY1 == 0) return KEY1_PRES;
+ 144              		.loc 1 62 3 is_stmt 1 view .LVU32
+ 145              		.loc 1 62 6 is_stmt 0 view .LVU33
+ 146 003c 1E4B     		ldr	r3, .L23+4
+ 147 003e D3F81031 		ldr	r3, [r3, #272]
+ 148              		.loc 1 62 5 view .LVU34
+ 149 0042 73B3     		cbz	r3, .L10
+  63:HARDWARE/KEY/Key.c **** 		else if(KEY2 == 0) return KEY2_PRES;
+ 150              		.loc 1 63 8 is_stmt 1 view .LVU35
+ 151              		.loc 1 63 11 is_stmt 0 view .LVU36
+ 152 0044 1C4B     		ldr	r3, .L23+4
+ 153 0046 D3F81431 		ldr	r3, [r3, #276]
+ 154              		.loc 1 63 10 view .LVU37
+ 155 004a 63B3     		cbz	r3, .L11
+  64:HARDWARE/KEY/Key.c **** 		else if(KEY3 == 0) return KEY3_PRES;
+ 156              		.loc 1 64 8 is_stmt 1 view .LVU38
+ 157              		.loc 1 64 11 is_stmt 0 view .LVU39
+ 158 004c 1A4B     		ldr	r3, .L23+4
+ 159 004e D3F81831 		ldr	r3, [r3, #280]
+ 160              		.loc 1 64 10 view .LVU40
+ 161 0052 53B3     		cbz	r3, .L12
+  65:HARDWARE/KEY/Key.c **** 		else if(KEY4 == 0) return KEY4_PRES;
+ 162              		.loc 1 65 8 is_stmt 1 view .LVU41
+ 163              		.loc 1 65 11 is_stmt 0 view .LVU42
+ 164 0054 184B     		ldr	r3, .L23+4
+ 165 0056 D3F81C31 		ldr	r3, [r3, #284]
+ 166              		.loc 1 65 10 view .LVU43
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cciIAxYh.s 			page 5
+
+
+ 167 005a 43B3     		cbz	r3, .L13
+  66:HARDWARE/KEY/Key.c **** 	} 
+  67:HARDWARE/KEY/Key.c **** 	// 检测按键是否松开
+  68:HARDWARE/KEY/Key.c **** 	else if(KEY1 == 1 && KEY2 == 1 && KEY3 == 1 && KEY4 == 1) 
+  69:HARDWARE/KEY/Key.c **** 		key_up = 1; 	    
+  70:HARDWARE/KEY/Key.c ****   	return 0;  // 无按键按下
+ 168              		.loc 1 70 11 view .LVU44
+ 169 005c 1046     		mov	r0, r2
+ 170 005e 05E0     		b	.L9
+ 171              	.LVL6:
+ 172              	.L7:
+  68:HARDWARE/KEY/Key.c **** 		key_up = 1; 	    
+ 173              		.loc 1 68 7 is_stmt 1 view .LVU45
+  68:HARDWARE/KEY/Key.c **** 		key_up = 1; 	    
+ 174              		.loc 1 68 10 is_stmt 0 view .LVU46
+ 175 0060 154B     		ldr	r3, .L23+4
+ 176 0062 D3F81031 		ldr	r3, [r3, #272]
+  68:HARDWARE/KEY/Key.c **** 		key_up = 1; 	    
+ 177              		.loc 1 68 9 view .LVU47
+ 178 0066 012B     		cmp	r3, #1
+ 179 0068 01D0     		beq	.L19
+ 180              		.loc 1 70 11 view .LVU48
+ 181 006a 0020     		movs	r0, #0
+ 182              	.LVL7:
+ 183              	.L9:
+  71:HARDWARE/KEY/Key.c **** }
+ 184              		.loc 1 71 1 view .LVU49
+ 185 006c 08BD     		pop	{r3, pc}
+ 186              	.LVL8:
+ 187              	.L19:
+  68:HARDWARE/KEY/Key.c **** 		key_up = 1; 	    
+ 188              		.loc 1 68 23 discriminator 1 view .LVU50
+ 189 006e 124B     		ldr	r3, .L23+4
+ 190 0070 D3F81431 		ldr	r3, [r3, #276]
+  68:HARDWARE/KEY/Key.c **** 		key_up = 1; 	    
+ 191              		.loc 1 68 20 discriminator 1 view .LVU51
+ 192 0074 012B     		cmp	r3, #1
+ 193 0076 01D0     		beq	.L20
+  70:HARDWARE/KEY/Key.c **** }
+ 194              		.loc 1 70 11 view .LVU52
+ 195 0078 0020     		movs	r0, #0
+ 196              	.LVL9:
+  70:HARDWARE/KEY/Key.c **** }
+ 197              		.loc 1 70 11 view .LVU53
+ 198 007a F7E7     		b	.L9
+ 199              	.LVL10:
+ 200              	.L20:
+  68:HARDWARE/KEY/Key.c **** 		key_up = 1; 	    
+ 201              		.loc 1 68 36 discriminator 2 view .LVU54
+ 202 007c 0E4B     		ldr	r3, .L23+4
+ 203 007e D3F81831 		ldr	r3, [r3, #280]
+  68:HARDWARE/KEY/Key.c **** 		key_up = 1; 	    
+ 204              		.loc 1 68 33 discriminator 2 view .LVU55
+ 205 0082 012B     		cmp	r3, #1
+ 206 0084 01D0     		beq	.L21
+  70:HARDWARE/KEY/Key.c **** }
+ 207              		.loc 1 70 11 view .LVU56
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cciIAxYh.s 			page 6
+
+
+ 208 0086 0020     		movs	r0, #0
+ 209              	.LVL11:
+  70:HARDWARE/KEY/Key.c **** }
+ 210              		.loc 1 70 11 view .LVU57
+ 211 0088 F0E7     		b	.L9
+ 212              	.LVL12:
+ 213              	.L21:
+  68:HARDWARE/KEY/Key.c **** 		key_up = 1; 	    
+ 214              		.loc 1 68 49 discriminator 3 view .LVU58
+ 215 008a 0B4B     		ldr	r3, .L23+4
+ 216 008c D3F81C31 		ldr	r3, [r3, #284]
+  68:HARDWARE/KEY/Key.c **** 		key_up = 1; 	    
+ 217              		.loc 1 68 46 discriminator 3 view .LVU59
+ 218 0090 012B     		cmp	r3, #1
+ 219 0092 01D0     		beq	.L22
+  70:HARDWARE/KEY/Key.c **** }
+ 220              		.loc 1 70 11 view .LVU60
+ 221 0094 0020     		movs	r0, #0
+ 222              	.LVL13:
+  70:HARDWARE/KEY/Key.c **** }
+ 223              		.loc 1 70 11 view .LVU61
+ 224 0096 E9E7     		b	.L9
+ 225              	.LVL14:
+ 226              	.L22:
+  69:HARDWARE/KEY/Key.c ****   	return 0;  // 无按键按下
+ 227              		.loc 1 69 3 is_stmt 1 view .LVU62
+  69:HARDWARE/KEY/Key.c ****   	return 0;  // 无按键按下
+ 228              		.loc 1 69 10 is_stmt 0 view .LVU63
+ 229 0098 064B     		ldr	r3, .L23
+ 230 009a 0122     		movs	r2, #1
+ 231 009c 1A70     		strb	r2, [r3]
+  70:HARDWARE/KEY/Key.c **** }
+ 232              		.loc 1 70 11 view .LVU64
+ 233 009e 0020     		movs	r0, #0
+ 234              	.LVL15:
+  70:HARDWARE/KEY/Key.c **** }
+ 235              		.loc 1 70 11 view .LVU65
+ 236 00a0 E4E7     		b	.L9
+ 237              	.L10:
+  62:HARDWARE/KEY/Key.c **** 		else if(KEY2 == 0) return KEY2_PRES;
+ 238              		.loc 1 62 24 discriminator 1 view .LVU66
+ 239 00a2 0120     		movs	r0, #1
+ 240 00a4 E2E7     		b	.L9
+ 241              	.L11:
+  63:HARDWARE/KEY/Key.c **** 		else if(KEY3 == 0) return KEY3_PRES;
+ 242              		.loc 1 63 29 discriminator 1 view .LVU67
+ 243 00a6 0220     		movs	r0, #2
+ 244 00a8 E0E7     		b	.L9
+ 245              	.L12:
+  64:HARDWARE/KEY/Key.c **** 		else if(KEY4 == 0) return KEY4_PRES;
+ 246              		.loc 1 64 29 discriminator 1 view .LVU68
+ 247 00aa 0320     		movs	r0, #3
+ 248 00ac DEE7     		b	.L9
+ 249              	.L13:
+  65:HARDWARE/KEY/Key.c **** 	} 
+ 250              		.loc 1 65 29 discriminator 1 view .LVU69
+ 251 00ae 0420     		movs	r0, #4
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cciIAxYh.s 			page 7
+
+
+ 252 00b0 DCE7     		b	.L9
+ 253              	.L24:
+ 254 00b2 00BF     		.align	2
+ 255              	.L23:
+ 256 00b4 00000000 		.word	key_up.0
+ 257 00b8 00802142 		.word	1109491712
+ 258              		.cfi_endproc
+ 259              	.LFE30:
+ 261              		.section	.data.key_up.0,"aw"
+ 264              	key_up.0:
+ 265 0000 01       		.byte	1
+ 266              		.text
+ 267              	.Letext0:
+ 268              		.file 2 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 269              		.file 3 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 270              		.file 4 "USER/stm32f10x.h"
+ 271              		.file 5 "STM32F10x_FWLib/inc/stm32f10x_gpio.h"
+ 272              		.file 6 "SYSTEM/delay/delay.h"
+ 273              		.file 7 "STM32F10x_FWLib/inc/stm32f10x_rcc.h"
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cciIAxYh.s 			page 8
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 Key.c
+C:\Users\31687\AppData\Local\Temp\cciIAxYh.s:19     .text.Key_Init:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cciIAxYh.s:25     .text.Key_Init:00000000 Key_Init
+C:\Users\31687\AppData\Local\Temp\cciIAxYh.s:71     .text.Key_Init:00000030 $d
+C:\Users\31687\AppData\Local\Temp\cciIAxYh.s:77     .text.KEY_Scan:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cciIAxYh.s:83     .text.KEY_Scan:00000000 KEY_Scan
+C:\Users\31687\AppData\Local\Temp\cciIAxYh.s:256    .text.KEY_Scan:000000b4 $d
+C:\Users\31687\AppData\Local\Temp\cciIAxYh.s:264    .data.key_up.0:00000000 key_up.0
+
+UNDEFINED SYMBOLS
+RCC_APB2PeriphClockCmd
+GPIO_PinRemapConfig
+GPIO_Init
+delay_ms

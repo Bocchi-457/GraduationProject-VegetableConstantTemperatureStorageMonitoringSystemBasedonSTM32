@@ -1,0 +1,1301 @@
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 1
+
+
+   1              		.cpu cortex-m3
+   2              		.arch armv7-m
+   3              		.fpu softvfp
+   4              		.eabi_attribute 20, 1
+   5              		.eabi_attribute 21, 1
+   6              		.eabi_attribute 23, 3
+   7              		.eabi_attribute 24, 1
+   8              		.eabi_attribute 25, 1
+   9              		.eabi_attribute 26, 1
+  10              		.eabi_attribute 30, 1
+  11              		.eabi_attribute 34, 1
+  12              		.eabi_attribute 18, 4
+  13              		.file	"SGP30.c"
+  14              		.text
+  15              	.Ltext0:
+  16              		.cfi_sections	.debug_frame
+  17              		.file 1 "HARDWARE/SGP30/SGP30.c"
+  18              		.section	.text.SGP30_GPIO_Init,"ax",%progbits
+  19              		.align	1
+  20              		.global	SGP30_GPIO_Init
+  21              		.syntax unified
+  22              		.thumb
+  23              		.thumb_func
+  25              	SGP30_GPIO_Init:
+  26              	.LFB29:
+   1:HARDWARE/SGP30/SGP30.c **** /**
+   2:HARDWARE/SGP30/SGP30.c ****  * SGP30.c
+   3:HARDWARE/SGP30/SGP30.c ****  * SGP30气体传感器驱动实现文件
+   4:HARDWARE/SGP30/SGP30.c ****  * 功能：实现SGP30传感器的IIC通信和数据读写函数
+   5:HARDWARE/SGP30/SGP30.c ****  * 版本：V1.0
+   6:HARDWARE/SGP30/SGP30.c ****  * 测试硬件：STM32F103RCT6
+   7:HARDWARE/SGP30/SGP30.c ****  * 作者：蔬菜恒温库监控系统开发团队
+   8:HARDWARE/SGP30/SGP30.c ****  * 创建日期：2026-03-08
+   9:HARDWARE/SGP30/SGP30.c ****  * 项目：蔬菜恒温库监控系统
+  10:HARDWARE/SGP30/SGP30.c ****  */
+  11:HARDWARE/SGP30/SGP30.c **** 
+  12:HARDWARE/SGP30/SGP30.c **** #include "sgp30.h"
+  13:HARDWARE/SGP30/SGP30.c **** #include "delay.h"
+  14:HARDWARE/SGP30/SGP30.c **** 
+  15:HARDWARE/SGP30/SGP30.c **** /**
+  16:HARDWARE/SGP30/SGP30.c ****  * @brief 初始化SGP30的GPIO引脚
+  17:HARDWARE/SGP30/SGP30.c ****  * @param 无
+  18:HARDWARE/SGP30/SGP30.c ****  * @return 无
+  19:HARDWARE/SGP30/SGP30.c ****  * @note 配置PB10和PB11为推挽输出
+  20:HARDWARE/SGP30/SGP30.c ****  */
+  21:HARDWARE/SGP30/SGP30.c **** void SGP30_GPIO_Init(void)
+  22:HARDWARE/SGP30/SGP30.c **** {
+  27              		.loc 1 22 1 view -0
+  28              		.cfi_startproc
+  29              		@ args = 0, pretend = 0, frame = 8
+  30              		@ frame_needed = 0, uses_anonymous_args = 0
+  31 0000 10B5     		push	{r4, lr}
+  32              	.LCFI0:
+  33              		.cfi_def_cfa_offset 8
+  34              		.cfi_offset 4, -8
+  35              		.cfi_offset 14, -4
+  36 0002 82B0     		sub	sp, sp, #8
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 2
+
+
+  37              	.LCFI1:
+  38              		.cfi_def_cfa_offset 16
+  23:HARDWARE/SGP30/SGP30.c ****   GPIO_InitTypeDef GPIO_InitStructure;
+  39              		.loc 1 23 3 view .LVU1
+  24:HARDWARE/SGP30/SGP30.c **** 
+  25:HARDWARE/SGP30/SGP30.c ****   // 使能GPIOB时钟
+  26:HARDWARE/SGP30/SGP30.c ****   RCC_APB2PeriphClockCmd(SGP30_SCL_GPIO_CLK | SGP30_SDA_GPIO_SDA, ENABLE);
+  40              		.loc 1 26 3 view .LVU2
+  41 0004 0121     		movs	r1, #1
+  42 0006 0820     		movs	r0, #8
+  43 0008 FFF7FEFF 		bl	RCC_APB2PeriphClockCmd
+  44              	.LVL0:
+  27:HARDWARE/SGP30/SGP30.c **** 
+  28:HARDWARE/SGP30/SGP30.c ****   // 配置SCL引脚（PB10）
+  29:HARDWARE/SGP30/SGP30.c ****   GPIO_InitStructure.GPIO_Pin = SGP30_SCL_GPIO_PIN;
+  45              		.loc 1 29 3 view .LVU3
+  46              		.loc 1 29 31 is_stmt 0 view .LVU4
+  47 000c 4FF48063 		mov	r3, #1024
+  48 0010 ADF80430 		strh	r3, [sp, #4]	@ movhi
+  30:HARDWARE/SGP30/SGP30.c ****   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;      // 推挽输出
+  49              		.loc 1 30 3 is_stmt 1 view .LVU5
+  50              		.loc 1 30 32 is_stmt 0 view .LVU6
+  51 0014 1023     		movs	r3, #16
+  52 0016 8DF80730 		strb	r3, [sp, #7]
+  31:HARDWARE/SGP30/SGP30.c ****   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;    // 速度50MHz
+  53              		.loc 1 31 3 is_stmt 1 view .LVU7
+  54              		.loc 1 31 33 is_stmt 0 view .LVU8
+  55 001a 0323     		movs	r3, #3
+  56 001c 8DF80630 		strb	r3, [sp, #6]
+  32:HARDWARE/SGP30/SGP30.c ****   GPIO_Init(SGP30_SCL_GPIO_PORT, &GPIO_InitStructure);
+  57              		.loc 1 32 3 is_stmt 1 view .LVU9
+  58 0020 074C     		ldr	r4, .L3
+  59 0022 01A9     		add	r1, sp, #4
+  60 0024 2046     		mov	r0, r4
+  61 0026 FFF7FEFF 		bl	GPIO_Init
+  62              	.LVL1:
+  33:HARDWARE/SGP30/SGP30.c **** 
+  34:HARDWARE/SGP30/SGP30.c ****   // 配置SDA引脚（PB11）
+  35:HARDWARE/SGP30/SGP30.c ****   GPIO_InitStructure.GPIO_Pin = SGP30_SDA_GPIO_PIN;
+  63              		.loc 1 35 3 view .LVU10
+  64              		.loc 1 35 31 is_stmt 0 view .LVU11
+  65 002a 4FF40063 		mov	r3, #2048
+  66 002e ADF80430 		strh	r3, [sp, #4]	@ movhi
+  36:HARDWARE/SGP30/SGP30.c ****   GPIO_Init(SGP30_SDA_GPIO_PORT, &GPIO_InitStructure);
+  67              		.loc 1 36 3 is_stmt 1 view .LVU12
+  68 0032 01A9     		add	r1, sp, #4
+  69 0034 2046     		mov	r0, r4
+  70 0036 FFF7FEFF 		bl	GPIO_Init
+  71              	.LVL2:
+  37:HARDWARE/SGP30/SGP30.c **** }
+  72              		.loc 1 37 1 is_stmt 0 view .LVU13
+  73 003a 02B0     		add	sp, sp, #8
+  74              	.LCFI2:
+  75              		.cfi_def_cfa_offset 8
+  76              		@ sp needed
+  77 003c 10BD     		pop	{r4, pc}
+  78              	.L4:
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 3
+
+
+  79 003e 00BF     		.align	2
+  80              	.L3:
+  81 0040 000C0140 		.word	1073810432
+  82              		.cfi_endproc
+  83              	.LFE29:
+  85              		.section	.text.SDA_OUT,"ax",%progbits
+  86              		.align	1
+  87              		.global	SDA_OUT
+  88              		.syntax unified
+  89              		.thumb
+  90              		.thumb_func
+  92              	SDA_OUT:
+  93              	.LFB30:
+  38:HARDWARE/SGP30/SGP30.c **** 
+  39:HARDWARE/SGP30/SGP30.c **** 
+  40:HARDWARE/SGP30/SGP30.c **** /**
+  41:HARDWARE/SGP30/SGP30.c ****  * @brief 将SDA引脚设置为输出模式
+  42:HARDWARE/SGP30/SGP30.c ****  * @param 无
+  43:HARDWARE/SGP30/SGP30.c ****  * @return 无
+  44:HARDWARE/SGP30/SGP30.c ****  */
+  45:HARDWARE/SGP30/SGP30.c **** void SDA_OUT(void)
+  46:HARDWARE/SGP30/SGP30.c **** {
+  94              		.loc 1 46 1 is_stmt 1 view -0
+  95              		.cfi_startproc
+  96              		@ args = 0, pretend = 0, frame = 8
+  97              		@ frame_needed = 0, uses_anonymous_args = 0
+  98 0000 00B5     		push	{lr}
+  99              	.LCFI3:
+ 100              		.cfi_def_cfa_offset 4
+ 101              		.cfi_offset 14, -4
+ 102 0002 83B0     		sub	sp, sp, #12
+ 103              	.LCFI4:
+ 104              		.cfi_def_cfa_offset 16
+  47:HARDWARE/SGP30/SGP30.c ****   GPIO_InitTypeDef GPIO_InitStructure;
+ 105              		.loc 1 47 3 view .LVU15
+  48:HARDWARE/SGP30/SGP30.c ****   GPIO_InitStructure.GPIO_Pin = SGP30_SDA_GPIO_PIN;
+ 106              		.loc 1 48 3 view .LVU16
+ 107              		.loc 1 48 31 is_stmt 0 view .LVU17
+ 108 0004 4FF40063 		mov	r3, #2048
+ 109 0008 ADF80430 		strh	r3, [sp, #4]	@ movhi
+  49:HARDWARE/SGP30/SGP30.c ****   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;      // 推挽输出
+ 110              		.loc 1 49 3 is_stmt 1 view .LVU18
+ 111              		.loc 1 49 32 is_stmt 0 view .LVU19
+ 112 000c 1023     		movs	r3, #16
+ 113 000e 8DF80730 		strb	r3, [sp, #7]
+  50:HARDWARE/SGP30/SGP30.c ****   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;    // 速度50MHz
+ 114              		.loc 1 50 3 is_stmt 1 view .LVU20
+ 115              		.loc 1 50 33 is_stmt 0 view .LVU21
+ 116 0012 0323     		movs	r3, #3
+ 117 0014 8DF80630 		strb	r3, [sp, #6]
+  51:HARDWARE/SGP30/SGP30.c ****   GPIO_Init(SGP30_SDA_GPIO_PORT, &GPIO_InitStructure);
+ 118              		.loc 1 51 3 is_stmt 1 view .LVU22
+ 119 0018 01A9     		add	r1, sp, #4
+ 120 001a 0348     		ldr	r0, .L7
+ 121 001c FFF7FEFF 		bl	GPIO_Init
+ 122              	.LVL3:
+  52:HARDWARE/SGP30/SGP30.c **** }
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 4
+
+
+ 123              		.loc 1 52 1 is_stmt 0 view .LVU23
+ 124 0020 03B0     		add	sp, sp, #12
+ 125              	.LCFI5:
+ 126              		.cfi_def_cfa_offset 4
+ 127              		@ sp needed
+ 128 0022 5DF804FB 		ldr	pc, [sp], #4
+ 129              	.L8:
+ 130 0026 00BF     		.align	2
+ 131              	.L7:
+ 132 0028 000C0140 		.word	1073810432
+ 133              		.cfi_endproc
+ 134              	.LFE30:
+ 136              		.section	.text.SDA_IN,"ax",%progbits
+ 137              		.align	1
+ 138              		.global	SDA_IN
+ 139              		.syntax unified
+ 140              		.thumb
+ 141              		.thumb_func
+ 143              	SDA_IN:
+ 144              	.LFB31:
+  53:HARDWARE/SGP30/SGP30.c **** 
+  54:HARDWARE/SGP30/SGP30.c **** /**
+  55:HARDWARE/SGP30/SGP30.c ****  * @brief 将SDA引脚设置为输入模式
+  56:HARDWARE/SGP30/SGP30.c ****  * @param 无
+  57:HARDWARE/SGP30/SGP30.c ****  * @return 无
+  58:HARDWARE/SGP30/SGP30.c ****  */
+  59:HARDWARE/SGP30/SGP30.c **** void SDA_IN(void)
+  60:HARDWARE/SGP30/SGP30.c **** {
+ 145              		.loc 1 60 1 is_stmt 1 view -0
+ 146              		.cfi_startproc
+ 147              		@ args = 0, pretend = 0, frame = 8
+ 148              		@ frame_needed = 0, uses_anonymous_args = 0
+ 149 0000 00B5     		push	{lr}
+ 150              	.LCFI6:
+ 151              		.cfi_def_cfa_offset 4
+ 152              		.cfi_offset 14, -4
+ 153 0002 83B0     		sub	sp, sp, #12
+ 154              	.LCFI7:
+ 155              		.cfi_def_cfa_offset 16
+  61:HARDWARE/SGP30/SGP30.c ****   GPIO_InitTypeDef GPIO_InitStructure;
+ 156              		.loc 1 61 3 view .LVU25
+  62:HARDWARE/SGP30/SGP30.c ****   GPIO_InitStructure.GPIO_Pin = SGP30_SDA_GPIO_PIN;
+ 157              		.loc 1 62 3 view .LVU26
+ 158              		.loc 1 62 31 is_stmt 0 view .LVU27
+ 159 0004 4FF40063 		mov	r3, #2048
+ 160 0008 ADF80430 		strh	r3, [sp, #4]	@ movhi
+  63:HARDWARE/SGP30/SGP30.c ****   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_10MHz;    // 速度10MHz
+ 161              		.loc 1 63 3 is_stmt 1 view .LVU28
+ 162              		.loc 1 63 33 is_stmt 0 view .LVU29
+ 163 000c 0123     		movs	r3, #1
+ 164 000e 8DF80630 		strb	r3, [sp, #6]
+  64:HARDWARE/SGP30/SGP30.c ****   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING; // 浮空输入
+ 165              		.loc 1 64 3 is_stmt 1 view .LVU30
+ 166              		.loc 1 64 32 is_stmt 0 view .LVU31
+ 167 0012 0423     		movs	r3, #4
+ 168 0014 8DF80730 		strb	r3, [sp, #7]
+  65:HARDWARE/SGP30/SGP30.c ****   GPIO_Init(SGP30_SDA_GPIO_PORT, &GPIO_InitStructure);
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 5
+
+
+ 169              		.loc 1 65 3 is_stmt 1 view .LVU32
+ 170 0018 0DEB0301 		add	r1, sp, r3
+ 171 001c 0248     		ldr	r0, .L11
+ 172 001e FFF7FEFF 		bl	GPIO_Init
+ 173              	.LVL4:
+  66:HARDWARE/SGP30/SGP30.c **** }
+ 174              		.loc 1 66 1 is_stmt 0 view .LVU33
+ 175 0022 03B0     		add	sp, sp, #12
+ 176              	.LCFI8:
+ 177              		.cfi_def_cfa_offset 4
+ 178              		@ sp needed
+ 179 0024 5DF804FB 		ldr	pc, [sp], #4
+ 180              	.L12:
+ 181              		.align	2
+ 182              	.L11:
+ 183 0028 000C0140 		.word	1073810432
+ 184              		.cfi_endproc
+ 185              	.LFE31:
+ 187              		.section	.text.SGP30_IIC_Start,"ax",%progbits
+ 188              		.align	1
+ 189              		.global	SGP30_IIC_Start
+ 190              		.syntax unified
+ 191              		.thumb
+ 192              		.thumb_func
+ 194              	SGP30_IIC_Start:
+ 195              	.LFB32:
+  67:HARDWARE/SGP30/SGP30.c **** 
+  68:HARDWARE/SGP30/SGP30.c **** /**
+  69:HARDWARE/SGP30/SGP30.c ****  * @brief 产生IIC起始信号
+  70:HARDWARE/SGP30/SGP30.c ****  * @param 无
+  71:HARDWARE/SGP30/SGP30.c ****  * @return 无
+  72:HARDWARE/SGP30/SGP30.c ****  * @note 当CLK为高电平时，DATA从高电平变为低电平
+  73:HARDWARE/SGP30/SGP30.c ****  */
+  74:HARDWARE/SGP30/SGP30.c **** void SGP30_IIC_Start(void)
+  75:HARDWARE/SGP30/SGP30.c **** {
+ 196              		.loc 1 75 1 is_stmt 1 view -0
+ 197              		.cfi_startproc
+ 198              		@ args = 0, pretend = 0, frame = 0
+ 199              		@ frame_needed = 0, uses_anonymous_args = 0
+ 200 0000 38B5     		push	{r3, r4, r5, lr}
+ 201              	.LCFI9:
+ 202              		.cfi_def_cfa_offset 16
+ 203              		.cfi_offset 3, -16
+ 204              		.cfi_offset 4, -12
+ 205              		.cfi_offset 5, -8
+ 206              		.cfi_offset 14, -4
+  76:HARDWARE/SGP30/SGP30.c ****   SDA_OUT();           // 设置SDA为输出
+ 207              		.loc 1 76 3 view .LVU35
+ 208 0002 FFF7FEFF 		bl	SDA_OUT
+ 209              	.LVL5:
+  77:HARDWARE/SGP30/SGP30.c ****   SGP30_SDA = 1;       // SDA置高
+ 210              		.loc 1 77 3 view .LVU36
+ 211              		.loc 1 77 13 is_stmt 0 view .LVU37
+ 212 0006 094C     		ldr	r4, .L15
+ 213 0008 0123     		movs	r3, #1
+ 214 000a C4F8AC31 		str	r3, [r4, #428]
+  78:HARDWARE/SGP30/SGP30.c ****   SGP30_SCL = 1;       // SCL置高
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 6
+
+
+ 215              		.loc 1 78 3 is_stmt 1 view .LVU38
+ 216              		.loc 1 78 13 is_stmt 0 view .LVU39
+ 217 000e C4F8A831 		str	r3, [r4, #424]
+  79:HARDWARE/SGP30/SGP30.c ****   delay_us(20);         // 延时
+ 218              		.loc 1 79 3 is_stmt 1 view .LVU40
+ 219 0012 1420     		movs	r0, #20
+ 220 0014 FFF7FEFF 		bl	delay_us
+ 221              	.LVL6:
+  80:HARDWARE/SGP30/SGP30.c **** 
+  81:HARDWARE/SGP30/SGP30.c ****   SGP30_SDA = 0;       // START:当CLK为高电平时，DATA从高电平变为低电平
+ 222              		.loc 1 81 3 view .LVU41
+ 223              		.loc 1 81 13 is_stmt 0 view .LVU42
+ 224 0018 0025     		movs	r5, #0
+ 225 001a C4F8AC51 		str	r5, [r4, #428]
+  82:HARDWARE/SGP30/SGP30.c ****   delay_us(20);         // 延时
+ 226              		.loc 1 82 3 is_stmt 1 view .LVU43
+ 227 001e 1420     		movs	r0, #20
+ 228 0020 FFF7FEFF 		bl	delay_us
+ 229              	.LVL7:
+  83:HARDWARE/SGP30/SGP30.c ****   SGP30_SCL = 0;       // 钳住I2C总线，准备发送或接收数据
+ 230              		.loc 1 83 3 view .LVU44
+ 231              		.loc 1 83 13 is_stmt 0 view .LVU45
+ 232 0024 C4F8A851 		str	r5, [r4, #424]
+  84:HARDWARE/SGP30/SGP30.c **** }
+ 233              		.loc 1 84 1 view .LVU46
+ 234 0028 38BD     		pop	{r3, r4, r5, pc}
+ 235              	.L16:
+ 236 002a 00BF     		.align	2
+ 237              	.L15:
+ 238 002c 00802142 		.word	1109491712
+ 239              		.cfi_endproc
+ 240              	.LFE32:
+ 242              		.section	.text.SGP30_IIC_Stop,"ax",%progbits
+ 243              		.align	1
+ 244              		.global	SGP30_IIC_Stop
+ 245              		.syntax unified
+ 246              		.thumb
+ 247              		.thumb_func
+ 249              	SGP30_IIC_Stop:
+ 250              	.LFB33:
+  85:HARDWARE/SGP30/SGP30.c **** 
+  86:HARDWARE/SGP30/SGP30.c **** /**
+  87:HARDWARE/SGP30/SGP30.c ****  * @brief 产生IIC停止信号
+  88:HARDWARE/SGP30/SGP30.c ****  * @param 无
+  89:HARDWARE/SGP30/SGP30.c ****  * @return 无
+  90:HARDWARE/SGP30/SGP30.c ****  * @note 当CLK为高电平时，DATA从低电平变为高电平
+  91:HARDWARE/SGP30/SGP30.c ****  */
+  92:HARDWARE/SGP30/SGP30.c **** void SGP30_IIC_Stop(void)
+  93:HARDWARE/SGP30/SGP30.c **** {
+ 251              		.loc 1 93 1 is_stmt 1 view -0
+ 252              		.cfi_startproc
+ 253              		@ args = 0, pretend = 0, frame = 0
+ 254              		@ frame_needed = 0, uses_anonymous_args = 0
+ 255 0000 10B5     		push	{r4, lr}
+ 256              	.LCFI10:
+ 257              		.cfi_def_cfa_offset 8
+ 258              		.cfi_offset 4, -8
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 7
+
+
+ 259              		.cfi_offset 14, -4
+  94:HARDWARE/SGP30/SGP30.c ****   SDA_OUT();           // 设置SDA为输出
+ 260              		.loc 1 94 3 view .LVU48
+ 261 0002 FFF7FEFF 		bl	SDA_OUT
+ 262              	.LVL8:
+  95:HARDWARE/SGP30/SGP30.c ****   SGP30_SCL = 0;       // SCL置低
+ 263              		.loc 1 95 3 view .LVU49
+ 264              		.loc 1 95 13 is_stmt 0 view .LVU50
+ 265 0006 094C     		ldr	r4, .L19
+ 266 0008 0023     		movs	r3, #0
+ 267 000a C4F8A831 		str	r3, [r4, #424]
+  96:HARDWARE/SGP30/SGP30.c ****   SGP30_SDA = 0;       // STOP:当CLK为高电平时，DATA从低电平变为高电平
+ 268              		.loc 1 96 3 is_stmt 1 view .LVU51
+ 269              		.loc 1 96 13 is_stmt 0 view .LVU52
+ 270 000e C4F8AC31 		str	r3, [r4, #428]
+  97:HARDWARE/SGP30/SGP30.c ****   delay_us(20);         // 延时
+ 271              		.loc 1 97 3 is_stmt 1 view .LVU53
+ 272 0012 1420     		movs	r0, #20
+ 273 0014 FFF7FEFF 		bl	delay_us
+ 274              	.LVL9:
+  98:HARDWARE/SGP30/SGP30.c ****   SGP30_SCL = 1;       // SCL置高
+ 275              		.loc 1 98 3 view .LVU54
+ 276              		.loc 1 98 13 is_stmt 0 view .LVU55
+ 277 0018 0123     		movs	r3, #1
+ 278 001a C4F8A831 		str	r3, [r4, #424]
+  99:HARDWARE/SGP30/SGP30.c ****   SGP30_SDA = 1;       // 发送I2C总线结束信号
+ 279              		.loc 1 99 3 is_stmt 1 view .LVU56
+ 280              		.loc 1 99 13 is_stmt 0 view .LVU57
+ 281 001e C4F8AC31 		str	r3, [r4, #428]
+ 100:HARDWARE/SGP30/SGP30.c ****   delay_us(20);         // 延时
+ 282              		.loc 1 100 3 is_stmt 1 view .LVU58
+ 283 0022 1420     		movs	r0, #20
+ 284 0024 FFF7FEFF 		bl	delay_us
+ 285              	.LVL10:
+ 101:HARDWARE/SGP30/SGP30.c **** }
+ 286              		.loc 1 101 1 is_stmt 0 view .LVU59
+ 287 0028 10BD     		pop	{r4, pc}
+ 288              	.L20:
+ 289 002a 00BF     		.align	2
+ 290              	.L19:
+ 291 002c 00802142 		.word	1109491712
+ 292              		.cfi_endproc
+ 293              	.LFE33:
+ 295              		.section	.text.SGP30_IIC_Wait_Ack,"ax",%progbits
+ 296              		.align	1
+ 297              		.global	SGP30_IIC_Wait_Ack
+ 298              		.syntax unified
+ 299              		.thumb
+ 300              		.thumb_func
+ 302              	SGP30_IIC_Wait_Ack:
+ 303              	.LFB34:
+ 102:HARDWARE/SGP30/SGP30.c **** 
+ 103:HARDWARE/SGP30/SGP30.c **** /**
+ 104:HARDWARE/SGP30/SGP30.c ****  * @brief 等待应答信号到来
+ 105:HARDWARE/SGP30/SGP30.c ****  * @param 无
+ 106:HARDWARE/SGP30/SGP30.c ****  * @return 0表示成功，1表示失败
+ 107:HARDWARE/SGP30/SGP30.c ****  */
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 8
+
+
+ 108:HARDWARE/SGP30/SGP30.c **** u8 SGP30_IIC_Wait_Ack(void)
+ 109:HARDWARE/SGP30/SGP30.c **** {
+ 304              		.loc 1 109 1 is_stmt 1 view -0
+ 305              		.cfi_startproc
+ 306              		@ args = 0, pretend = 0, frame = 0
+ 307              		@ frame_needed = 0, uses_anonymous_args = 0
+ 308 0000 38B5     		push	{r3, r4, r5, lr}
+ 309              	.LCFI11:
+ 310              		.cfi_def_cfa_offset 16
+ 311              		.cfi_offset 3, -16
+ 312              		.cfi_offset 4, -12
+ 313              		.cfi_offset 5, -8
+ 314              		.cfi_offset 14, -4
+ 110:HARDWARE/SGP30/SGP30.c ****   u8 ucErrTime = 0;
+ 315              		.loc 1 110 3 view .LVU61
+ 316              	.LVL11:
+ 111:HARDWARE/SGP30/SGP30.c ****   SDA_IN();            // 设置SDA为输入
+ 317              		.loc 1 111 3 view .LVU62
+ 318 0002 FFF7FEFF 		bl	SDA_IN
+ 319              	.LVL12:
+ 112:HARDWARE/SGP30/SGP30.c ****   SGP30_SDA = 1;       // SDA置高
+ 320              		.loc 1 112 3 view .LVU63
+ 321              		.loc 1 112 13 is_stmt 0 view .LVU64
+ 322 0006 114C     		ldr	r4, .L27
+ 323 0008 0125     		movs	r5, #1
+ 324 000a C4F8AC51 		str	r5, [r4, #428]
+ 113:HARDWARE/SGP30/SGP30.c ****   delay_us(10);         // 延时
+ 325              		.loc 1 113 3 is_stmt 1 view .LVU65
+ 326 000e 0A20     		movs	r0, #10
+ 327 0010 FFF7FEFF 		bl	delay_us
+ 328              	.LVL13:
+ 114:HARDWARE/SGP30/SGP30.c ****   SGP30_SCL = 1;       // SCL置高
+ 329              		.loc 1 114 3 view .LVU66
+ 330              		.loc 1 114 13 is_stmt 0 view .LVU67
+ 331 0014 C4F8A851 		str	r5, [r4, #424]
+ 115:HARDWARE/SGP30/SGP30.c ****   delay_us(10);         // 延时
+ 332              		.loc 1 115 3 is_stmt 1 view .LVU68
+ 333 0018 0A20     		movs	r0, #10
+ 334 001a FFF7FEFF 		bl	delay_us
+ 335              	.LVL14:
+ 116:HARDWARE/SGP30/SGP30.c ****   while(SGP30_SDA_READ()) // 等待SDA变为低电平
+ 336              		.loc 1 116 3 view .LVU69
+ 110:HARDWARE/SGP30/SGP30.c ****   SDA_IN();            // 设置SDA为输入
+ 337              		.loc 1 110 6 is_stmt 0 view .LVU70
+ 338 001e 0024     		movs	r4, #0
+ 339              	.LVL15:
+ 340              	.L22:
+ 341              		.loc 1 116 9 is_stmt 1 view .LVU71
+ 342 0020 4FF40061 		mov	r1, #2048
+ 343 0024 0A48     		ldr	r0, .L27+4
+ 344 0026 FFF7FEFF 		bl	GPIO_ReadInputDataBit
+ 345              	.LVL16:
+ 346              		.loc 1 116 9 is_stmt 0 discriminator 1 view .LVU72
+ 347 002a 0346     		mov	r3, r0
+ 348 002c 38B1     		cbz	r0, .L26
+ 117:HARDWARE/SGP30/SGP30.c ****   {
+ 118:HARDWARE/SGP30/SGP30.c ****     ucErrTime++;        // 错误计数
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 9
+
+
+ 349              		.loc 1 118 5 is_stmt 1 view .LVU73
+ 350              		.loc 1 118 14 is_stmt 0 view .LVU74
+ 351 002e 0134     		adds	r4, r4, #1
+ 352              	.LVL17:
+ 353              		.loc 1 118 14 view .LVU75
+ 354 0030 E4B2     		uxtb	r4, r4
+ 355              	.LVL18:
+ 119:HARDWARE/SGP30/SGP30.c ****     if(ucErrTime > 250) // 超时
+ 356              		.loc 1 119 5 is_stmt 1 view .LVU76
+ 357              		.loc 1 119 7 is_stmt 0 view .LVU77
+ 358 0032 FA2C     		cmp	r4, #250
+ 359 0034 F4D9     		bls	.L22
+ 120:HARDWARE/SGP30/SGP30.c ****     {
+ 121:HARDWARE/SGP30/SGP30.c ****       SGP30_IIC_Stop(); // 发送停止信号
+ 360              		.loc 1 121 7 is_stmt 1 view .LVU78
+ 361 0036 FFF7FEFF 		bl	SGP30_IIC_Stop
+ 362              	.LVL19:
+ 122:HARDWARE/SGP30/SGP30.c ****       return 1;         // 返回错误
+ 363              		.loc 1 122 7 view .LVU79
+ 364              		.loc 1 122 14 is_stmt 0 view .LVU80
+ 365 003a 0123     		movs	r3, #1
+ 366 003c 03E0     		b	.L23
+ 367              	.L26:
+ 123:HARDWARE/SGP30/SGP30.c ****     }
+ 124:HARDWARE/SGP30/SGP30.c ****   }
+ 125:HARDWARE/SGP30/SGP30.c ****   SGP30_SCL = 0;        // 时钟输出0
+ 368              		.loc 1 125 3 is_stmt 1 view .LVU81
+ 369              		.loc 1 125 13 is_stmt 0 view .LVU82
+ 370 003e 034A     		ldr	r2, .L27
+ 371 0040 0021     		movs	r1, #0
+ 372 0042 C2F8A811 		str	r1, [r2, #424]
+ 126:HARDWARE/SGP30/SGP30.c ****   return 0;             // 返回成功
+ 373              		.loc 1 126 3 is_stmt 1 view .LVU83
+ 374              	.L23:
+ 127:HARDWARE/SGP30/SGP30.c **** }
+ 375              		.loc 1 127 1 is_stmt 0 view .LVU84
+ 376 0046 1846     		mov	r0, r3
+ 377 0048 38BD     		pop	{r3, r4, r5, pc}
+ 378              	.LVL20:
+ 379              	.L28:
+ 380              		.loc 1 127 1 view .LVU85
+ 381 004a 00BF     		.align	2
+ 382              	.L27:
+ 383 004c 00802142 		.word	1109491712
+ 384 0050 000C0140 		.word	1073810432
+ 385              		.cfi_endproc
+ 386              	.LFE34:
+ 388              		.section	.text.SGP30_IIC_Ack,"ax",%progbits
+ 389              		.align	1
+ 390              		.global	SGP30_IIC_Ack
+ 391              		.syntax unified
+ 392              		.thumb
+ 393              		.thumb_func
+ 395              	SGP30_IIC_Ack:
+ 396              	.LFB35:
+ 128:HARDWARE/SGP30/SGP30.c **** 
+ 129:HARDWARE/SGP30/SGP30.c **** /**
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 10
+
+
+ 130:HARDWARE/SGP30/SGP30.c ****  * @brief 产生ACK应答
+ 131:HARDWARE/SGP30/SGP30.c ****  * @param 无
+ 132:HARDWARE/SGP30/SGP30.c ****  * @return 无
+ 133:HARDWARE/SGP30/SGP30.c ****  */
+ 134:HARDWARE/SGP30/SGP30.c **** void SGP30_IIC_Ack(void)
+ 135:HARDWARE/SGP30/SGP30.c **** {
+ 397              		.loc 1 135 1 is_stmt 1 view -0
+ 398              		.cfi_startproc
+ 399              		@ args = 0, pretend = 0, frame = 0
+ 400              		@ frame_needed = 0, uses_anonymous_args = 0
+ 401 0000 38B5     		push	{r3, r4, r5, lr}
+ 402              	.LCFI12:
+ 403              		.cfi_def_cfa_offset 16
+ 404              		.cfi_offset 3, -16
+ 405              		.cfi_offset 4, -12
+ 406              		.cfi_offset 5, -8
+ 407              		.cfi_offset 14, -4
+ 136:HARDWARE/SGP30/SGP30.c ****   SGP30_SCL = 0;        // SCL置低
+ 408              		.loc 1 136 3 view .LVU87
+ 409              		.loc 1 136 13 is_stmt 0 view .LVU88
+ 410 0002 0A4C     		ldr	r4, .L31
+ 411 0004 0025     		movs	r5, #0
+ 412 0006 C4F8A851 		str	r5, [r4, #424]
+ 137:HARDWARE/SGP30/SGP30.c ****   SDA_OUT();            // 设置SDA为输出
+ 413              		.loc 1 137 3 is_stmt 1 view .LVU89
+ 414 000a FFF7FEFF 		bl	SDA_OUT
+ 415              	.LVL21:
+ 138:HARDWARE/SGP30/SGP30.c ****   SGP30_SDA = 0;        // SDA置低
+ 416              		.loc 1 138 3 view .LVU90
+ 417              		.loc 1 138 13 is_stmt 0 view .LVU91
+ 418 000e C4F8AC51 		str	r5, [r4, #428]
+ 139:HARDWARE/SGP30/SGP30.c ****   delay_us(20);         // 延时
+ 419              		.loc 1 139 3 is_stmt 1 view .LVU92
+ 420 0012 1420     		movs	r0, #20
+ 421 0014 FFF7FEFF 		bl	delay_us
+ 422              	.LVL22:
+ 140:HARDWARE/SGP30/SGP30.c ****   SGP30_SCL = 1;        // SCL置高
+ 423              		.loc 1 140 3 view .LVU93
+ 424              		.loc 1 140 13 is_stmt 0 view .LVU94
+ 425 0018 0123     		movs	r3, #1
+ 426 001a C4F8A831 		str	r3, [r4, #424]
+ 141:HARDWARE/SGP30/SGP30.c ****   delay_us(20);         // 延时
+ 427              		.loc 1 141 3 is_stmt 1 view .LVU95
+ 428 001e 1420     		movs	r0, #20
+ 429 0020 FFF7FEFF 		bl	delay_us
+ 430              	.LVL23:
+ 142:HARDWARE/SGP30/SGP30.c ****   SGP30_SCL = 0;        // SCL置低
+ 431              		.loc 1 142 3 view .LVU96
+ 432              		.loc 1 142 13 is_stmt 0 view .LVU97
+ 433 0024 C4F8A851 		str	r5, [r4, #424]
+ 143:HARDWARE/SGP30/SGP30.c **** }
+ 434              		.loc 1 143 1 view .LVU98
+ 435 0028 38BD     		pop	{r3, r4, r5, pc}
+ 436              	.L32:
+ 437 002a 00BF     		.align	2
+ 438              	.L31:
+ 439 002c 00802142 		.word	1109491712
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 11
+
+
+ 440              		.cfi_endproc
+ 441              	.LFE35:
+ 443              		.section	.text.SGP30_IIC_NAck,"ax",%progbits
+ 444              		.align	1
+ 445              		.global	SGP30_IIC_NAck
+ 446              		.syntax unified
+ 447              		.thumb
+ 448              		.thumb_func
+ 450              	SGP30_IIC_NAck:
+ 451              	.LFB36:
+ 144:HARDWARE/SGP30/SGP30.c **** 
+ 145:HARDWARE/SGP30/SGP30.c **** /**
+ 146:HARDWARE/SGP30/SGP30.c ****  * @brief 不产生ACK应答
+ 147:HARDWARE/SGP30/SGP30.c ****  * @param 无
+ 148:HARDWARE/SGP30/SGP30.c ****  * @return 无
+ 149:HARDWARE/SGP30/SGP30.c ****  */
+ 150:HARDWARE/SGP30/SGP30.c **** void SGP30_IIC_NAck(void)
+ 151:HARDWARE/SGP30/SGP30.c **** {
+ 452              		.loc 1 151 1 is_stmt 1 view -0
+ 453              		.cfi_startproc
+ 454              		@ args = 0, pretend = 0, frame = 0
+ 455              		@ frame_needed = 0, uses_anonymous_args = 0
+ 456 0000 70B5     		push	{r4, r5, r6, lr}
+ 457              	.LCFI13:
+ 458              		.cfi_def_cfa_offset 16
+ 459              		.cfi_offset 4, -16
+ 460              		.cfi_offset 5, -12
+ 461              		.cfi_offset 6, -8
+ 462              		.cfi_offset 14, -4
+ 152:HARDWARE/SGP30/SGP30.c ****   SGP30_SCL = 0;        // SCL置低
+ 463              		.loc 1 152 3 view .LVU100
+ 464              		.loc 1 152 13 is_stmt 0 view .LVU101
+ 465 0002 0A4C     		ldr	r4, .L35
+ 466 0004 0025     		movs	r5, #0
+ 467 0006 C4F8A851 		str	r5, [r4, #424]
+ 153:HARDWARE/SGP30/SGP30.c ****   SDA_OUT();            // 设置SDA为输出
+ 468              		.loc 1 153 3 is_stmt 1 view .LVU102
+ 469 000a FFF7FEFF 		bl	SDA_OUT
+ 470              	.LVL24:
+ 154:HARDWARE/SGP30/SGP30.c ****   SGP30_SDA = 1;        // SDA置高
+ 471              		.loc 1 154 3 view .LVU103
+ 472              		.loc 1 154 13 is_stmt 0 view .LVU104
+ 473 000e 0126     		movs	r6, #1
+ 474 0010 C4F8AC61 		str	r6, [r4, #428]
+ 155:HARDWARE/SGP30/SGP30.c ****   delay_us(20);         // 延时
+ 475              		.loc 1 155 3 is_stmt 1 view .LVU105
+ 476 0014 1420     		movs	r0, #20
+ 477 0016 FFF7FEFF 		bl	delay_us
+ 478              	.LVL25:
+ 156:HARDWARE/SGP30/SGP30.c ****   SGP30_SCL = 1;        // SCL置高
+ 479              		.loc 1 156 3 view .LVU106
+ 480              		.loc 1 156 13 is_stmt 0 view .LVU107
+ 481 001a C4F8A861 		str	r6, [r4, #424]
+ 157:HARDWARE/SGP30/SGP30.c ****   delay_us(20);         // 延时
+ 482              		.loc 1 157 3 is_stmt 1 view .LVU108
+ 483 001e 1420     		movs	r0, #20
+ 484 0020 FFF7FEFF 		bl	delay_us
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 12
+
+
+ 485              	.LVL26:
+ 158:HARDWARE/SGP30/SGP30.c ****   SGP30_SCL = 0;        // SCL置低
+ 486              		.loc 1 158 3 view .LVU109
+ 487              		.loc 1 158 13 is_stmt 0 view .LVU110
+ 488 0024 C4F8A851 		str	r5, [r4, #424]
+ 159:HARDWARE/SGP30/SGP30.c **** }
+ 489              		.loc 1 159 1 view .LVU111
+ 490 0028 70BD     		pop	{r4, r5, r6, pc}
+ 491              	.L36:
+ 492 002a 00BF     		.align	2
+ 493              	.L35:
+ 494 002c 00802142 		.word	1109491712
+ 495              		.cfi_endproc
+ 496              	.LFE36:
+ 498              		.section	.text.SGP30_IIC_Send_Byte,"ax",%progbits
+ 499              		.align	1
+ 500              		.global	SGP30_IIC_Send_Byte
+ 501              		.syntax unified
+ 502              		.thumb
+ 503              		.thumb_func
+ 505              	SGP30_IIC_Send_Byte:
+ 506              	.LVL27:
+ 507              	.LFB37:
+ 160:HARDWARE/SGP30/SGP30.c **** 
+ 161:HARDWARE/SGP30/SGP30.c **** /**
+ 162:HARDWARE/SGP30/SGP30.c ****  * @brief IIC发送一个字节
+ 163:HARDWARE/SGP30/SGP30.c ****  * @param txd: 要发送的字节
+ 164:HARDWARE/SGP30/SGP30.c ****  * @return 无
+ 165:HARDWARE/SGP30/SGP30.c ****  */
+ 166:HARDWARE/SGP30/SGP30.c **** void SGP30_IIC_Send_Byte(u8 txd)
+ 167:HARDWARE/SGP30/SGP30.c **** {
+ 508              		.loc 1 167 1 is_stmt 1 view -0
+ 509              		.cfi_startproc
+ 510              		@ args = 0, pretend = 0, frame = 0
+ 511              		@ frame_needed = 0, uses_anonymous_args = 0
+ 512              		.loc 1 167 1 is_stmt 0 view .LVU113
+ 513 0000 70B5     		push	{r4, r5, r6, lr}
+ 514              	.LCFI14:
+ 515              		.cfi_def_cfa_offset 16
+ 516              		.cfi_offset 4, -16
+ 517              		.cfi_offset 5, -12
+ 518              		.cfi_offset 6, -8
+ 519              		.cfi_offset 14, -4
+ 520 0002 0646     		mov	r6, r0
+ 168:HARDWARE/SGP30/SGP30.c ****   u8 t;
+ 521              		.loc 1 168 3 is_stmt 1 view .LVU114
+ 169:HARDWARE/SGP30/SGP30.c ****   SDA_OUT();            // 设置SDA为输出
+ 522              		.loc 1 169 3 view .LVU115
+ 523 0004 FFF7FEFF 		bl	SDA_OUT
+ 524              	.LVL28:
+ 170:HARDWARE/SGP30/SGP30.c ****   SGP30_SCL = 0;        // 拉低时钟开始数据传输
+ 525              		.loc 1 170 3 view .LVU116
+ 526              		.loc 1 170 13 is_stmt 0 view .LVU117
+ 527 0008 0024     		movs	r4, #0
+ 528 000a 154B     		ldr	r3, .L44
+ 529 000c C3F8A841 		str	r4, [r3, #424]
+ 171:HARDWARE/SGP30/SGP30.c ****   for(t = 0; t < 8; t++) // 发送8位数据
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 13
+
+
+ 530              		.loc 1 171 3 is_stmt 1 view .LVU118
+ 531              	.LVL29:
+ 532              		.loc 1 171 3 is_stmt 0 view .LVU119
+ 533 0010 17E0     		b	.L38
+ 534              	.LVL30:
+ 535              	.L39:
+ 172:HARDWARE/SGP30/SGP30.c ****   {
+ 173:HARDWARE/SGP30/SGP30.c ****     if((txd & 0x80) >> 7) // 发送最高位
+ 174:HARDWARE/SGP30/SGP30.c ****       SGP30_SDA = 1;
+ 175:HARDWARE/SGP30/SGP30.c ****     else
+ 176:HARDWARE/SGP30/SGP30.c ****       SGP30_SDA = 0;
+ 536              		.loc 1 176 7 is_stmt 1 view .LVU120
+ 537              		.loc 1 176 17 is_stmt 0 view .LVU121
+ 538 0012 134B     		ldr	r3, .L44
+ 539 0014 0022     		movs	r2, #0
+ 540 0016 C3F8AC21 		str	r2, [r3, #428]
+ 541              	.L40:
+ 177:HARDWARE/SGP30/SGP30.c ****     txd <<= 1;           // 左移一位
+ 542              		.loc 1 177 5 is_stmt 1 view .LVU122
+ 543              		.loc 1 177 9 is_stmt 0 view .LVU123
+ 544 001a 7600     		lsls	r6, r6, #1
+ 545              	.LVL31:
+ 546              		.loc 1 177 9 view .LVU124
+ 547 001c F6B2     		uxtb	r6, r6
+ 548              	.LVL32:
+ 178:HARDWARE/SGP30/SGP30.c ****     delay_us(20);         // 延时
+ 549              		.loc 1 178 5 is_stmt 1 view .LVU125
+ 550 001e 1420     		movs	r0, #20
+ 551 0020 FFF7FEFF 		bl	delay_us
+ 552              	.LVL33:
+ 179:HARDWARE/SGP30/SGP30.c ****     SGP30_SCL = 1;        // SCL置高，数据有效
+ 553              		.loc 1 179 5 view .LVU126
+ 554              		.loc 1 179 15 is_stmt 0 view .LVU127
+ 555 0024 0E4D     		ldr	r5, .L44
+ 556 0026 0123     		movs	r3, #1
+ 557 0028 C5F8A831 		str	r3, [r5, #424]
+ 180:HARDWARE/SGP30/SGP30.c ****     delay_us(20);         // 延时
+ 558              		.loc 1 180 5 is_stmt 1 view .LVU128
+ 559 002c 1420     		movs	r0, #20
+ 560 002e FFF7FEFF 		bl	delay_us
+ 561              	.LVL34:
+ 181:HARDWARE/SGP30/SGP30.c ****     SGP30_SCL = 0;        // SCL置低，准备下一位
+ 562              		.loc 1 181 5 view .LVU129
+ 563              		.loc 1 181 15 is_stmt 0 view .LVU130
+ 564 0032 0023     		movs	r3, #0
+ 565 0034 C5F8A831 		str	r3, [r5, #424]
+ 182:HARDWARE/SGP30/SGP30.c ****     delay_us(20);         // 延时
+ 566              		.loc 1 182 5 is_stmt 1 view .LVU131
+ 567 0038 1420     		movs	r0, #20
+ 568 003a FFF7FEFF 		bl	delay_us
+ 569              	.LVL35:
+ 171:HARDWARE/SGP30/SGP30.c ****   {
+ 570              		.loc 1 171 22 discriminator 2 view .LVU132
+ 571 003e 0134     		adds	r4, r4, #1
+ 572              	.LVL36:
+ 171:HARDWARE/SGP30/SGP30.c ****   {
+ 573              		.loc 1 171 22 is_stmt 0 discriminator 2 view .LVU133
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 14
+
+
+ 574 0040 E4B2     		uxtb	r4, r4
+ 575              	.LVL37:
+ 576              	.L38:
+ 171:HARDWARE/SGP30/SGP30.c ****   {
+ 577              		.loc 1 171 16 is_stmt 1 discriminator 1 view .LVU134
+ 578 0042 072C     		cmp	r4, #7
+ 579 0044 07D8     		bhi	.L43
+ 173:HARDWARE/SGP30/SGP30.c ****       SGP30_SDA = 1;
+ 580              		.loc 1 173 5 view .LVU135
+ 173:HARDWARE/SGP30/SGP30.c ****       SGP30_SDA = 1;
+ 581              		.loc 1 173 7 is_stmt 0 view .LVU136
+ 582 0046 16F0800F 		tst	r6, #128
+ 583 004a E2D0     		beq	.L39
+ 174:HARDWARE/SGP30/SGP30.c ****     else
+ 584              		.loc 1 174 7 is_stmt 1 view .LVU137
+ 174:HARDWARE/SGP30/SGP30.c ****     else
+ 585              		.loc 1 174 17 is_stmt 0 view .LVU138
+ 586 004c 044B     		ldr	r3, .L44
+ 587 004e 0122     		movs	r2, #1
+ 588 0050 C3F8AC21 		str	r2, [r3, #428]
+ 589 0054 E1E7     		b	.L40
+ 590              	.L43:
+ 183:HARDWARE/SGP30/SGP30.c ****   }
+ 184:HARDWARE/SGP30/SGP30.c ****   delay_us(20);           // 延时
+ 591              		.loc 1 184 3 is_stmt 1 view .LVU139
+ 592 0056 1420     		movs	r0, #20
+ 593 0058 FFF7FEFF 		bl	delay_us
+ 594              	.LVL38:
+ 185:HARDWARE/SGP30/SGP30.c **** }
+ 595              		.loc 1 185 1 is_stmt 0 view .LVU140
+ 596 005c 70BD     		pop	{r4, r5, r6, pc}
+ 597              	.LVL39:
+ 598              	.L45:
+ 599              		.loc 1 185 1 view .LVU141
+ 600 005e 00BF     		.align	2
+ 601              	.L44:
+ 602 0060 00802142 		.word	1109491712
+ 603              		.cfi_endproc
+ 604              	.LFE37:
+ 606              		.section	.text.SGP30_IIC_Read_Byte,"ax",%progbits
+ 607              		.align	1
+ 608              		.global	SGP30_IIC_Read_Byte
+ 609              		.syntax unified
+ 610              		.thumb
+ 611              		.thumb_func
+ 613              	SGP30_IIC_Read_Byte:
+ 614              	.LVL40:
+ 615              	.LFB38:
+ 186:HARDWARE/SGP30/SGP30.c **** 
+ 187:HARDWARE/SGP30/SGP30.c **** /**
+ 188:HARDWARE/SGP30/SGP30.c ****  * @brief IIC读取一个字节
+ 189:HARDWARE/SGP30/SGP30.c ****  * @param ack: 应答标志，1表示发送ACK，0表示发送NACK
+ 190:HARDWARE/SGP30/SGP30.c ****  * @return 读取的字节
+ 191:HARDWARE/SGP30/SGP30.c ****  */
+ 192:HARDWARE/SGP30/SGP30.c **** u16 SGP30_IIC_Read_Byte(u8 ack)
+ 193:HARDWARE/SGP30/SGP30.c **** {
+ 616              		.loc 1 193 1 is_stmt 1 view -0
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 15
+
+
+ 617              		.cfi_startproc
+ 618              		@ args = 0, pretend = 0, frame = 0
+ 619              		@ frame_needed = 0, uses_anonymous_args = 0
+ 620              		.loc 1 193 1 is_stmt 0 view .LVU143
+ 621 0000 F8B5     		push	{r3, r4, r5, r6, r7, lr}
+ 622              	.LCFI15:
+ 623              		.cfi_def_cfa_offset 24
+ 624              		.cfi_offset 3, -24
+ 625              		.cfi_offset 4, -20
+ 626              		.cfi_offset 5, -16
+ 627              		.cfi_offset 6, -12
+ 628              		.cfi_offset 7, -8
+ 629              		.cfi_offset 14, -4
+ 630 0002 0746     		mov	r7, r0
+ 194:HARDWARE/SGP30/SGP30.c ****   u8 i;
+ 631              		.loc 1 194 3 is_stmt 1 view .LVU144
+ 195:HARDWARE/SGP30/SGP30.c ****   u16 receive = 0;
+ 632              		.loc 1 195 3 view .LVU145
+ 633              	.LVL41:
+ 196:HARDWARE/SGP30/SGP30.c ****   SDA_IN();            // 设置SDA为输入
+ 634              		.loc 1 196 3 view .LVU146
+ 635 0004 FFF7FEFF 		bl	SDA_IN
+ 636              	.LVL42:
+ 197:HARDWARE/SGP30/SGP30.c ****   for(i = 0; i < 8; i++ ) // 读取8位数据
+ 637              		.loc 1 197 3 view .LVU147
+ 195:HARDWARE/SGP30/SGP30.c ****   u16 receive = 0;
+ 638              		.loc 1 195 7 is_stmt 0 view .LVU148
+ 639 0008 0024     		movs	r4, #0
+ 640              		.loc 1 197 9 view .LVU149
+ 641 000a 2546     		mov	r5, r4
+ 642              		.loc 1 197 3 view .LVU150
+ 643 000c 04E0     		b	.L47
+ 644              	.LVL43:
+ 645              	.L48:
+ 198:HARDWARE/SGP30/SGP30.c ****   {
+ 199:HARDWARE/SGP30/SGP30.c ****     SGP30_SCL = 0;        // SCL置低
+ 200:HARDWARE/SGP30/SGP30.c ****     delay_us(20);         // 延时
+ 201:HARDWARE/SGP30/SGP30.c ****     SGP30_SCL = 1;        // SCL置高，数据有效
+ 202:HARDWARE/SGP30/SGP30.c ****     receive <<= 1;        // 左移一位
+ 203:HARDWARE/SGP30/SGP30.c ****     if(SGP30_SDA_READ())  // 读取SDA状态
+ 204:HARDWARE/SGP30/SGP30.c ****       receive++;
+ 205:HARDWARE/SGP30/SGP30.c ****     delay_us(20);         // 延时
+ 646              		.loc 1 205 5 is_stmt 1 view .LVU151
+ 647 000e 1420     		movs	r0, #20
+ 648 0010 FFF7FEFF 		bl	delay_us
+ 649              	.LVL44:
+ 197:HARDWARE/SGP30/SGP30.c ****   for(i = 0; i < 8; i++ ) // 读取8位数据
+ 650              		.loc 1 197 22 discriminator 2 view .LVU152
+ 651 0014 0135     		adds	r5, r5, #1
+ 652              	.LVL45:
+ 197:HARDWARE/SGP30/SGP30.c ****   for(i = 0; i < 8; i++ ) // 读取8位数据
+ 653              		.loc 1 197 22 is_stmt 0 discriminator 2 view .LVU153
+ 654 0016 EDB2     		uxtb	r5, r5
+ 655              	.LVL46:
+ 656              	.L47:
+ 197:HARDWARE/SGP30/SGP30.c ****   for(i = 0; i < 8; i++ ) // 读取8位数据
+ 657              		.loc 1 197 16 is_stmt 1 discriminator 1 view .LVU154
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 16
+
+
+ 658 0018 072D     		cmp	r5, #7
+ 659 001a 15D8     		bhi	.L53
+ 199:HARDWARE/SGP30/SGP30.c ****     delay_us(20);         // 延时
+ 660              		.loc 1 199 5 view .LVU155
+ 199:HARDWARE/SGP30/SGP30.c ****     delay_us(20);         // 延时
+ 661              		.loc 1 199 15 is_stmt 0 view .LVU156
+ 662 001c 0E4E     		ldr	r6, .L54
+ 663 001e 0023     		movs	r3, #0
+ 664 0020 C6F8A831 		str	r3, [r6, #424]
+ 200:HARDWARE/SGP30/SGP30.c ****     SGP30_SCL = 1;        // SCL置高，数据有效
+ 665              		.loc 1 200 5 is_stmt 1 view .LVU157
+ 666 0024 1420     		movs	r0, #20
+ 667 0026 FFF7FEFF 		bl	delay_us
+ 668              	.LVL47:
+ 201:HARDWARE/SGP30/SGP30.c ****     receive <<= 1;        // 左移一位
+ 669              		.loc 1 201 5 view .LVU158
+ 201:HARDWARE/SGP30/SGP30.c ****     receive <<= 1;        // 左移一位
+ 670              		.loc 1 201 15 is_stmt 0 view .LVU159
+ 671 002a 0123     		movs	r3, #1
+ 672 002c C6F8A831 		str	r3, [r6, #424]
+ 202:HARDWARE/SGP30/SGP30.c ****     if(SGP30_SDA_READ())  // 读取SDA状态
+ 673              		.loc 1 202 5 is_stmt 1 view .LVU160
+ 202:HARDWARE/SGP30/SGP30.c ****     if(SGP30_SDA_READ())  // 读取SDA状态
+ 674              		.loc 1 202 13 is_stmt 0 view .LVU161
+ 675 0030 9C40     		lsls	r4, r4, r3
+ 676              	.LVL48:
+ 202:HARDWARE/SGP30/SGP30.c ****     if(SGP30_SDA_READ())  // 读取SDA状态
+ 677              		.loc 1 202 13 view .LVU162
+ 678 0032 A4B2     		uxth	r4, r4
+ 679              	.LVL49:
+ 203:HARDWARE/SGP30/SGP30.c ****       receive++;
+ 680              		.loc 1 203 5 is_stmt 1 view .LVU163
+ 203:HARDWARE/SGP30/SGP30.c ****       receive++;
+ 681              		.loc 1 203 8 is_stmt 0 view .LVU164
+ 682 0034 4FF40061 		mov	r1, #2048
+ 683 0038 0848     		ldr	r0, .L54+4
+ 684 003a FFF7FEFF 		bl	GPIO_ReadInputDataBit
+ 685              	.LVL50:
+ 203:HARDWARE/SGP30/SGP30.c ****       receive++;
+ 686              		.loc 1 203 7 discriminator 1 view .LVU165
+ 687 003e 0028     		cmp	r0, #0
+ 688 0040 E5D0     		beq	.L48
+ 204:HARDWARE/SGP30/SGP30.c ****     delay_us(20);         // 延时
+ 689              		.loc 1 204 7 is_stmt 1 view .LVU166
+ 204:HARDWARE/SGP30/SGP30.c ****     delay_us(20);         // 延时
+ 690              		.loc 1 204 14 is_stmt 0 view .LVU167
+ 691 0042 0134     		adds	r4, r4, #1
+ 692              	.LVL51:
+ 204:HARDWARE/SGP30/SGP30.c ****     delay_us(20);         // 延时
+ 693              		.loc 1 204 14 view .LVU168
+ 694 0044 A4B2     		uxth	r4, r4
+ 695              	.LVL52:
+ 204:HARDWARE/SGP30/SGP30.c ****     delay_us(20);         // 延时
+ 696              		.loc 1 204 14 view .LVU169
+ 697 0046 E2E7     		b	.L48
+ 698              	.L53:
+ 206:HARDWARE/SGP30/SGP30.c ****   }
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 17
+
+
+ 207:HARDWARE/SGP30/SGP30.c ****   if (!ack)
+ 699              		.loc 1 207 3 is_stmt 1 view .LVU170
+ 700              		.loc 1 207 6 is_stmt 0 view .LVU171
+ 701 0048 1FB9     		cbnz	r7, .L50
+ 208:HARDWARE/SGP30/SGP30.c ****     SGP30_IIC_NAck();     // 发送nACK
+ 702              		.loc 1 208 5 is_stmt 1 view .LVU172
+ 703 004a FFF7FEFF 		bl	SGP30_IIC_NAck
+ 704              	.LVL53:
+ 705              	.L51:
+ 209:HARDWARE/SGP30/SGP30.c ****   else
+ 210:HARDWARE/SGP30/SGP30.c ****     SGP30_IIC_Ack();      // 发送ACK
+ 211:HARDWARE/SGP30/SGP30.c ****   return receive;
+ 706              		.loc 1 211 3 view .LVU173
+ 212:HARDWARE/SGP30/SGP30.c **** }
+ 707              		.loc 1 212 1 is_stmt 0 view .LVU174
+ 708 004e 2046     		mov	r0, r4
+ 709 0050 F8BD     		pop	{r3, r4, r5, r6, r7, pc}
+ 710              	.LVL54:
+ 711              	.L50:
+ 210:HARDWARE/SGP30/SGP30.c ****   return receive;
+ 712              		.loc 1 210 5 is_stmt 1 view .LVU175
+ 713 0052 FFF7FEFF 		bl	SGP30_IIC_Ack
+ 714              	.LVL55:
+ 715 0056 FAE7     		b	.L51
+ 716              	.L55:
+ 717              		.align	2
+ 718              	.L54:
+ 719 0058 00802142 		.word	1109491712
+ 720 005c 000C0140 		.word	1073810432
+ 721              		.cfi_endproc
+ 722              	.LFE38:
+ 724              		.section	.text.SGP30_Write,"ax",%progbits
+ 725              		.align	1
+ 726              		.global	SGP30_Write
+ 727              		.syntax unified
+ 728              		.thumb
+ 729              		.thumb_func
+ 731              	SGP30_Write:
+ 732              	.LVL56:
+ 733              	.LFB40:
+ 213:HARDWARE/SGP30/SGP30.c **** 
+ 214:HARDWARE/SGP30/SGP30.c **** 
+ 215:HARDWARE/SGP30/SGP30.c **** /**
+ 216:HARDWARE/SGP30/SGP30.c ****  * @brief 初始化SGP30传感器
+ 217:HARDWARE/SGP30/SGP30.c ****  * @param 无
+ 218:HARDWARE/SGP30/SGP30.c ****  * @return 无
+ 219:HARDWARE/SGP30/SGP30.c ****  * @note 初始化GPIO并发送初始化命令
+ 220:HARDWARE/SGP30/SGP30.c ****  */
+ 221:HARDWARE/SGP30/SGP30.c **** void SGP30_Init(void)
+ 222:HARDWARE/SGP30/SGP30.c **** {
+ 223:HARDWARE/SGP30/SGP30.c ****   SGP30_GPIO_Init();       // 初始化GPIO
+ 224:HARDWARE/SGP30/SGP30.c ****   SGP30_Write(0x20, 0x03); // 发送初始化命令（IAQ_Init）
+ 225:HARDWARE/SGP30/SGP30.c ****   // SGP30_ad_write(0x20,0x61); // 预留命令
+ 226:HARDWARE/SGP30/SGP30.c ****   // SGP30_ad_write(0x01,0x00); // 预留命令
+ 227:HARDWARE/SGP30/SGP30.c **** }
+ 228:HARDWARE/SGP30/SGP30.c **** 
+ 229:HARDWARE/SGP30/SGP30.c **** 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 18
+
+
+ 230:HARDWARE/SGP30/SGP30.c **** /**
+ 231:HARDWARE/SGP30/SGP30.c ****  * @brief 向SGP30写入命令
+ 232:HARDWARE/SGP30/SGP30.c ****  * @param a: 命令高字节
+ 233:HARDWARE/SGP30/SGP30.c ****  * @param b: 命令低字节
+ 234:HARDWARE/SGP30/SGP30.c ****  * @return 无
+ 235:HARDWARE/SGP30/SGP30.c ****  */
+ 236:HARDWARE/SGP30/SGP30.c **** void SGP30_Write(u8 a, u8 b)
+ 237:HARDWARE/SGP30/SGP30.c **** {
+ 734              		.loc 1 237 1 view -0
+ 735              		.cfi_startproc
+ 736              		@ args = 0, pretend = 0, frame = 0
+ 737              		@ frame_needed = 0, uses_anonymous_args = 0
+ 738              		.loc 1 237 1 is_stmt 0 view .LVU177
+ 739 0000 38B5     		push	{r3, r4, r5, lr}
+ 740              	.LCFI16:
+ 741              		.cfi_def_cfa_offset 16
+ 742              		.cfi_offset 3, -16
+ 743              		.cfi_offset 4, -12
+ 744              		.cfi_offset 5, -8
+ 745              		.cfi_offset 14, -4
+ 746 0002 0546     		mov	r5, r0
+ 747 0004 0C46     		mov	r4, r1
+ 238:HARDWARE/SGP30/SGP30.c ****   SGP30_IIC_Start();                  // 发送开始信号
+ 748              		.loc 1 238 3 is_stmt 1 view .LVU178
+ 749 0006 FFF7FEFF 		bl	SGP30_IIC_Start
+ 750              	.LVL57:
+ 239:HARDWARE/SGP30/SGP30.c ****   SGP30_IIC_Send_Byte(SGP30_write);   // 发送器件地址+写指令
+ 751              		.loc 1 239 3 view .LVU179
+ 752 000a B020     		movs	r0, #176
+ 753 000c FFF7FEFF 		bl	SGP30_IIC_Send_Byte
+ 754              	.LVL58:
+ 240:HARDWARE/SGP30/SGP30.c ****   SGP30_IIC_Wait_Ack();               // 等待应答
+ 755              		.loc 1 240 3 view .LVU180
+ 756 0010 FFF7FEFF 		bl	SGP30_IIC_Wait_Ack
+ 757              	.LVL59:
+ 241:HARDWARE/SGP30/SGP30.c ****   SGP30_IIC_Send_Byte(a);             // 发送控制字节高8位
+ 758              		.loc 1 241 3 view .LVU181
+ 759 0014 2846     		mov	r0, r5
+ 760 0016 FFF7FEFF 		bl	SGP30_IIC_Send_Byte
+ 761              	.LVL60:
+ 242:HARDWARE/SGP30/SGP30.c ****   SGP30_IIC_Wait_Ack();               // 等待应答
+ 762              		.loc 1 242 3 view .LVU182
+ 763 001a FFF7FEFF 		bl	SGP30_IIC_Wait_Ack
+ 764              	.LVL61:
+ 243:HARDWARE/SGP30/SGP30.c ****   SGP30_IIC_Send_Byte(b);             // 发送控制字节低8位
+ 765              		.loc 1 243 3 view .LVU183
+ 766 001e 2046     		mov	r0, r4
+ 767 0020 FFF7FEFF 		bl	SGP30_IIC_Send_Byte
+ 768              	.LVL62:
+ 244:HARDWARE/SGP30/SGP30.c ****   SGP30_IIC_Wait_Ack();               // 等待应答
+ 769              		.loc 1 244 3 view .LVU184
+ 770 0024 FFF7FEFF 		bl	SGP30_IIC_Wait_Ack
+ 771              	.LVL63:
+ 245:HARDWARE/SGP30/SGP30.c ****   SGP30_IIC_Stop();                   // 发送停止信号
+ 772              		.loc 1 245 3 view .LVU185
+ 773 0028 FFF7FEFF 		bl	SGP30_IIC_Stop
+ 774              	.LVL64:
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 19
+
+
+ 246:HARDWARE/SGP30/SGP30.c ****   delay_ms(100);                      // 延时100ms
+ 775              		.loc 1 246 3 view .LVU186
+ 776 002c 6420     		movs	r0, #100
+ 777 002e FFF7FEFF 		bl	delay_ms
+ 778              	.LVL65:
+ 247:HARDWARE/SGP30/SGP30.c **** }
+ 779              		.loc 1 247 1 is_stmt 0 view .LVU187
+ 780 0032 38BD     		pop	{r3, r4, r5, pc}
+ 781              		.loc 1 247 1 view .LVU188
+ 782              		.cfi_endproc
+ 783              	.LFE40:
+ 785              		.section	.text.SGP30_Init,"ax",%progbits
+ 786              		.align	1
+ 787              		.global	SGP30_Init
+ 788              		.syntax unified
+ 789              		.thumb
+ 790              		.thumb_func
+ 792              	SGP30_Init:
+ 793              	.LFB39:
+ 222:HARDWARE/SGP30/SGP30.c ****   SGP30_GPIO_Init();       // 初始化GPIO
+ 794              		.loc 1 222 1 is_stmt 1 view -0
+ 795              		.cfi_startproc
+ 796              		@ args = 0, pretend = 0, frame = 0
+ 797              		@ frame_needed = 0, uses_anonymous_args = 0
+ 798 0000 08B5     		push	{r3, lr}
+ 799              	.LCFI17:
+ 800              		.cfi_def_cfa_offset 8
+ 801              		.cfi_offset 3, -8
+ 802              		.cfi_offset 14, -4
+ 223:HARDWARE/SGP30/SGP30.c ****   SGP30_Write(0x20, 0x03); // 发送初始化命令（IAQ_Init）
+ 803              		.loc 1 223 3 view .LVU190
+ 804 0002 FFF7FEFF 		bl	SGP30_GPIO_Init
+ 805              	.LVL66:
+ 224:HARDWARE/SGP30/SGP30.c ****   // SGP30_ad_write(0x20,0x61); // 预留命令
+ 806              		.loc 1 224 3 view .LVU191
+ 807 0006 0321     		movs	r1, #3
+ 808 0008 2020     		movs	r0, #32
+ 809 000a FFF7FEFF 		bl	SGP30_Write
+ 810              	.LVL67:
+ 227:HARDWARE/SGP30/SGP30.c **** 
+ 811              		.loc 1 227 1 is_stmt 0 view .LVU192
+ 812 000e 08BD     		pop	{r3, pc}
+ 813              		.cfi_endproc
+ 814              	.LFE39:
+ 816              		.section	.text.SGP30_Read,"ax",%progbits
+ 817              		.align	1
+ 818              		.global	SGP30_Read
+ 819              		.syntax unified
+ 820              		.thumb
+ 821              		.thumb_func
+ 823              	SGP30_Read:
+ 824              	.LFB41:
+ 248:HARDWARE/SGP30/SGP30.c **** 
+ 249:HARDWARE/SGP30/SGP30.c **** /**
+ 250:HARDWARE/SGP30/SGP30.c ****  * @brief 从SGP30读取数据
+ 251:HARDWARE/SGP30/SGP30.c ****  * @param 无
+ 252:HARDWARE/SGP30/SGP30.c ****  * @return 读取的数据（32位）
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 20
+
+
+ 253:HARDWARE/SGP30/SGP30.c ****  * @note 读取的数据包含eCO2和TVOC值
+ 254:HARDWARE/SGP30/SGP30.c ****  */
+ 255:HARDWARE/SGP30/SGP30.c **** u32 SGP30_Read(void)
+ 256:HARDWARE/SGP30/SGP30.c **** {
+ 825              		.loc 1 256 1 is_stmt 1 view -0
+ 826              		.cfi_startproc
+ 827              		@ args = 0, pretend = 0, frame = 0
+ 828              		@ frame_needed = 0, uses_anonymous_args = 0
+ 829 0000 10B5     		push	{r4, lr}
+ 830              	.LCFI18:
+ 831              		.cfi_def_cfa_offset 8
+ 832              		.cfi_offset 4, -8
+ 833              		.cfi_offset 14, -4
+ 257:HARDWARE/SGP30/SGP30.c ****   u32 dat;      // 存储读取的数据
+ 834              		.loc 1 257 3 view .LVU194
+ 258:HARDWARE/SGP30/SGP30.c ****   u8 crc;       // 存储CRC校验值
+ 835              		.loc 1 258 3 view .LVU195
+ 259:HARDWARE/SGP30/SGP30.c ****   SGP30_IIC_Start();                  // 发送开始信号
+ 836              		.loc 1 259 3 view .LVU196
+ 837 0002 FFF7FEFF 		bl	SGP30_IIC_Start
+ 838              	.LVL68:
+ 260:HARDWARE/SGP30/SGP30.c ****   SGP30_IIC_Send_Byte(SGP30_read);    // 发送器件地址+读指令
+ 839              		.loc 1 260 3 view .LVU197
+ 840 0006 B120     		movs	r0, #177
+ 841 0008 FFF7FEFF 		bl	SGP30_IIC_Send_Byte
+ 842              	.LVL69:
+ 261:HARDWARE/SGP30/SGP30.c ****   SGP30_IIC_Wait_Ack();               // 等待应答
+ 843              		.loc 1 261 3 view .LVU198
+ 844 000c FFF7FEFF 		bl	SGP30_IIC_Wait_Ack
+ 845              	.LVL70:
+ 262:HARDWARE/SGP30/SGP30.c ****   dat = SGP30_IIC_Read_Byte(1);       // 读取第一个字节（eCO2高8位）
+ 846              		.loc 1 262 3 view .LVU199
+ 847              		.loc 1 262 9 is_stmt 0 view .LVU200
+ 848 0010 0120     		movs	r0, #1
+ 849 0012 FFF7FEFF 		bl	SGP30_IIC_Read_Byte
+ 850              	.LVL71:
+ 263:HARDWARE/SGP30/SGP30.c ****   dat <<= 8;                          // 左移8位
+ 851              		.loc 1 263 3 is_stmt 1 view .LVU201
+ 852              		.loc 1 263 7 is_stmt 0 view .LVU202
+ 853 0016 0402     		lsls	r4, r0, #8
+ 854              	.LVL72:
+ 264:HARDWARE/SGP30/SGP30.c ****   dat += SGP30_IIC_Read_Byte(1);      // 读取第二个字节（eCO2低8位）
+ 855              		.loc 1 264 3 is_stmt 1 view .LVU203
+ 856              		.loc 1 264 10 is_stmt 0 view .LVU204
+ 857 0018 0120     		movs	r0, #1
+ 858 001a FFF7FEFF 		bl	SGP30_IIC_Read_Byte
+ 859              	.LVL73:
+ 860              		.loc 1 264 7 discriminator 1 view .LVU205
+ 861 001e 0444     		add	r4, r4, r0
+ 862              	.LVL74:
+ 265:HARDWARE/SGP30/SGP30.c ****   crc = SGP30_IIC_Read_Byte(1);       // 读取CRC校验值，舍去
+ 863              		.loc 1 265 3 is_stmt 1 view .LVU206
+ 864              		.loc 1 265 9 is_stmt 0 view .LVU207
+ 865 0020 0120     		movs	r0, #1
+ 866 0022 FFF7FEFF 		bl	SGP30_IIC_Read_Byte
+ 867              	.LVL75:
+ 266:HARDWARE/SGP30/SGP30.c ****   crc = crc;                          // 为了不让出现编译警告
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 21
+
+
+ 868              		.loc 1 266 3 is_stmt 1 view .LVU208
+ 267:HARDWARE/SGP30/SGP30.c ****   dat <<= 8;                          // 左移8位
+ 869              		.loc 1 267 3 view .LVU209
+ 870              		.loc 1 267 7 is_stmt 0 view .LVU210
+ 871 0026 2402     		lsls	r4, r4, #8
+ 872              	.LVL76:
+ 268:HARDWARE/SGP30/SGP30.c ****   dat += SGP30_IIC_Read_Byte(1);      // 读取第三个字节（TVOC高8位）
+ 873              		.loc 1 268 3 is_stmt 1 view .LVU211
+ 874              		.loc 1 268 10 is_stmt 0 view .LVU212
+ 875 0028 0120     		movs	r0, #1
+ 876 002a FFF7FEFF 		bl	SGP30_IIC_Read_Byte
+ 877              	.LVL77:
+ 878              		.loc 1 268 7 discriminator 1 view .LVU213
+ 879 002e 0444     		add	r4, r4, r0
+ 880              	.LVL78:
+ 269:HARDWARE/SGP30/SGP30.c ****   dat <<= 8;                          // 左移8位
+ 881              		.loc 1 269 3 is_stmt 1 view .LVU214
+ 882              		.loc 1 269 7 is_stmt 0 view .LVU215
+ 883 0030 2402     		lsls	r4, r4, #8
+ 884              	.LVL79:
+ 270:HARDWARE/SGP30/SGP30.c ****   dat += SGP30_IIC_Read_Byte(0);      // 读取第四个字节（TVOC低8位），发送NACK
+ 885              		.loc 1 270 3 is_stmt 1 view .LVU216
+ 886              		.loc 1 270 10 is_stmt 0 view .LVU217
+ 887 0032 0020     		movs	r0, #0
+ 888 0034 FFF7FEFF 		bl	SGP30_IIC_Read_Byte
+ 889              	.LVL80:
+ 890              		.loc 1 270 7 discriminator 1 view .LVU218
+ 891 0038 0444     		add	r4, r4, r0
+ 892              	.LVL81:
+ 271:HARDWARE/SGP30/SGP30.c ****   SGP30_IIC_Stop();                   // 发送停止信号
+ 893              		.loc 1 271 3 is_stmt 1 view .LVU219
+ 894 003a FFF7FEFF 		bl	SGP30_IIC_Stop
+ 895              	.LVL82:
+ 272:HARDWARE/SGP30/SGP30.c ****   return(dat);                        // 返回读取的数据
+ 896              		.loc 1 272 3 view .LVU220
+ 273:HARDWARE/SGP30/SGP30.c **** }
+ 897              		.loc 1 273 1 is_stmt 0 view .LVU221
+ 898 003e 2046     		mov	r0, r4
+ 899 0040 10BD     		pop	{r4, pc}
+ 900              		.loc 1 273 1 view .LVU222
+ 901              		.cfi_endproc
+ 902              	.LFE41:
+ 904              		.text
+ 905              	.Letext0:
+ 906              		.file 2 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 907              		.file 3 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 908              		.file 4 "USER/stm32f10x.h"
+ 909              		.file 5 "STM32F10x_FWLib/inc/stm32f10x_gpio.h"
+ 910              		.file 6 "SYSTEM/delay/delay.h"
+ 911              		.file 7 "STM32F10x_FWLib/inc/stm32f10x_rcc.h"
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s 			page 22
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 SGP30.c
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:19     .text.SGP30_GPIO_Init:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:25     .text.SGP30_GPIO_Init:00000000 SGP30_GPIO_Init
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:81     .text.SGP30_GPIO_Init:00000040 $d
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:86     .text.SDA_OUT:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:92     .text.SDA_OUT:00000000 SDA_OUT
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:132    .text.SDA_OUT:00000028 $d
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:137    .text.SDA_IN:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:143    .text.SDA_IN:00000000 SDA_IN
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:183    .text.SDA_IN:00000028 $d
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:188    .text.SGP30_IIC_Start:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:194    .text.SGP30_IIC_Start:00000000 SGP30_IIC_Start
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:238    .text.SGP30_IIC_Start:0000002c $d
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:243    .text.SGP30_IIC_Stop:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:249    .text.SGP30_IIC_Stop:00000000 SGP30_IIC_Stop
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:291    .text.SGP30_IIC_Stop:0000002c $d
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:296    .text.SGP30_IIC_Wait_Ack:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:302    .text.SGP30_IIC_Wait_Ack:00000000 SGP30_IIC_Wait_Ack
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:383    .text.SGP30_IIC_Wait_Ack:0000004c $d
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:389    .text.SGP30_IIC_Ack:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:395    .text.SGP30_IIC_Ack:00000000 SGP30_IIC_Ack
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:439    .text.SGP30_IIC_Ack:0000002c $d
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:444    .text.SGP30_IIC_NAck:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:450    .text.SGP30_IIC_NAck:00000000 SGP30_IIC_NAck
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:494    .text.SGP30_IIC_NAck:0000002c $d
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:499    .text.SGP30_IIC_Send_Byte:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:505    .text.SGP30_IIC_Send_Byte:00000000 SGP30_IIC_Send_Byte
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:602    .text.SGP30_IIC_Send_Byte:00000060 $d
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:607    .text.SGP30_IIC_Read_Byte:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:613    .text.SGP30_IIC_Read_Byte:00000000 SGP30_IIC_Read_Byte
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:719    .text.SGP30_IIC_Read_Byte:00000058 $d
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:725    .text.SGP30_Write:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:731    .text.SGP30_Write:00000000 SGP30_Write
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:786    .text.SGP30_Init:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:792    .text.SGP30_Init:00000000 SGP30_Init
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:817    .text.SGP30_Read:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccIQvtVc.s:823    .text.SGP30_Read:00000000 SGP30_Read
+
+UNDEFINED SYMBOLS
+RCC_APB2PeriphClockCmd
+GPIO_Init
+delay_us
+GPIO_ReadInputDataBit
+delay_ms

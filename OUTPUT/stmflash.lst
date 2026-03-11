@@ -1,0 +1,1310 @@
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 1
+
+
+   1              		.cpu cortex-m3
+   2              		.arch armv7-m
+   3              		.fpu softvfp
+   4              		.eabi_attribute 20, 1
+   5              		.eabi_attribute 21, 1
+   6              		.eabi_attribute 23, 3
+   7              		.eabi_attribute 24, 1
+   8              		.eabi_attribute 25, 1
+   9              		.eabi_attribute 26, 1
+  10              		.eabi_attribute 30, 1
+  11              		.eabi_attribute 34, 1
+  12              		.eabi_attribute 18, 4
+  13              		.file	"stmflash.c"
+  14              		.text
+  15              	.Ltext0:
+  16              		.cfi_sections	.debug_frame
+  17              		.file 1 "HARDWARE/STMFLASH/stmflash.c"
+  18              		.section	.text.STMFLASH_Unlock,"ax",%progbits
+  19              		.align	1
+  20              		.global	STMFLASH_Unlock
+  21              		.syntax unified
+  22              		.thumb
+  23              		.thumb_func
+  25              	STMFLASH_Unlock:
+  26              	.LFB29:
+   1:HARDWARE/STMFLASH/stmflash.c **** /**
+   2:HARDWARE/STMFLASH/stmflash.c ****  * stmflash.c
+   3:HARDWARE/STMFLASH/stmflash.c ****  * STM32 FLASH操作驱动实现文件
+   4:HARDWARE/STMFLASH/stmflash.c ****  * 功能：实现FLASH的读写、擦除等操作函数
+   5:HARDWARE/STMFLASH/stmflash.c ****  * 版本：V1.0
+   6:HARDWARE/STMFLASH/stmflash.c ****  * 测试硬件：STM32F103RCT6
+   7:HARDWARE/STMFLASH/stmflash.c ****  * 作者：蔬菜恒温库监控系统开发团队
+   8:HARDWARE/STMFLASH/stmflash.c ****  * 创建日期：2026-03-08
+   9:HARDWARE/STMFLASH/stmflash.c ****  * 项目：蔬菜恒温库监控系统
+  10:HARDWARE/STMFLASH/stmflash.c ****  */
+  11:HARDWARE/STMFLASH/stmflash.c **** 
+  12:HARDWARE/STMFLASH/stmflash.c **** #include "stmflash.h"
+  13:HARDWARE/STMFLASH/stmflash.c **** #include "delay.h"
+  14:HARDWARE/STMFLASH/stmflash.c **** #include "sys.h"
+  15:HARDWARE/STMFLASH/stmflash.c **** 
+  16:HARDWARE/STMFLASH/stmflash.c **** /**
+  17:HARDWARE/STMFLASH/stmflash.c ****  * @brief Flash相关数组
+  18:HARDWARE/STMFLASH/stmflash.c ****  */
+  19:HARDWARE/STMFLASH/stmflash.c **** u16 A_Parameter[10], B_Parameter[10], Flash_Parameter[10];  // Flash相关数组
+  20:HARDWARE/STMFLASH/stmflash.c **** 
+  21:HARDWARE/STMFLASH/stmflash.c **** /**
+  22:HARDWARE/STMFLASH/stmflash.c ****  * @brief 解锁STM32的FLASH
+  23:HARDWARE/STMFLASH/stmflash.c ****  * @param 无
+  24:HARDWARE/STMFLASH/stmflash.c ****  * @return 无
+  25:HARDWARE/STMFLASH/stmflash.c ****  */
+  26:HARDWARE/STMFLASH/stmflash.c **** void STMFLASH_Unlock(void)
+  27:HARDWARE/STMFLASH/stmflash.c **** {
+  27              		.loc 1 27 1 view -0
+  28              		.cfi_startproc
+  29              		@ args = 0, pretend = 0, frame = 0
+  30              		@ frame_needed = 0, uses_anonymous_args = 0
+  31              		@ link register save eliminated.
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 2
+
+
+  28:HARDWARE/STMFLASH/stmflash.c ****   FLASH->KEYR = FLASH_KEY1;  // 写入解锁序列
+  32              		.loc 1 28 3 view .LVU1
+  33              		.loc 1 28 15 is_stmt 0 view .LVU2
+  34 0000 034B     		ldr	r3, .L2
+  35 0002 044A     		ldr	r2, .L2+4
+  36 0004 5A60     		str	r2, [r3, #4]
+  29:HARDWARE/STMFLASH/stmflash.c ****   FLASH->KEYR = FLASH_KEY2;
+  37              		.loc 1 29 3 is_stmt 1 view .LVU3
+  38              		.loc 1 29 15 is_stmt 0 view .LVU4
+  39 0006 02F18832 		add	r2, r2, #-2004318072
+  40 000a 5A60     		str	r2, [r3, #4]
+  30:HARDWARE/STMFLASH/stmflash.c **** }
+  41              		.loc 1 30 1 view .LVU5
+  42 000c 7047     		bx	lr
+  43              	.L3:
+  44 000e 00BF     		.align	2
+  45              	.L2:
+  46 0010 00200240 		.word	1073881088
+  47 0014 23016745 		.word	1164378403
+  48              		.cfi_endproc
+  49              	.LFE29:
+  51              		.section	.text.STMFLASH_Lock,"ax",%progbits
+  52              		.align	1
+  53              		.global	STMFLASH_Lock
+  54              		.syntax unified
+  55              		.thumb
+  56              		.thumb_func
+  58              	STMFLASH_Lock:
+  59              	.LFB30:
+  31:HARDWARE/STMFLASH/stmflash.c **** 
+  32:HARDWARE/STMFLASH/stmflash.c **** /**
+  33:HARDWARE/STMFLASH/stmflash.c ****  * @brief FLASH上锁
+  34:HARDWARE/STMFLASH/stmflash.c ****  * @param 无
+  35:HARDWARE/STMFLASH/stmflash.c ****  * @return 无
+  36:HARDWARE/STMFLASH/stmflash.c ****  */
+  37:HARDWARE/STMFLASH/stmflash.c **** void STMFLASH_Lock(void)
+  38:HARDWARE/STMFLASH/stmflash.c **** {
+  60              		.loc 1 38 1 is_stmt 1 view -0
+  61              		.cfi_startproc
+  62              		@ args = 0, pretend = 0, frame = 0
+  63              		@ frame_needed = 0, uses_anonymous_args = 0
+  64              		@ link register save eliminated.
+  39:HARDWARE/STMFLASH/stmflash.c ****   FLASH->CR |= 1 << 7;  // 上锁
+  65              		.loc 1 39 3 view .LVU7
+  66              		.loc 1 39 8 is_stmt 0 view .LVU8
+  67 0000 024A     		ldr	r2, .L5
+  68 0002 1369     		ldr	r3, [r2, #16]
+  69              		.loc 1 39 13 view .LVU9
+  70 0004 43F08003 		orr	r3, r3, #128
+  71 0008 1361     		str	r3, [r2, #16]
+  40:HARDWARE/STMFLASH/stmflash.c **** }
+  72              		.loc 1 40 1 view .LVU10
+  73 000a 7047     		bx	lr
+  74              	.L6:
+  75              		.align	2
+  76              	.L5:
+  77 000c 00200240 		.word	1073881088
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 3
+
+
+  78              		.cfi_endproc
+  79              	.LFE30:
+  81              		.section	.text.STMFLASH_GetStatus,"ax",%progbits
+  82              		.align	1
+  83              		.global	STMFLASH_GetStatus
+  84              		.syntax unified
+  85              		.thumb
+  86              		.thumb_func
+  88              	STMFLASH_GetStatus:
+  89              	.LFB31:
+  41:HARDWARE/STMFLASH/stmflash.c **** 
+  42:HARDWARE/STMFLASH/stmflash.c **** /**
+  43:HARDWARE/STMFLASH/stmflash.c ****  * @brief 得到FLASH状态
+  44:HARDWARE/STMFLASH/stmflash.c ****  * @param 无
+  45:HARDWARE/STMFLASH/stmflash.c ****  * @return 状态值：0-操作完成，1-忙，2-编程错误，3-写保护错误
+  46:HARDWARE/STMFLASH/stmflash.c ****  */
+  47:HARDWARE/STMFLASH/stmflash.c **** u8 STMFLASH_GetStatus(void)
+  48:HARDWARE/STMFLASH/stmflash.c **** {	
+  90              		.loc 1 48 1 is_stmt 1 view -0
+  91              		.cfi_startproc
+  92              		@ args = 0, pretend = 0, frame = 0
+  93              		@ frame_needed = 0, uses_anonymous_args = 0
+  94              		@ link register save eliminated.
+  49:HARDWARE/STMFLASH/stmflash.c **** 	u32 res;		
+  95              		.loc 1 49 2 view .LVU12
+  50:HARDWARE/STMFLASH/stmflash.c **** 	res = FLASH->SR; 
+  96              		.loc 1 50 2 view .LVU13
+  97              		.loc 1 50 6 is_stmt 0 view .LVU14
+  98 0000 094B     		ldr	r3, .L12
+  99 0002 DB68     		ldr	r3, [r3, #12]
+ 100              	.LVL0:
+  51:HARDWARE/STMFLASH/stmflash.c **** 	if(res & (1 << 0)) return 1;  // 忙
+ 101              		.loc 1 51 2 is_stmt 1 view .LVU15
+ 102              		.loc 1 51 4 is_stmt 0 view .LVU16
+ 103 0004 13F0010F 		tst	r3, #1
+ 104 0008 07D1     		bne	.L9
+  52:HARDWARE/STMFLASH/stmflash.c **** 	else if(res & (1 << 2)) return 2;  // 编程错误
+ 105              		.loc 1 52 7 is_stmt 1 view .LVU17
+ 106              		.loc 1 52 9 is_stmt 0 view .LVU18
+ 107 000a 13F0040F 		tst	r3, #4
+ 108 000e 06D1     		bne	.L10
+  53:HARDWARE/STMFLASH/stmflash.c **** 	else if(res & (1 << 4)) return 3;  // 写保护错误
+ 109              		.loc 1 53 7 is_stmt 1 view .LVU19
+ 110              		.loc 1 53 9 is_stmt 0 view .LVU20
+ 111 0010 13F0100F 		tst	r3, #16
+ 112 0014 05D1     		bne	.L11
+  54:HARDWARE/STMFLASH/stmflash.c **** 	return 0;  // 操作完成
+ 113              		.loc 1 54 9 view .LVU21
+ 114 0016 0020     		movs	r0, #0
+ 115 0018 7047     		bx	lr
+ 116              	.L9:
+  51:HARDWARE/STMFLASH/stmflash.c **** 	else if(res & (1 << 2)) return 2;  // 编程错误
+ 117              		.loc 1 51 28 discriminator 1 view .LVU22
+ 118 001a 0120     		movs	r0, #1
+ 119 001c 7047     		bx	lr
+ 120              	.L10:
+  52:HARDWARE/STMFLASH/stmflash.c **** 	else if(res & (1 << 4)) return 3;  // 写保护错误
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 4
+
+
+ 121              		.loc 1 52 33 discriminator 1 view .LVU23
+ 122 001e 0220     		movs	r0, #2
+ 123 0020 7047     		bx	lr
+ 124              	.L11:
+  53:HARDWARE/STMFLASH/stmflash.c **** 	return 0;  // 操作完成
+ 125              		.loc 1 53 33 discriminator 1 view .LVU24
+ 126 0022 0320     		movs	r0, #3
+  55:HARDWARE/STMFLASH/stmflash.c **** }
+ 127              		.loc 1 55 1 view .LVU25
+ 128 0024 7047     		bx	lr
+ 129              	.L13:
+ 130 0026 00BF     		.align	2
+ 131              	.L12:
+ 132 0028 00200240 		.word	1073881088
+ 133              		.cfi_endproc
+ 134              	.LFE31:
+ 136              		.section	.text.STMFLASH_WaitDone,"ax",%progbits
+ 137              		.align	1
+ 138              		.global	STMFLASH_WaitDone
+ 139              		.syntax unified
+ 140              		.thumb
+ 141              		.thumb_func
+ 143              	STMFLASH_WaitDone:
+ 144              	.LVL1:
+ 145              	.LFB32:
+  56:HARDWARE/STMFLASH/stmflash.c **** /**
+  57:HARDWARE/STMFLASH/stmflash.c ****  * @brief 等待FLASH操作结束
+  58:HARDWARE/STMFLASH/stmflash.c ****  * @param time: 超时时间
+  59:HARDWARE/STMFLASH/stmflash.c ****  * @return 状态值：0-操作完成，1-忙，2-编程错误，3-写保护错误，0xff-超时
+  60:HARDWARE/STMFLASH/stmflash.c ****  */
+  61:HARDWARE/STMFLASH/stmflash.c **** u8 STMFLASH_WaitDone(u16 time)
+  62:HARDWARE/STMFLASH/stmflash.c **** {
+ 146              		.loc 1 62 1 is_stmt 1 view -0
+ 147              		.cfi_startproc
+ 148              		@ args = 0, pretend = 0, frame = 0
+ 149              		@ frame_needed = 0, uses_anonymous_args = 0
+ 150              		.loc 1 62 1 is_stmt 0 view .LVU27
+ 151 0000 38B5     		push	{r3, r4, r5, lr}
+ 152              	.LCFI0:
+ 153              		.cfi_def_cfa_offset 16
+ 154              		.cfi_offset 3, -16
+ 155              		.cfi_offset 4, -12
+ 156              		.cfi_offset 5, -8
+ 157              		.cfi_offset 14, -4
+ 158 0002 0446     		mov	r4, r0
+ 159              	.LVL2:
+ 160              	.L16:
+  63:HARDWARE/STMFLASH/stmflash.c **** 	u8 res;
+ 161              		.loc 1 63 2 is_stmt 1 view .LVU28
+  64:HARDWARE/STMFLASH/stmflash.c **** 	do
+ 162              		.loc 1 64 2 view .LVU29
+  65:HARDWARE/STMFLASH/stmflash.c **** 	{
+  66:HARDWARE/STMFLASH/stmflash.c **** 		res = STMFLASH_GetStatus();
+ 163              		.loc 1 66 3 view .LVU30
+ 164              		.loc 1 66 9 is_stmt 0 view .LVU31
+ 165 0004 FFF7FEFF 		bl	STMFLASH_GetStatus
+ 166              	.LVL3:
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 5
+
+
+ 167 0008 0546     		mov	r5, r0
+ 168              	.LVL4:
+  67:HARDWARE/STMFLASH/stmflash.c **** 		if(res != 1) break;  // 非忙,无需等待了,直接退出
+ 169              		.loc 1 67 3 is_stmt 1 view .LVU32
+ 170              		.loc 1 67 5 is_stmt 0 view .LVU33
+ 171 000a 0128     		cmp	r0, #1
+ 172 000c 06D1     		bne	.L15
+  68:HARDWARE/STMFLASH/stmflash.c **** 		delay_us(1);
+ 173              		.loc 1 68 3 is_stmt 1 view .LVU34
+ 174 000e 0120     		movs	r0, #1
+ 175              	.LVL5:
+ 176              		.loc 1 68 3 is_stmt 0 view .LVU35
+ 177 0010 FFF7FEFF 		bl	delay_us
+ 178              	.LVL6:
+  69:HARDWARE/STMFLASH/stmflash.c **** 		time--;
+ 179              		.loc 1 69 3 is_stmt 1 view .LVU36
+ 180              		.loc 1 69 7 is_stmt 0 view .LVU37
+ 181 0014 013C     		subs	r4, r4, #1
+ 182              	.LVL7:
+ 183              		.loc 1 69 7 view .LVU38
+ 184 0016 A4B2     		uxth	r4, r4
+ 185              	.LVL8:
+  70:HARDWARE/STMFLASH/stmflash.c **** 	 }while(time);
+ 186              		.loc 1 70 10 is_stmt 1 view .LVU39
+ 187 0018 002C     		cmp	r4, #0
+ 188 001a F3D1     		bne	.L16
+ 189              	.L15:
+  71:HARDWARE/STMFLASH/stmflash.c **** 	 if(time == 0) res = 0xff;  // TIMEOUT
+ 190              		.loc 1 71 3 view .LVU40
+ 191              		.loc 1 71 5 is_stmt 0 view .LVU41
+ 192 001c 0CB1     		cbz	r4, .L20
+ 193              	.L17:
+ 194              	.LVL9:
+  72:HARDWARE/STMFLASH/stmflash.c **** 	 return res;
+ 195              		.loc 1 72 3 is_stmt 1 view .LVU42
+  73:HARDWARE/STMFLASH/stmflash.c **** }
+ 196              		.loc 1 73 1 is_stmt 0 view .LVU43
+ 197 001e 2846     		mov	r0, r5
+ 198 0020 38BD     		pop	{r3, r4, r5, pc}
+ 199              	.LVL10:
+ 200              	.L20:
+  71:HARDWARE/STMFLASH/stmflash.c **** 	 if(time == 0) res = 0xff;  // TIMEOUT
+ 201              		.loc 1 71 21 discriminator 1 view .LVU44
+ 202 0022 FF25     		movs	r5, #255
+ 203 0024 FBE7     		b	.L17
+ 204              		.cfi_endproc
+ 205              	.LFE32:
+ 207              		.section	.text.STMFLASH_ErasePage,"ax",%progbits
+ 208              		.align	1
+ 209              		.global	STMFLASH_ErasePage
+ 210              		.syntax unified
+ 211              		.thumb
+ 212              		.thumb_func
+ 214              	STMFLASH_ErasePage:
+ 215              	.LVL11:
+ 216              	.LFB33:
+  74:HARDWARE/STMFLASH/stmflash.c **** /**
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 6
+
+
+  75:HARDWARE/STMFLASH/stmflash.c ****  * @brief 擦除FLASH页
+  76:HARDWARE/STMFLASH/stmflash.c ****  * @param paddr: 页地址
+  77:HARDWARE/STMFLASH/stmflash.c ****  * @return 执行情况：0-成功，其他-错误码
+  78:HARDWARE/STMFLASH/stmflash.c ****  */
+  79:HARDWARE/STMFLASH/stmflash.c **** u8 STMFLASH_ErasePage(u32 paddr)
+  80:HARDWARE/STMFLASH/stmflash.c **** {
+ 217              		.loc 1 80 1 is_stmt 1 view -0
+ 218              		.cfi_startproc
+ 219              		@ args = 0, pretend = 0, frame = 0
+ 220              		@ frame_needed = 0, uses_anonymous_args = 0
+ 221              		.loc 1 80 1 is_stmt 0 view .LVU46
+ 222 0000 10B5     		push	{r4, lr}
+ 223              	.LCFI1:
+ 224              		.cfi_def_cfa_offset 8
+ 225              		.cfi_offset 4, -8
+ 226              		.cfi_offset 14, -4
+ 227 0002 0446     		mov	r4, r0
+  81:HARDWARE/STMFLASH/stmflash.c **** 	u8 res = 0;
+ 228              		.loc 1 81 2 is_stmt 1 view .LVU47
+ 229              	.LVL12:
+  82:HARDWARE/STMFLASH/stmflash.c **** 	res = STMFLASH_WaitDone(0X5FFF);  // 等待上次操作结束,>20ms    
+ 230              		.loc 1 82 2 view .LVU48
+ 231              		.loc 1 82 8 is_stmt 0 view .LVU49
+ 232 0004 45F6FF70 		movw	r0, #24575
+ 233              	.LVL13:
+ 234              		.loc 1 82 8 view .LVU50
+ 235 0008 FFF7FEFF 		bl	STMFLASH_WaitDone
+ 236              	.LVL14:
+  83:HARDWARE/STMFLASH/stmflash.c **** 	if(res == 0)
+ 237              		.loc 1 83 2 is_stmt 1 view .LVU51
+ 238              		.loc 1 83 4 is_stmt 0 view .LVU52
+ 239 000c 00B1     		cbz	r0, .L24
+ 240              	.L22:
+ 241              	.LVL15:
+  84:HARDWARE/STMFLASH/stmflash.c **** 	{
+  85:HARDWARE/STMFLASH/stmflash.c **** 		FLASH->CR |= 1 << 1;  // 页擦除
+  86:HARDWARE/STMFLASH/stmflash.c **** 		FLASH->AR = paddr;  // 设置页地址 
+  87:HARDWARE/STMFLASH/stmflash.c **** 		FLASH->CR |= 1 << 6;  // 开始擦除		  
+  88:HARDWARE/STMFLASH/stmflash.c **** 		res = STMFLASH_WaitDone(0X5FFF);  // 等待操作结束,>20ms  
+  89:HARDWARE/STMFLASH/stmflash.c **** 		if(res != 1)  // 非忙
+  90:HARDWARE/STMFLASH/stmflash.c **** 		{
+  91:HARDWARE/STMFLASH/stmflash.c **** 			FLASH->CR &= ~(1 << 1);  // 清除页擦除标志
+  92:HARDWARE/STMFLASH/stmflash.c **** 		}
+  93:HARDWARE/STMFLASH/stmflash.c **** 	}
+  94:HARDWARE/STMFLASH/stmflash.c **** 	return res;
+ 242              		.loc 1 94 2 is_stmt 1 view .LVU53
+  95:HARDWARE/STMFLASH/stmflash.c **** }
+ 243              		.loc 1 95 1 is_stmt 0 view .LVU54
+ 244 000e 10BD     		pop	{r4, pc}
+ 245              	.LVL16:
+ 246              	.L24:
+  85:HARDWARE/STMFLASH/stmflash.c **** 		FLASH->AR = paddr;  // 设置页地址 
+ 247              		.loc 1 85 3 is_stmt 1 view .LVU55
+  85:HARDWARE/STMFLASH/stmflash.c **** 		FLASH->AR = paddr;  // 设置页地址 
+ 248              		.loc 1 85 8 is_stmt 0 view .LVU56
+ 249 0010 0A4B     		ldr	r3, .L25
+ 250 0012 1A69     		ldr	r2, [r3, #16]
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 7
+
+
+  85:HARDWARE/STMFLASH/stmflash.c **** 		FLASH->AR = paddr;  // 设置页地址 
+ 251              		.loc 1 85 13 view .LVU57
+ 252 0014 42F00202 		orr	r2, r2, #2
+ 253 0018 1A61     		str	r2, [r3, #16]
+  86:HARDWARE/STMFLASH/stmflash.c **** 		FLASH->CR |= 1 << 6;  // 开始擦除		  
+ 254              		.loc 1 86 3 is_stmt 1 view .LVU58
+  86:HARDWARE/STMFLASH/stmflash.c **** 		FLASH->CR |= 1 << 6;  // 开始擦除		  
+ 255              		.loc 1 86 13 is_stmt 0 view .LVU59
+ 256 001a 5C61     		str	r4, [r3, #20]
+  87:HARDWARE/STMFLASH/stmflash.c **** 		res = STMFLASH_WaitDone(0X5FFF);  // 等待操作结束,>20ms  
+ 257              		.loc 1 87 3 is_stmt 1 view .LVU60
+  87:HARDWARE/STMFLASH/stmflash.c **** 		res = STMFLASH_WaitDone(0X5FFF);  // 等待操作结束,>20ms  
+ 258              		.loc 1 87 8 is_stmt 0 view .LVU61
+ 259 001c 1A69     		ldr	r2, [r3, #16]
+  87:HARDWARE/STMFLASH/stmflash.c **** 		res = STMFLASH_WaitDone(0X5FFF);  // 等待操作结束,>20ms  
+ 260              		.loc 1 87 13 view .LVU62
+ 261 001e 42F04002 		orr	r2, r2, #64
+ 262 0022 1A61     		str	r2, [r3, #16]
+  88:HARDWARE/STMFLASH/stmflash.c **** 		if(res != 1)  // 非忙
+ 263              		.loc 1 88 3 is_stmt 1 view .LVU63
+  88:HARDWARE/STMFLASH/stmflash.c **** 		if(res != 1)  // 非忙
+ 264              		.loc 1 88 9 is_stmt 0 view .LVU64
+ 265 0024 45F6FF70 		movw	r0, #24575
+ 266 0028 FFF7FEFF 		bl	STMFLASH_WaitDone
+ 267              	.LVL17:
+  89:HARDWARE/STMFLASH/stmflash.c **** 		{
+ 268              		.loc 1 89 3 is_stmt 1 view .LVU65
+  89:HARDWARE/STMFLASH/stmflash.c **** 		{
+ 269              		.loc 1 89 5 is_stmt 0 view .LVU66
+ 270 002c 0128     		cmp	r0, #1
+ 271 002e EED0     		beq	.L22
+  91:HARDWARE/STMFLASH/stmflash.c **** 		}
+ 272              		.loc 1 91 4 is_stmt 1 view .LVU67
+  91:HARDWARE/STMFLASH/stmflash.c **** 		}
+ 273              		.loc 1 91 9 is_stmt 0 view .LVU68
+ 274 0030 024A     		ldr	r2, .L25
+ 275 0032 1369     		ldr	r3, [r2, #16]
+  91:HARDWARE/STMFLASH/stmflash.c **** 		}
+ 276              		.loc 1 91 14 view .LVU69
+ 277 0034 23F00203 		bic	r3, r3, #2
+ 278 0038 1361     		str	r3, [r2, #16]
+ 279 003a E8E7     		b	.L22
+ 280              	.L26:
+ 281              		.align	2
+ 282              	.L25:
+ 283 003c 00200240 		.word	1073881088
+ 284              		.cfi_endproc
+ 285              	.LFE33:
+ 287              		.section	.text.STMFLASH_ReadHalfWord,"ax",%progbits
+ 288              		.align	1
+ 289              		.global	STMFLASH_ReadHalfWord
+ 290              		.syntax unified
+ 291              		.thumb
+ 292              		.thumb_func
+ 294              	STMFLASH_ReadHalfWord:
+ 295              	.LVL18:
+ 296              	.LFB34:
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 8
+
+
+  96:HARDWARE/STMFLASH/stmflash.c **** 
+  97:HARDWARE/STMFLASH/stmflash.c **** /**
+  98:HARDWARE/STMFLASH/stmflash.c ****  * @brief 读取指定地址的半字(16位数据)
+  99:HARDWARE/STMFLASH/stmflash.c ****  * @param faddr: 读地址(此地址必须为2的倍数!!)
+ 100:HARDWARE/STMFLASH/stmflash.c ****  * @return 对应数据
+ 101:HARDWARE/STMFLASH/stmflash.c ****  */
+ 102:HARDWARE/STMFLASH/stmflash.c **** u16 STMFLASH_ReadHalfWord(u32 faddr)
+ 103:HARDWARE/STMFLASH/stmflash.c **** {
+ 297              		.loc 1 103 1 is_stmt 1 view -0
+ 298              		.cfi_startproc
+ 299              		@ args = 0, pretend = 0, frame = 0
+ 300              		@ frame_needed = 0, uses_anonymous_args = 0
+ 301              		@ link register save eliminated.
+ 104:HARDWARE/STMFLASH/stmflash.c **** 	return *(vu16*)faddr; 
+ 302              		.loc 1 104 2 view .LVU71
+ 303              		.loc 1 104 9 is_stmt 0 view .LVU72
+ 304 0000 0088     		ldrh	r0, [r0]
+ 305              	.LVL19:
+ 105:HARDWARE/STMFLASH/stmflash.c **** }
+ 306              		.loc 1 105 1 view .LVU73
+ 307 0002 80B2     		uxth	r0, r0
+ 308 0004 7047     		bx	lr
+ 309              		.cfi_endproc
+ 310              	.LFE34:
+ 312              		.section	.text.STMFLASH_Write_NoCheck,"ax",%progbits
+ 313              		.align	1
+ 314              		.global	STMFLASH_Write_NoCheck
+ 315              		.syntax unified
+ 316              		.thumb
+ 317              		.thumb_func
+ 319              	STMFLASH_Write_NoCheck:
+ 320              	.LVL20:
+ 321              	.LFB35:
+ 106:HARDWARE/STMFLASH/stmflash.c **** /**
+ 107:HARDWARE/STMFLASH/stmflash.c ****  * @brief 不检查的写入
+ 108:HARDWARE/STMFLASH/stmflash.c ****  * @param WriteAddr: 起始地址
+ 109:HARDWARE/STMFLASH/stmflash.c ****  * @param pBuffer: 数据指针
+ 110:HARDWARE/STMFLASH/stmflash.c ****  * @param NumToWrite: 半字(16位)数
+ 111:HARDWARE/STMFLASH/stmflash.c ****  * @return 无
+ 112:HARDWARE/STMFLASH/stmflash.c ****  */
+ 113:HARDWARE/STMFLASH/stmflash.c **** void STMFLASH_Write_NoCheck(u32 WriteAddr, u16 *pBuffer, u16 NumToWrite)   
+ 114:HARDWARE/STMFLASH/stmflash.c **** {  		  
+ 322              		.loc 1 114 1 is_stmt 1 view -0
+ 323              		.cfi_startproc
+ 324              		@ args = 0, pretend = 0, frame = 0
+ 325              		@ frame_needed = 0, uses_anonymous_args = 0
+ 326              		.loc 1 114 1 is_stmt 0 view .LVU75
+ 327 0000 F8B5     		push	{r3, r4, r5, r6, r7, lr}
+ 328              	.LCFI2:
+ 329              		.cfi_def_cfa_offset 24
+ 330              		.cfi_offset 3, -24
+ 331              		.cfi_offset 4, -20
+ 332              		.cfi_offset 5, -16
+ 333              		.cfi_offset 6, -12
+ 334              		.cfi_offset 7, -8
+ 335              		.cfi_offset 14, -4
+ 336 0002 0546     		mov	r5, r0
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 9
+
+
+ 337 0004 0F46     		mov	r7, r1
+ 338 0006 1646     		mov	r6, r2
+ 115:HARDWARE/STMFLASH/stmflash.c **** 	u16 i;
+ 339              		.loc 1 115 2 is_stmt 1 view .LVU76
+ 116:HARDWARE/STMFLASH/stmflash.c **** 	for(i = 0; i < NumToWrite; i++)
+ 340              		.loc 1 116 2 view .LVU77
+ 341              	.LVL21:
+ 342              		.loc 1 116 8 is_stmt 0 view .LVU78
+ 343 0008 0024     		movs	r4, #0
+ 344              		.loc 1 116 2 view .LVU79
+ 345 000a 07E0     		b	.L29
+ 346              	.LVL22:
+ 347              	.L30:
+ 117:HARDWARE/STMFLASH/stmflash.c **** 	{
+ 118:HARDWARE/STMFLASH/stmflash.c **** 		FLASH_ProgramHalfWord(WriteAddr, pBuffer[i]);
+ 348              		.loc 1 118 3 is_stmt 1 view .LVU80
+ 349 000c 37F81410 		ldrh	r1, [r7, r4, lsl #1]
+ 350 0010 2846     		mov	r0, r5
+ 351 0012 FFF7FEFF 		bl	FLASH_ProgramHalfWord
+ 352              	.LVL23:
+ 119:HARDWARE/STMFLASH/stmflash.c **** 	    WriteAddr += 2;  // 地址增加2
+ 353              		.loc 1 119 6 view .LVU81
+ 354              		.loc 1 119 16 is_stmt 0 view .LVU82
+ 355 0016 0235     		adds	r5, r5, #2
+ 356              	.LVL24:
+ 116:HARDWARE/STMFLASH/stmflash.c **** 	for(i = 0; i < NumToWrite; i++)
+ 357              		.loc 1 116 30 is_stmt 1 discriminator 3 view .LVU83
+ 358 0018 0134     		adds	r4, r4, #1
+ 359              	.LVL25:
+ 116:HARDWARE/STMFLASH/stmflash.c **** 	for(i = 0; i < NumToWrite; i++)
+ 360              		.loc 1 116 30 is_stmt 0 discriminator 3 view .LVU84
+ 361 001a A4B2     		uxth	r4, r4
+ 362              	.LVL26:
+ 363              	.L29:
+ 116:HARDWARE/STMFLASH/stmflash.c **** 	for(i = 0; i < NumToWrite; i++)
+ 364              		.loc 1 116 15 is_stmt 1 discriminator 1 view .LVU85
+ 365 001c B442     		cmp	r4, r6
+ 366 001e F5D3     		bcc	.L30
+ 120:HARDWARE/STMFLASH/stmflash.c **** 	}  
+ 121:HARDWARE/STMFLASH/stmflash.c **** }
+ 367              		.loc 1 121 1 is_stmt 0 view .LVU86
+ 368 0020 F8BD     		pop	{r3, r4, r5, r6, r7, pc}
+ 369              		.loc 1 121 1 view .LVU87
+ 370              		.cfi_endproc
+ 371              	.LFE35:
+ 373              		.section	.text.STMFLASH_Read,"ax",%progbits
+ 374              		.align	1
+ 375              		.global	STMFLASH_Read
+ 376              		.syntax unified
+ 377              		.thumb
+ 378              		.thumb_func
+ 380              	STMFLASH_Read:
+ 381              	.LVL27:
+ 382              	.LFB37:
+ 122:HARDWARE/STMFLASH/stmflash.c **** 
+ 123:HARDWARE/STMFLASH/stmflash.c **** /**
+ 124:HARDWARE/STMFLASH/stmflash.c ****  * @brief 从指定地址开始写入指定长度的数据
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 10
+
+
+ 125:HARDWARE/STMFLASH/stmflash.c ****  * @param WriteAddr: 起始地址(此地址必须为2的倍数!!)
+ 126:HARDWARE/STMFLASH/stmflash.c ****  * @param pBuffer: 数据指针
+ 127:HARDWARE/STMFLASH/stmflash.c ****  * @param NumToWrite: 半字(16位)数(就是要写入的16位数据的个数.)
+ 128:HARDWARE/STMFLASH/stmflash.c ****  * @return 无
+ 129:HARDWARE/STMFLASH/stmflash.c ****  */
+ 130:HARDWARE/STMFLASH/stmflash.c **** #if STM32_FLASH_SIZE < 256
+ 131:HARDWARE/STMFLASH/stmflash.c **** #define STM_SECTOR_SIZE 1024 // 字节
+ 132:HARDWARE/STMFLASH/stmflash.c **** #else 
+ 133:HARDWARE/STMFLASH/stmflash.c **** #define STM_SECTOR_SIZE	2048
+ 134:HARDWARE/STMFLASH/stmflash.c **** #endif		 
+ 135:HARDWARE/STMFLASH/stmflash.c **** u16 STMFLASH_BUF[STM_SECTOR_SIZE / 2];  // 最多是2K字节
+ 136:HARDWARE/STMFLASH/stmflash.c **** 
+ 137:HARDWARE/STMFLASH/stmflash.c **** void STMFLASH_Write(u32 WriteAddr, u16 *pBuffer, u16 NumToWrite)	
+ 138:HARDWARE/STMFLASH/stmflash.c **** {
+ 139:HARDWARE/STMFLASH/stmflash.c **** 	u32 secpos;   // 扇区地址
+ 140:HARDWARE/STMFLASH/stmflash.c **** 	u16 secoff;   // 扇区内偏移地址(16位字计算)
+ 141:HARDWARE/STMFLASH/stmflash.c **** 	u16 secremain; // 扇区内剩余地址(16位字计算)	   
+ 142:HARDWARE/STMFLASH/stmflash.c ****   	u16 i;    
+ 143:HARDWARE/STMFLASH/stmflash.c **** 	u32 offaddr;   // 去掉0X08000000后的地址
+ 144:HARDWARE/STMFLASH/stmflash.c **** 	
+ 145:HARDWARE/STMFLASH/stmflash.c **** 	// 检查地址是否合法
+ 146:HARDWARE/STMFLASH/stmflash.c **** 	if(WriteAddr < STM32_FLASH_BASE || (WriteAddr >= (STM32_FLASH_BASE + 1024 * STM32_FLASH_SIZE)))
+ 147:HARDWARE/STMFLASH/stmflash.c **** 		return;  // 非法地址
+ 148:HARDWARE/STMFLASH/stmflash.c **** 	
+ 149:HARDWARE/STMFLASH/stmflash.c **** 	FLASH_Unlock();					// 解锁
+ 150:HARDWARE/STMFLASH/stmflash.c **** 	offaddr = WriteAddr - STM32_FLASH_BASE;  // 实际偏移地址
+ 151:HARDWARE/STMFLASH/stmflash.c **** 	secpos = offaddr / STM_SECTOR_SIZE;  // 扇区地址  0~127 for STM32F103RBT6
+ 152:HARDWARE/STMFLASH/stmflash.c **** 	secoff = (offaddr % STM_SECTOR_SIZE) / 2;  // 在扇区内的偏移(2个字节为基本单位)
+ 153:HARDWARE/STMFLASH/stmflash.c **** 	secremain = STM_SECTOR_SIZE / 2 - secoff;  // 扇区剩余空间大小   
+ 154:HARDWARE/STMFLASH/stmflash.c **** 	
+ 155:HARDWARE/STMFLASH/stmflash.c **** 	if(NumToWrite <= secremain) secremain = NumToWrite;  // 不大于该扇区范围
+ 156:HARDWARE/STMFLASH/stmflash.c **** 	
+ 157:HARDWARE/STMFLASH/stmflash.c **** 	while(1) 
+ 158:HARDWARE/STMFLASH/stmflash.c **** 	{	
+ 159:HARDWARE/STMFLASH/stmflash.c **** 		// 读出整个扇区的内容
+ 160:HARDWARE/STMFLASH/stmflash.c **** 		STMFLASH_Read(secpos * STM_SECTOR_SIZE + STM32_FLASH_BASE, STMFLASH_BUF, STM_SECTOR_SIZE / 2);
+ 161:HARDWARE/STMFLASH/stmflash.c **** 		
+ 162:HARDWARE/STMFLASH/stmflash.c **** 		// 校验数据
+ 163:HARDWARE/STMFLASH/stmflash.c **** 		for(i = 0; i < secremain; i++)
+ 164:HARDWARE/STMFLASH/stmflash.c **** 		{
+ 165:HARDWARE/STMFLASH/stmflash.c **** 			if(STMFLASH_BUF[secoff + i] != 0XFFFF) break;  // 需要擦除  	  
+ 166:HARDWARE/STMFLASH/stmflash.c **** 		}
+ 167:HARDWARE/STMFLASH/stmflash.c **** 		
+ 168:HARDWARE/STMFLASH/stmflash.c **** 		if(i < secremain)  // 需要擦除
+ 169:HARDWARE/STMFLASH/stmflash.c **** 		{
+ 170:HARDWARE/STMFLASH/stmflash.c **** 			// 擦除这个扇区
+ 171:HARDWARE/STMFLASH/stmflash.c **** 			FLASH_ErasePage(secpos * STM_SECTOR_SIZE + STM32_FLASH_BASE);
+ 172:HARDWARE/STMFLASH/stmflash.c **** 			
+ 173:HARDWARE/STMFLASH/stmflash.c **** 			// 复制数据
+ 174:HARDWARE/STMFLASH/stmflash.c **** 			for(i = 0; i < secremain; i++)
+ 175:HARDWARE/STMFLASH/stmflash.c **** 			{
+ 176:HARDWARE/STMFLASH/stmflash.c **** 				STMFLASH_BUF[i + secoff] = pBuffer[i];	  
+ 177:HARDWARE/STMFLASH/stmflash.c **** 			}
+ 178:HARDWARE/STMFLASH/stmflash.c **** 			
+ 179:HARDWARE/STMFLASH/stmflash.c **** 			// 写入整个扇区
+ 180:HARDWARE/STMFLASH/stmflash.c **** 			STMFLASH_Write_NoCheck(secpos * STM_SECTOR_SIZE + STM32_FLASH_BASE, STMFLASH_BUF, STM_SECTOR_SIZ
+ 181:HARDWARE/STMFLASH/stmflash.c **** 		}
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 11
+
+
+ 182:HARDWARE/STMFLASH/stmflash.c **** 		else
+ 183:HARDWARE/STMFLASH/stmflash.c **** 		{
+ 184:HARDWARE/STMFLASH/stmflash.c **** 			// 写已经擦除了的,直接写入扇区剩余区间
+ 185:HARDWARE/STMFLASH/stmflash.c **** 			STMFLASH_Write_NoCheck(WriteAddr, pBuffer, secremain);
+ 186:HARDWARE/STMFLASH/stmflash.c **** 		}
+ 187:HARDWARE/STMFLASH/stmflash.c **** 		
+ 188:HARDWARE/STMFLASH/stmflash.c **** 		if(NumToWrite == secremain) break;  // 写入结束了
+ 189:HARDWARE/STMFLASH/stmflash.c **** 		else  // 写入未结束
+ 190:HARDWARE/STMFLASH/stmflash.c **** 		{
+ 191:HARDWARE/STMFLASH/stmflash.c **** 			secpos++;  // 扇区地址增1
+ 192:HARDWARE/STMFLASH/stmflash.c **** 			secoff = 0;  // 偏移位置为0 	 
+ 193:HARDWARE/STMFLASH/stmflash.c **** 		    pBuffer += secremain;   // 指针偏移
+ 194:HARDWARE/STMFLASH/stmflash.c **** 			WriteAddr += secremain;  // 写地址偏移	   
+ 195:HARDWARE/STMFLASH/stmflash.c **** 		    NumToWrite -= secremain;  // 字节(16位)数递减
+ 196:HARDWARE/STMFLASH/stmflash.c **** 			
+ 197:HARDWARE/STMFLASH/stmflash.c **** 			if(NumToWrite > (STM_SECTOR_SIZE / 2))
+ 198:HARDWARE/STMFLASH/stmflash.c **** 				secremain = STM_SECTOR_SIZE / 2;  // 下一个扇区还是写不完
+ 199:HARDWARE/STMFLASH/stmflash.c **** 			else
+ 200:HARDWARE/STMFLASH/stmflash.c **** 				secremain = NumToWrite;  // 下一个扇区可以写完了
+ 201:HARDWARE/STMFLASH/stmflash.c **** 		} 	 
+ 202:HARDWARE/STMFLASH/stmflash.c **** 	};	
+ 203:HARDWARE/STMFLASH/stmflash.c **** 	
+ 204:HARDWARE/STMFLASH/stmflash.c **** 	FLASH_Lock();  // 上锁
+ 205:HARDWARE/STMFLASH/stmflash.c **** }
+ 206:HARDWARE/STMFLASH/stmflash.c **** 
+ 207:HARDWARE/STMFLASH/stmflash.c **** /**
+ 208:HARDWARE/STMFLASH/stmflash.c ****  * @brief 从指定地址开始读出指定长度的数据
+ 209:HARDWARE/STMFLASH/stmflash.c ****  * @param ReadAddr: 起始地址
+ 210:HARDWARE/STMFLASH/stmflash.c ****  * @param pBuffer: 数据指针
+ 211:HARDWARE/STMFLASH/stmflash.c ****  * @param NumToRead: 半字(16位)数
+ 212:HARDWARE/STMFLASH/stmflash.c ****  * @return 无
+ 213:HARDWARE/STMFLASH/stmflash.c ****  */
+ 214:HARDWARE/STMFLASH/stmflash.c **** void STMFLASH_Read(u32 ReadAddr, u16 *pBuffer, u16 NumToRead)    	
+ 215:HARDWARE/STMFLASH/stmflash.c **** {
+ 383              		.loc 1 215 1 is_stmt 1 view -0
+ 384              		.cfi_startproc
+ 385              		@ args = 0, pretend = 0, frame = 0
+ 386              		@ frame_needed = 0, uses_anonymous_args = 0
+ 387              		.loc 1 215 1 is_stmt 0 view .LVU89
+ 388 0000 F8B5     		push	{r3, r4, r5, r6, r7, lr}
+ 389              	.LCFI3:
+ 390              		.cfi_def_cfa_offset 24
+ 391              		.cfi_offset 3, -24
+ 392              		.cfi_offset 4, -20
+ 393              		.cfi_offset 5, -16
+ 394              		.cfi_offset 6, -12
+ 395              		.cfi_offset 7, -8
+ 396              		.cfi_offset 14, -4
+ 397 0002 0546     		mov	r5, r0
+ 398 0004 0F46     		mov	r7, r1
+ 399 0006 1646     		mov	r6, r2
+ 216:HARDWARE/STMFLASH/stmflash.c **** 	u16 i;
+ 400              		.loc 1 216 2 is_stmt 1 view .LVU90
+ 217:HARDWARE/STMFLASH/stmflash.c **** 	for(i = 0; i < NumToRead; i++)
+ 401              		.loc 1 217 2 view .LVU91
+ 402              	.LVL28:
+ 403              		.loc 1 217 8 is_stmt 0 view .LVU92
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 12
+
+
+ 404 0008 0024     		movs	r4, #0
+ 405              		.loc 1 217 2 view .LVU93
+ 406 000a 07E0     		b	.L33
+ 407              	.LVL29:
+ 408              	.L34:
+ 218:HARDWARE/STMFLASH/stmflash.c **** 	{
+ 219:HARDWARE/STMFLASH/stmflash.c **** 		pBuffer[i] = STMFLASH_ReadHalfWord(ReadAddr);  // 读取2个字节
+ 409              		.loc 1 219 3 is_stmt 1 view .LVU94
+ 410              		.loc 1 219 16 is_stmt 0 view .LVU95
+ 411 000c 2846     		mov	r0, r5
+ 412 000e FFF7FEFF 		bl	STMFLASH_ReadHalfWord
+ 413              	.LVL30:
+ 414              		.loc 1 219 14 discriminator 1 view .LVU96
+ 415 0012 27F81400 		strh	r0, [r7, r4, lsl #1]	@ movhi
+ 220:HARDWARE/STMFLASH/stmflash.c **** 		ReadAddr += 2;  // 偏移2个字节	
+ 416              		.loc 1 220 3 is_stmt 1 view .LVU97
+ 417              		.loc 1 220 12 is_stmt 0 view .LVU98
+ 418 0016 0235     		adds	r5, r5, #2
+ 419              	.LVL31:
+ 217:HARDWARE/STMFLASH/stmflash.c **** 	for(i = 0; i < NumToRead; i++)
+ 420              		.loc 1 217 29 is_stmt 1 discriminator 3 view .LVU99
+ 421 0018 0134     		adds	r4, r4, #1
+ 422              	.LVL32:
+ 217:HARDWARE/STMFLASH/stmflash.c **** 	for(i = 0; i < NumToRead; i++)
+ 423              		.loc 1 217 29 is_stmt 0 discriminator 3 view .LVU100
+ 424 001a A4B2     		uxth	r4, r4
+ 425              	.LVL33:
+ 426              	.L33:
+ 217:HARDWARE/STMFLASH/stmflash.c **** 	for(i = 0; i < NumToRead; i++)
+ 427              		.loc 1 217 15 is_stmt 1 discriminator 1 view .LVU101
+ 428 001c B442     		cmp	r4, r6
+ 429 001e F5D3     		bcc	.L34
+ 221:HARDWARE/STMFLASH/stmflash.c **** 	}
+ 222:HARDWARE/STMFLASH/stmflash.c **** }
+ 430              		.loc 1 222 1 is_stmt 0 view .LVU102
+ 431 0020 F8BD     		pop	{r3, r4, r5, r6, r7, pc}
+ 432              		.loc 1 222 1 view .LVU103
+ 433              		.cfi_endproc
+ 434              	.LFE37:
+ 436              		.section	.text.STMFLASH_Write,"ax",%progbits
+ 437              		.align	1
+ 438              		.global	STMFLASH_Write
+ 439              		.syntax unified
+ 440              		.thumb
+ 441              		.thumb_func
+ 443              	STMFLASH_Write:
+ 444              	.LVL34:
+ 445              	.LFB36:
+ 138:HARDWARE/STMFLASH/stmflash.c **** 	u32 secpos;   // 扇区地址
+ 446              		.loc 1 138 1 is_stmt 1 view -0
+ 447              		.cfi_startproc
+ 448              		@ args = 0, pretend = 0, frame = 0
+ 449              		@ frame_needed = 0, uses_anonymous_args = 0
+ 138:HARDWARE/STMFLASH/stmflash.c **** 	u32 secpos;   // 扇区地址
+ 450              		.loc 1 138 1 is_stmt 0 view .LVU105
+ 451 0000 2DE9F047 		push	{r4, r5, r6, r7, r8, r9, r10, lr}
+ 452              	.LCFI4:
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 13
+
+
+ 453              		.cfi_def_cfa_offset 32
+ 454              		.cfi_offset 4, -32
+ 455              		.cfi_offset 5, -28
+ 456              		.cfi_offset 6, -24
+ 457              		.cfi_offset 7, -20
+ 458              		.cfi_offset 8, -16
+ 459              		.cfi_offset 9, -12
+ 460              		.cfi_offset 10, -8
+ 461              		.cfi_offset 14, -4
+ 139:HARDWARE/STMFLASH/stmflash.c **** 	u16 secoff;   // 扇区内偏移地址(16位字计算)
+ 462              		.loc 1 139 2 is_stmt 1 view .LVU106
+ 140:HARDWARE/STMFLASH/stmflash.c **** 	u16 secremain; // 扇区内剩余地址(16位字计算)	   
+ 463              		.loc 1 140 2 view .LVU107
+ 141:HARDWARE/STMFLASH/stmflash.c ****   	u16 i;    
+ 464              		.loc 1 141 2 view .LVU108
+ 142:HARDWARE/STMFLASH/stmflash.c **** 	u32 offaddr;   // 去掉0X08000000后的地址
+ 465              		.loc 1 142 4 view .LVU109
+ 143:HARDWARE/STMFLASH/stmflash.c **** 	
+ 466              		.loc 1 143 2 view .LVU110
+ 146:HARDWARE/STMFLASH/stmflash.c **** 		return;  // 非法地址
+ 467              		.loc 1 146 2 view .LVU111
+ 146:HARDWARE/STMFLASH/stmflash.c **** 		return;  // 非法地址
+ 468              		.loc 1 146 34 is_stmt 0 view .LVU112
+ 469 0004 00F17845 		add	r5, r0, #-134217728
+ 146:HARDWARE/STMFLASH/stmflash.c **** 		return;  // 非法地址
+ 470              		.loc 1 146 4 view .LVU113
+ 471 0008 B5F5803F 		cmp	r5, #65536
+ 472 000c 01D3     		bcc	.L52
+ 473              	.LVL35:
+ 474              	.L36:
+ 205:HARDWARE/STMFLASH/stmflash.c **** 
+ 475              		.loc 1 205 1 view .LVU114
+ 476 000e BDE8F087 		pop	{r4, r5, r6, r7, r8, r9, r10, pc}
+ 477              	.LVL36:
+ 478              	.L52:
+ 205:HARDWARE/STMFLASH/stmflash.c **** 
+ 479              		.loc 1 205 1 view .LVU115
+ 480 0012 8146     		mov	r9, r0
+ 481 0014 0E46     		mov	r6, r1
+ 482 0016 1746     		mov	r7, r2
+ 149:HARDWARE/STMFLASH/stmflash.c **** 	offaddr = WriteAddr - STM32_FLASH_BASE;  // 实际偏移地址
+ 483              		.loc 1 149 2 is_stmt 1 view .LVU116
+ 484 0018 FFF7FEFF 		bl	FLASH_Unlock
+ 485              	.LVL37:
+ 150:HARDWARE/STMFLASH/stmflash.c **** 	secpos = offaddr / STM_SECTOR_SIZE;  // 扇区地址  0~127 for STM32F103RBT6
+ 486              		.loc 1 150 2 view .LVU117
+ 151:HARDWARE/STMFLASH/stmflash.c **** 	secoff = (offaddr % STM_SECTOR_SIZE) / 2;  // 在扇区内的偏移(2个字节为基本单位)
+ 487              		.loc 1 151 2 view .LVU118
+ 151:HARDWARE/STMFLASH/stmflash.c **** 	secoff = (offaddr % STM_SECTOR_SIZE) / 2;  // 在扇区内的偏移(2个字节为基本单位)
+ 488              		.loc 1 151 9 is_stmt 0 view .LVU119
+ 489 001c 4FEA952A 		lsr	r10, r5, #10
+ 490              	.LVL38:
+ 152:HARDWARE/STMFLASH/stmflash.c **** 	secremain = STM_SECTOR_SIZE / 2 - secoff;  // 扇区剩余空间大小   
+ 491              		.loc 1 152 2 is_stmt 1 view .LVU120
+ 152:HARDWARE/STMFLASH/stmflash.c **** 	secremain = STM_SECTOR_SIZE / 2 - secoff;  // 扇区剩余空间大小   
+ 492              		.loc 1 152 9 is_stmt 0 view .LVU121
+ 493 0020 C5F34805 		ubfx	r5, r5, #1, #9
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 14
+
+
+ 494              	.LVL39:
+ 153:HARDWARE/STMFLASH/stmflash.c **** 	
+ 495              		.loc 1 153 2 is_stmt 1 view .LVU122
+ 153:HARDWARE/STMFLASH/stmflash.c **** 	
+ 496              		.loc 1 153 12 is_stmt 0 view .LVU123
+ 497 0024 C5F50074 		rsb	r4, r5, #512
+ 498 0028 A4B2     		uxth	r4, r4
+ 499              	.LVL40:
+ 155:HARDWARE/STMFLASH/stmflash.c **** 	
+ 500              		.loc 1 155 2 is_stmt 1 view .LVU124
+ 155:HARDWARE/STMFLASH/stmflash.c **** 	
+ 501              		.loc 1 155 4 is_stmt 0 view .LVU125
+ 502 002a BC42     		cmp	r4, r7
+ 503 002c 04D3     		bcc	.L39
+ 155:HARDWARE/STMFLASH/stmflash.c **** 	
+ 504              		.loc 1 155 40 discriminator 1 view .LVU126
+ 505 002e 3C46     		mov	r4, r7
+ 506              	.LVL41:
+ 155:HARDWARE/STMFLASH/stmflash.c **** 	
+ 507              		.loc 1 155 40 discriminator 1 view .LVU127
+ 508 0030 02E0     		b	.L39
+ 509              	.LVL42:
+ 510              	.L48:
+ 198:HARDWARE/STMFLASH/stmflash.c **** 			else
+ 511              		.loc 1 198 15 view .LVU128
+ 512 0032 4FF40074 		mov	r4, #512
+ 513              	.L49:
+ 514              	.LVL43:
+ 200:HARDWARE/STMFLASH/stmflash.c **** 		} 	 
+ 515              		.loc 1 200 15 view .LVU129
+ 516 0036 0025     		movs	r5, #0
+ 517              	.LVL44:
+ 518              	.L39:
+ 157:HARDWARE/STMFLASH/stmflash.c **** 	{	
+ 519              		.loc 1 157 2 is_stmt 1 view .LVU130
+ 160:HARDWARE/STMFLASH/stmflash.c **** 		
+ 520              		.loc 1 160 3 view .LVU131
+ 160:HARDWARE/STMFLASH/stmflash.c **** 		
+ 521              		.loc 1 160 42 is_stmt 0 view .LVU132
+ 522 0038 0AF50038 		add	r8, r10, #131072
+ 160:HARDWARE/STMFLASH/stmflash.c **** 		
+ 523              		.loc 1 160 3 view .LVU133
+ 524 003c 4FEA8828 		lsl	r8, r8, #10
+ 525 0040 4FF40072 		mov	r2, #512
+ 526 0044 1F49     		ldr	r1, .L54
+ 527 0046 4046     		mov	r0, r8
+ 528 0048 FFF7FEFF 		bl	STMFLASH_Read
+ 529              	.LVL45:
+ 163:HARDWARE/STMFLASH/stmflash.c **** 		{
+ 530              		.loc 1 163 3 is_stmt 1 view .LVU134
+ 163:HARDWARE/STMFLASH/stmflash.c **** 		{
+ 531              		.loc 1 163 9 is_stmt 0 view .LVU135
+ 532 004c 0023     		movs	r3, #0
+ 533              	.LVL46:
+ 534              	.L40:
+ 163:HARDWARE/STMFLASH/stmflash.c **** 		{
+ 535              		.loc 1 163 16 is_stmt 1 discriminator 1 view .LVU136
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 15
+
+
+ 536 004e 9C42     		cmp	r4, r3
+ 537 0050 0AD9     		bls	.L41
+ 165:HARDWARE/STMFLASH/stmflash.c **** 		}
+ 538              		.loc 1 165 4 view .LVU137
+ 165:HARDWARE/STMFLASH/stmflash.c **** 		}
+ 539              		.loc 1 165 27 is_stmt 0 view .LVU138
+ 540 0052 EA18     		adds	r2, r5, r3
+ 165:HARDWARE/STMFLASH/stmflash.c **** 		}
+ 541              		.loc 1 165 19 view .LVU139
+ 542 0054 1B49     		ldr	r1, .L54
+ 543 0056 31F81210 		ldrh	r1, [r1, r2, lsl #1]
+ 165:HARDWARE/STMFLASH/stmflash.c **** 		}
+ 544              		.loc 1 165 6 view .LVU140
+ 545 005a 4FF6FF72 		movw	r2, #65535
+ 546 005e 9142     		cmp	r1, r2
+ 547 0060 02D1     		bne	.L41
+ 163:HARDWARE/STMFLASH/stmflash.c **** 		{
+ 548              		.loc 1 163 30 is_stmt 1 discriminator 2 view .LVU141
+ 549 0062 0133     		adds	r3, r3, #1
+ 550              	.LVL47:
+ 163:HARDWARE/STMFLASH/stmflash.c **** 		{
+ 551              		.loc 1 163 30 is_stmt 0 discriminator 2 view .LVU142
+ 552 0064 9BB2     		uxth	r3, r3
+ 553              	.LVL48:
+ 163:HARDWARE/STMFLASH/stmflash.c **** 		{
+ 554              		.loc 1 163 30 discriminator 2 view .LVU143
+ 555 0066 F2E7     		b	.L40
+ 556              	.L41:
+ 168:HARDWARE/STMFLASH/stmflash.c **** 		{
+ 557              		.loc 1 168 3 is_stmt 1 view .LVU144
+ 168:HARDWARE/STMFLASH/stmflash.c **** 		{
+ 558              		.loc 1 168 5 is_stmt 0 view .LVU145
+ 559 0068 9C42     		cmp	r4, r3
+ 560 006a 12D8     		bhi	.L53
+ 185:HARDWARE/STMFLASH/stmflash.c **** 		}
+ 561              		.loc 1 185 4 is_stmt 1 view .LVU146
+ 562 006c 2246     		mov	r2, r4
+ 563 006e 3146     		mov	r1, r6
+ 564 0070 4846     		mov	r0, r9
+ 565 0072 FFF7FEFF 		bl	STMFLASH_Write_NoCheck
+ 566              	.LVL49:
+ 567              	.L46:
+ 188:HARDWARE/STMFLASH/stmflash.c **** 		else  // 写入未结束
+ 568              		.loc 1 188 3 view .LVU147
+ 188:HARDWARE/STMFLASH/stmflash.c **** 		else  // 写入未结束
+ 569              		.loc 1 188 5 is_stmt 0 view .LVU148
+ 570 0076 A742     		cmp	r7, r4
+ 571 0078 21D0     		beq	.L47
+ 191:HARDWARE/STMFLASH/stmflash.c **** 			secoff = 0;  // 偏移位置为0 	 
+ 572              		.loc 1 191 4 is_stmt 1 view .LVU149
+ 191:HARDWARE/STMFLASH/stmflash.c **** 			secoff = 0;  // 偏移位置为0 	 
+ 573              		.loc 1 191 10 is_stmt 0 view .LVU150
+ 574 007a 0AF1010A 		add	r10, r10, #1
+ 575              	.LVL50:
+ 192:HARDWARE/STMFLASH/stmflash.c **** 		    pBuffer += secremain;   // 指针偏移
+ 576              		.loc 1 192 4 is_stmt 1 view .LVU151
+ 193:HARDWARE/STMFLASH/stmflash.c **** 			WriteAddr += secremain;  // 写地址偏移	   
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 16
+
+
+ 577              		.loc 1 193 7 view .LVU152
+ 193:HARDWARE/STMFLASH/stmflash.c **** 			WriteAddr += secremain;  // 写地址偏移	   
+ 578              		.loc 1 193 15 is_stmt 0 view .LVU153
+ 579 007e 06EB4406 		add	r6, r6, r4, lsl #1
+ 580              	.LVL51:
+ 194:HARDWARE/STMFLASH/stmflash.c **** 		    NumToWrite -= secremain;  // 字节(16位)数递减
+ 581              		.loc 1 194 4 is_stmt 1 view .LVU154
+ 194:HARDWARE/STMFLASH/stmflash.c **** 		    NumToWrite -= secremain;  // 字节(16位)数递减
+ 582              		.loc 1 194 14 is_stmt 0 view .LVU155
+ 583 0082 A144     		add	r9, r9, r4
+ 584              	.LVL52:
+ 195:HARDWARE/STMFLASH/stmflash.c **** 			
+ 585              		.loc 1 195 7 is_stmt 1 view .LVU156
+ 195:HARDWARE/STMFLASH/stmflash.c **** 			
+ 586              		.loc 1 195 18 is_stmt 0 view .LVU157
+ 587 0084 3C1B     		subs	r4, r7, r4
+ 588              	.LVL53:
+ 195:HARDWARE/STMFLASH/stmflash.c **** 			
+ 589              		.loc 1 195 18 view .LVU158
+ 590 0086 A7B2     		uxth	r7, r4
+ 591              	.LVL54:
+ 197:HARDWARE/STMFLASH/stmflash.c **** 				secremain = STM_SECTOR_SIZE / 2;  // 下一个扇区还是写不完
+ 592              		.loc 1 197 4 is_stmt 1 view .LVU159
+ 197:HARDWARE/STMFLASH/stmflash.c **** 				secremain = STM_SECTOR_SIZE / 2;  // 下一个扇区还是写不完
+ 593              		.loc 1 197 6 is_stmt 0 view .LVU160
+ 594 0088 B7F5007F 		cmp	r7, #512
+ 595 008c D1D8     		bhi	.L48
+ 200:HARDWARE/STMFLASH/stmflash.c **** 		} 	 
+ 596              		.loc 1 200 15 view .LVU161
+ 597 008e 3C46     		mov	r4, r7
+ 598 0090 D1E7     		b	.L49
+ 599              	.LVL55:
+ 600              	.L53:
+ 171:HARDWARE/STMFLASH/stmflash.c **** 			
+ 601              		.loc 1 171 4 is_stmt 1 view .LVU162
+ 602 0092 4046     		mov	r0, r8
+ 603 0094 FFF7FEFF 		bl	FLASH_ErasePage
+ 604              	.LVL56:
+ 174:HARDWARE/STMFLASH/stmflash.c **** 			{
+ 605              		.loc 1 174 4 view .LVU163
+ 174:HARDWARE/STMFLASH/stmflash.c **** 			{
+ 606              		.loc 1 174 10 is_stmt 0 view .LVU164
+ 607 0098 0023     		movs	r3, #0
+ 174:HARDWARE/STMFLASH/stmflash.c **** 			{
+ 608              		.loc 1 174 4 view .LVU165
+ 609 009a 07E0     		b	.L44
+ 610              	.LVL57:
+ 611              	.L45:
+ 176:HARDWARE/STMFLASH/stmflash.c **** 			}
+ 612              		.loc 1 176 5 is_stmt 1 view .LVU166
+ 176:HARDWARE/STMFLASH/stmflash.c **** 			}
+ 613              		.loc 1 176 20 is_stmt 0 view .LVU167
+ 614 009c 5919     		adds	r1, r3, r5
+ 176:HARDWARE/STMFLASH/stmflash.c **** 			}
+ 615              		.loc 1 176 39 view .LVU168
+ 616 009e 36F81300 		ldrh	r0, [r6, r3, lsl #1]
+ 176:HARDWARE/STMFLASH/stmflash.c **** 			}
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 17
+
+
+ 617              		.loc 1 176 30 view .LVU169
+ 618 00a2 084A     		ldr	r2, .L54
+ 619 00a4 22F81100 		strh	r0, [r2, r1, lsl #1]	@ movhi
+ 174:HARDWARE/STMFLASH/stmflash.c **** 			{
+ 620              		.loc 1 174 31 is_stmt 1 discriminator 3 view .LVU170
+ 621 00a8 0133     		adds	r3, r3, #1
+ 622              	.LVL58:
+ 174:HARDWARE/STMFLASH/stmflash.c **** 			{
+ 623              		.loc 1 174 31 is_stmt 0 discriminator 3 view .LVU171
+ 624 00aa 9BB2     		uxth	r3, r3
+ 625              	.LVL59:
+ 626              	.L44:
+ 174:HARDWARE/STMFLASH/stmflash.c **** 			{
+ 627              		.loc 1 174 17 is_stmt 1 discriminator 1 view .LVU172
+ 628 00ac 9C42     		cmp	r4, r3
+ 629 00ae F5D8     		bhi	.L45
+ 180:HARDWARE/STMFLASH/stmflash.c **** 		}
+ 630              		.loc 1 180 4 view .LVU173
+ 631 00b0 4FF40072 		mov	r2, #512
+ 632 00b4 0349     		ldr	r1, .L54
+ 633 00b6 4046     		mov	r0, r8
+ 634 00b8 FFF7FEFF 		bl	STMFLASH_Write_NoCheck
+ 635              	.LVL60:
+ 180:HARDWARE/STMFLASH/stmflash.c **** 		}
+ 636              		.loc 1 180 4 is_stmt 0 view .LVU174
+ 637 00bc DBE7     		b	.L46
+ 638              	.LVL61:
+ 639              	.L47:
+ 202:HARDWARE/STMFLASH/stmflash.c **** 	
+ 640              		.loc 1 202 3 is_stmt 1 view .LVU175
+ 204:HARDWARE/STMFLASH/stmflash.c **** }
+ 641              		.loc 1 204 2 view .LVU176
+ 642 00be FFF7FEFF 		bl	FLASH_Lock
+ 643              	.LVL62:
+ 644 00c2 A4E7     		b	.L36
+ 645              	.L55:
+ 646              		.align	2
+ 647              	.L54:
+ 648 00c4 00000000 		.word	STMFLASH_BUF
+ 649              		.cfi_endproc
+ 650              	.LFE36:
+ 652              		.section	.text.Test_Write,"ax",%progbits
+ 653              		.align	1
+ 654              		.global	Test_Write
+ 655              		.syntax unified
+ 656              		.thumb
+ 657              		.thumb_func
+ 659              	Test_Write:
+ 660              	.LVL63:
+ 661              	.LFB38:
+ 223:HARDWARE/STMFLASH/stmflash.c **** 
+ 224:HARDWARE/STMFLASH/stmflash.c **** /**
+ 225:HARDWARE/STMFLASH/stmflash.c ****  * @brief 测试写入
+ 226:HARDWARE/STMFLASH/stmflash.c ****  * @param WriteAddr: 起始地址
+ 227:HARDWARE/STMFLASH/stmflash.c ****  * @param WriteData: 要写入的数据
+ 228:HARDWARE/STMFLASH/stmflash.c ****  * @return 无
+ 229:HARDWARE/STMFLASH/stmflash.c ****  */
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 18
+
+
+ 230:HARDWARE/STMFLASH/stmflash.c **** void Test_Write(u32 WriteAddr, u16 WriteData)    	
+ 231:HARDWARE/STMFLASH/stmflash.c **** {
+ 662              		.loc 1 231 1 view -0
+ 663              		.cfi_startproc
+ 664              		@ args = 0, pretend = 0, frame = 8
+ 665              		@ frame_needed = 0, uses_anonymous_args = 0
+ 666              		.loc 1 231 1 is_stmt 0 view .LVU178
+ 667 0000 00B5     		push	{lr}
+ 668              	.LCFI5:
+ 669              		.cfi_def_cfa_offset 4
+ 670              		.cfi_offset 14, -4
+ 671 0002 83B0     		sub	sp, sp, #12
+ 672              	.LCFI6:
+ 673              		.cfi_def_cfa_offset 16
+ 674 0004 ADF80610 		strh	r1, [sp, #6]	@ movhi
+ 232:HARDWARE/STMFLASH/stmflash.c **** 	STMFLASH_Write(WriteAddr, &WriteData, 1);  // 写入一个字 
+ 675              		.loc 1 232 2 is_stmt 1 view .LVU179
+ 676 0008 0122     		movs	r2, #1
+ 677 000a 0DF10601 		add	r1, sp, #6
+ 678              	.LVL64:
+ 679              		.loc 1 232 2 is_stmt 0 view .LVU180
+ 680 000e FFF7FEFF 		bl	STMFLASH_Write
+ 681              	.LVL65:
+ 233:HARDWARE/STMFLASH/stmflash.c **** }
+ 682              		.loc 1 233 1 view .LVU181
+ 683 0012 03B0     		add	sp, sp, #12
+ 684              	.LCFI7:
+ 685              		.cfi_def_cfa_offset 4
+ 686              		@ sp needed
+ 687 0014 5DF804FB 		ldr	pc, [sp], #4
+ 688              		.cfi_endproc
+ 689              	.LFE38:
+ 691              		.section	.text.Flash_Read,"ax",%progbits
+ 692              		.align	1
+ 693              		.global	Flash_Read
+ 694              		.syntax unified
+ 695              		.thumb
+ 696              		.thumb_func
+ 698              	Flash_Read:
+ 699              	.LFB39:
+ 234:HARDWARE/STMFLASH/stmflash.c **** 
+ 235:HARDWARE/STMFLASH/stmflash.c **** 
+ 236:HARDWARE/STMFLASH/stmflash.c **** /**
+ 237:HARDWARE/STMFLASH/stmflash.c ****  * @brief 从Flash读取指定数据
+ 238:HARDWARE/STMFLASH/stmflash.c ****  * @param 无
+ 239:HARDWARE/STMFLASH/stmflash.c ****  * @return 无
+ 240:HARDWARE/STMFLASH/stmflash.c ****  */
+ 241:HARDWARE/STMFLASH/stmflash.c **** void Flash_Read(void)
+ 242:HARDWARE/STMFLASH/stmflash.c **** {
+ 700              		.loc 1 242 1 is_stmt 1 view -0
+ 701              		.cfi_startproc
+ 702              		@ args = 0, pretend = 0, frame = 0
+ 703              		@ frame_needed = 0, uses_anonymous_args = 0
+ 704 0000 08B5     		push	{r3, lr}
+ 705              	.LCFI8:
+ 706              		.cfi_def_cfa_offset 8
+ 707              		.cfi_offset 3, -8
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 19
+
+
+ 708              		.cfi_offset 14, -4
+ 243:HARDWARE/STMFLASH/stmflash.c **** 	// 从FLASH_SAVE_ADDR地址读取10个半字到A_Parameter数组
+ 244:HARDWARE/STMFLASH/stmflash.c **** 	STMFLASH_Read(FLASH_SAVE_ADDR, (u16*)A_Parameter, 10);
+ 709              		.loc 1 244 2 view .LVU183
+ 710 0002 0A22     		movs	r2, #10
+ 711 0004 0249     		ldr	r1, .L61
+ 712 0006 0348     		ldr	r0, .L61+4
+ 713 0008 FFF7FEFF 		bl	STMFLASH_Read
+ 714              	.LVL66:
+ 245:HARDWARE/STMFLASH/stmflash.c **** 	
+ 246:HARDWARE/STMFLASH/stmflash.c **** 	// Flash未写入数据的时候，数据为65535
+ 247:HARDWARE/STMFLASH/stmflash.c **** 	if(A_Parameter[0] == 65535 && A_Parameter[1] == 65535 && A_Parameter[2] == 65535 && A_Parameter[3]
+ 715              		.loc 1 247 2 view .LVU184
+ 248:HARDWARE/STMFLASH/stmflash.c **** 	{
+ 249:HARDWARE/STMFLASH/stmflash.c **** 		// printf("FLASH暂时为空"); 
+ 250:HARDWARE/STMFLASH/stmflash.c **** 	}
+ 251:HARDWARE/STMFLASH/stmflash.c **** 	else  // Flash内有数据，进行读取
+ 252:HARDWARE/STMFLASH/stmflash.c **** 	{		
+ 253:HARDWARE/STMFLASH/stmflash.c **** 		// printf("%d,%d,%d,%d\r\n",A_Parameter[0],A_Parameter[1],A_Parameter[2],A_Parameter[3]);
+ 254:HARDWARE/STMFLASH/stmflash.c **** 	}
+ 255:HARDWARE/STMFLASH/stmflash.c **** }	
+ 716              		.loc 1 255 1 is_stmt 0 view .LVU185
+ 717 000c 08BD     		pop	{r3, pc}
+ 718              	.L62:
+ 719 000e 00BF     		.align	2
+ 720              	.L61:
+ 721 0010 00000000 		.word	A_Parameter
+ 722 0014 00FC0008 		.word	134282240
+ 723              		.cfi_endproc
+ 724              	.LFE39:
+ 726              		.section	.text.Flash_Write,"ax",%progbits
+ 727              		.align	1
+ 728              		.global	Flash_Write
+ 729              		.syntax unified
+ 730              		.thumb
+ 731              		.thumb_func
+ 733              	Flash_Write:
+ 734              	.LFB40:
+ 256:HARDWARE/STMFLASH/stmflash.c **** 
+ 257:HARDWARE/STMFLASH/stmflash.c **** /**
+ 258:HARDWARE/STMFLASH/stmflash.c ****  * @brief 向Flash写入数据
+ 259:HARDWARE/STMFLASH/stmflash.c ****  * @param 无
+ 260:HARDWARE/STMFLASH/stmflash.c ****  * @return 无
+ 261:HARDWARE/STMFLASH/stmflash.c ****  */
+ 262:HARDWARE/STMFLASH/stmflash.c **** void Flash_Write(void)
+ 263:HARDWARE/STMFLASH/stmflash.c **** {
+ 735              		.loc 1 263 1 is_stmt 1 view -0
+ 736              		.cfi_startproc
+ 737              		@ args = 0, pretend = 0, frame = 0
+ 738              		@ frame_needed = 0, uses_anonymous_args = 0
+ 739 0000 08B5     		push	{r3, lr}
+ 740              	.LCFI9:
+ 741              		.cfi_def_cfa_offset 8
+ 742              		.cfi_offset 3, -8
+ 743              		.cfi_offset 14, -4
+ 264:HARDWARE/STMFLASH/stmflash.c **** 	static unsigned int date = 0;  // 静态数据，不随函数进入把数据清除
+ 744              		.loc 1 264 2 view .LVU187
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 20
+
+
+ 265:HARDWARE/STMFLASH/stmflash.c **** 	if(++date == 65535) date = 0;  // 数据自加，循环计数
+ 745              		.loc 1 265 2 view .LVU188
+ 746              		.loc 1 265 5 is_stmt 0 view .LVU189
+ 747 0002 0D4A     		ldr	r2, .L67
+ 748 0004 1368     		ldr	r3, [r2]
+ 749 0006 0133     		adds	r3, r3, #1
+ 750              		.loc 1 265 4 view .LVU190
+ 751 0008 1360     		str	r3, [r2]
+ 752 000a 4FF6FF72 		movw	r2, #65535
+ 753 000e 9342     		cmp	r3, r2
+ 754 0010 0DD0     		beq	.L66
+ 755              	.L64:
+ 266:HARDWARE/STMFLASH/stmflash.c **** 	
+ 267:HARDWARE/STMFLASH/stmflash.c **** 	// 填充B_Parameter数组
+ 268:HARDWARE/STMFLASH/stmflash.c **** 	B_Parameter[0] = date; 		
+ 756              		.loc 1 268 2 is_stmt 1 view .LVU191
+ 757              		.loc 1 268 17 is_stmt 0 view .LVU192
+ 758 0012 0A49     		ldr	r1, .L67+4
+ 759 0014 084B     		ldr	r3, .L67
+ 760 0016 1B68     		ldr	r3, [r3]
+ 761 0018 0B80     		strh	r3, [r1]	@ movhi
+ 269:HARDWARE/STMFLASH/stmflash.c **** 	B_Parameter[1] = 2; 	
+ 762              		.loc 1 269 2 is_stmt 1 view .LVU193
+ 763              		.loc 1 269 17 is_stmt 0 view .LVU194
+ 764 001a 0223     		movs	r3, #2
+ 765 001c 4B80     		strh	r3, [r1, #2]	@ movhi
+ 270:HARDWARE/STMFLASH/stmflash.c **** 	B_Parameter[2] = 3; 	
+ 766              		.loc 1 270 2 is_stmt 1 view .LVU195
+ 767              		.loc 1 270 17 is_stmt 0 view .LVU196
+ 768 001e 0323     		movs	r3, #3
+ 769 0020 8B80     		strh	r3, [r1, #4]	@ movhi
+ 271:HARDWARE/STMFLASH/stmflash.c **** 	B_Parameter[3] = 4; 	
+ 770              		.loc 1 271 2 is_stmt 1 view .LVU197
+ 771              		.loc 1 271 17 is_stmt 0 view .LVU198
+ 772 0022 0422     		movs	r2, #4
+ 773 0024 CA80     		strh	r2, [r1, #6]	@ movhi
+ 272:HARDWARE/STMFLASH/stmflash.c **** 	
+ 273:HARDWARE/STMFLASH/stmflash.c **** 	// 写入数据到FLASH_SAVE_ADDR地址
+ 274:HARDWARE/STMFLASH/stmflash.c **** 	STMFLASH_Write(FLASH_SAVE_ADDR, (u16*)B_Parameter, 4);	
+ 774              		.loc 1 274 2 is_stmt 1 view .LVU199
+ 775 0026 0648     		ldr	r0, .L67+8
+ 776 0028 FFF7FEFF 		bl	STMFLASH_Write
+ 777              	.LVL67:
+ 275:HARDWARE/STMFLASH/stmflash.c **** }
+ 778              		.loc 1 275 1 is_stmt 0 view .LVU200
+ 779 002c 08BD     		pop	{r3, pc}
+ 780              	.L66:
+ 265:HARDWARE/STMFLASH/stmflash.c **** 	
+ 781              		.loc 1 265 22 is_stmt 1 discriminator 1 view .LVU201
+ 265:HARDWARE/STMFLASH/stmflash.c **** 	
+ 782              		.loc 1 265 27 is_stmt 0 discriminator 1 view .LVU202
+ 783 002e 024B     		ldr	r3, .L67
+ 784 0030 0022     		movs	r2, #0
+ 785 0032 1A60     		str	r2, [r3]
+ 786 0034 EDE7     		b	.L64
+ 787              	.L68:
+ 788 0036 00BF     		.align	2
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 21
+
+
+ 789              	.L67:
+ 790 0038 00000000 		.word	date.0
+ 791 003c 00000000 		.word	B_Parameter
+ 792 0040 00FC0008 		.word	134282240
+ 793              		.cfi_endproc
+ 794              	.LFE40:
+ 796              		.section	.bss.date.0,"aw",%nobits
+ 797              		.align	2
+ 800              	date.0:
+ 801 0000 00000000 		.space	4
+ 802              		.global	STMFLASH_BUF
+ 803              		.section	.bss.STMFLASH_BUF,"aw",%nobits
+ 804              		.align	2
+ 807              	STMFLASH_BUF:
+ 808 0000 00000000 		.space	1024
+ 808      00000000 
+ 808      00000000 
+ 808      00000000 
+ 808      00000000 
+ 809              		.global	Flash_Parameter
+ 810              		.section	.bss.Flash_Parameter,"aw",%nobits
+ 811              		.align	2
+ 814              	Flash_Parameter:
+ 815 0000 00000000 		.space	20
+ 815      00000000 
+ 815      00000000 
+ 815      00000000 
+ 815      00000000 
+ 816              		.global	B_Parameter
+ 817              		.section	.bss.B_Parameter,"aw",%nobits
+ 818              		.align	2
+ 821              	B_Parameter:
+ 822 0000 00000000 		.space	20
+ 822      00000000 
+ 822      00000000 
+ 822      00000000 
+ 822      00000000 
+ 823              		.global	A_Parameter
+ 824              		.section	.bss.A_Parameter,"aw",%nobits
+ 825              		.align	2
+ 828              	A_Parameter:
+ 829 0000 00000000 		.space	20
+ 829      00000000 
+ 829      00000000 
+ 829      00000000 
+ 829      00000000 
+ 830              		.text
+ 831              	.Letext0:
+ 832              		.file 2 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 833              		.file 3 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 834              		.file 4 "USER/stm32f10x.h"
+ 835              		.file 5 "STM32F10x_FWLib/inc/stm32f10x_flash.h"
+ 836              		.file 6 "HARDWARE/STMFLASH/stmflash.h"
+ 837              		.file 7 "SYSTEM/delay/delay.h"
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s 			page 22
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 stmflash.c
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:19     .text.STMFLASH_Unlock:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:25     .text.STMFLASH_Unlock:00000000 STMFLASH_Unlock
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:46     .text.STMFLASH_Unlock:00000010 $d
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:52     .text.STMFLASH_Lock:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:58     .text.STMFLASH_Lock:00000000 STMFLASH_Lock
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:77     .text.STMFLASH_Lock:0000000c $d
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:82     .text.STMFLASH_GetStatus:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:88     .text.STMFLASH_GetStatus:00000000 STMFLASH_GetStatus
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:132    .text.STMFLASH_GetStatus:00000028 $d
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:137    .text.STMFLASH_WaitDone:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:143    .text.STMFLASH_WaitDone:00000000 STMFLASH_WaitDone
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:208    .text.STMFLASH_ErasePage:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:214    .text.STMFLASH_ErasePage:00000000 STMFLASH_ErasePage
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:283    .text.STMFLASH_ErasePage:0000003c $d
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:288    .text.STMFLASH_ReadHalfWord:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:294    .text.STMFLASH_ReadHalfWord:00000000 STMFLASH_ReadHalfWord
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:313    .text.STMFLASH_Write_NoCheck:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:319    .text.STMFLASH_Write_NoCheck:00000000 STMFLASH_Write_NoCheck
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:374    .text.STMFLASH_Read:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:380    .text.STMFLASH_Read:00000000 STMFLASH_Read
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:437    .text.STMFLASH_Write:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:443    .text.STMFLASH_Write:00000000 STMFLASH_Write
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:648    .text.STMFLASH_Write:000000c4 $d
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:807    .bss.STMFLASH_BUF:00000000 STMFLASH_BUF
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:653    .text.Test_Write:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:659    .text.Test_Write:00000000 Test_Write
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:692    .text.Flash_Read:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:698    .text.Flash_Read:00000000 Flash_Read
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:721    .text.Flash_Read:00000010 $d
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:828    .bss.A_Parameter:00000000 A_Parameter
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:727    .text.Flash_Write:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:733    .text.Flash_Write:00000000 Flash_Write
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:790    .text.Flash_Write:00000038 $d
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:800    .bss.date.0:00000000 date.0
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:821    .bss.B_Parameter:00000000 B_Parameter
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:797    .bss.date.0:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:804    .bss.STMFLASH_BUF:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:814    .bss.Flash_Parameter:00000000 Flash_Parameter
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:811    .bss.Flash_Parameter:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:818    .bss.B_Parameter:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccAWoCyQ.s:825    .bss.A_Parameter:00000000 $d
+
+UNDEFINED SYMBOLS
+delay_us
+FLASH_ProgramHalfWord
+FLASH_Unlock
+FLASH_ErasePage
+FLASH_Lock

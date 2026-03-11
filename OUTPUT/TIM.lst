@@ -1,0 +1,285 @@
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cc6eHAak.s 			page 1
+
+
+   1              		.cpu cortex-m3
+   2              		.arch armv7-m
+   3              		.fpu softvfp
+   4              		.eabi_attribute 20, 1
+   5              		.eabi_attribute 21, 1
+   6              		.eabi_attribute 23, 3
+   7              		.eabi_attribute 24, 1
+   8              		.eabi_attribute 25, 1
+   9              		.eabi_attribute 26, 1
+  10              		.eabi_attribute 30, 1
+  11              		.eabi_attribute 34, 1
+  12              		.eabi_attribute 18, 4
+  13              		.file	"TIM.c"
+  14              		.text
+  15              	.Ltext0:
+  16              		.cfi_sections	.debug_frame
+  17              		.file 1 "HARDWARE/TIM/TIM.c"
+  18              		.section	.text.Timer_Init,"ax",%progbits
+  19              		.align	1
+  20              		.global	Timer_Init
+  21              		.syntax unified
+  22              		.thumb
+  23              		.thumb_func
+  25              	Timer_Init:
+  26              	.LFB29:
+   1:HARDWARE/TIM/TIM.c **** /**
+   2:HARDWARE/TIM/TIM.c ****  * TIM.c
+   3:HARDWARE/TIM/TIM.c ****  * 定时器驱动实现文件
+   4:HARDWARE/TIM/TIM.c ****  * 功能：实现定时器初始化和中断处理函数
+   5:HARDWARE/TIM/TIM.c ****  * 版本：V1.0
+   6:HARDWARE/TIM/TIM.c ****  * 测试硬件：STM32F103RCT6
+   7:HARDWARE/TIM/TIM.c ****  * 作者：蔬菜恒温库监控系统开发团队
+   8:HARDWARE/TIM/TIM.c ****  * 创建日期：2026-03-08
+   9:HARDWARE/TIM/TIM.c ****  * 项目：蔬菜恒温库监控系统
+  10:HARDWARE/TIM/TIM.c ****  */
+  11:HARDWARE/TIM/TIM.c **** 
+  12:HARDWARE/TIM/TIM.c **** #include "TIM.h"
+  13:HARDWARE/TIM/TIM.c **** #include "delay.h"
+  14:HARDWARE/TIM/TIM.c **** #include "stm32f10x.h"                  // Device header
+  15:HARDWARE/TIM/TIM.c **** 
+  16:HARDWARE/TIM/TIM.c **** /**
+  17:HARDWARE/TIM/TIM.c ****  * @brief 初始化定时器
+  18:HARDWARE/TIM/TIM.c ****  * @param 无
+  19:HARDWARE/TIM/TIM.c ****  * @return 无
+  20:HARDWARE/TIM/TIM.c ****  * @note 初始化TIM2定时器，配置为1秒中断一次
+  21:HARDWARE/TIM/TIM.c ****  *       时钟频率：72MHz / 7200 / 10000 = 1Hz
+  22:HARDWARE/TIM/TIM.c ****  */
+  23:HARDWARE/TIM/TIM.c **** void Timer_Init(void)
+  24:HARDWARE/TIM/TIM.c **** {
+  27              		.loc 1 24 1 view -0
+  28              		.cfi_startproc
+  29              		@ args = 0, pretend = 0, frame = 16
+  30              		@ frame_needed = 0, uses_anonymous_args = 0
+  31 0000 10B5     		push	{r4, lr}
+  32              	.LCFI0:
+  33              		.cfi_def_cfa_offset 8
+  34              		.cfi_offset 4, -8
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cc6eHAak.s 			page 2
+
+
+  35              		.cfi_offset 14, -4
+  36 0002 84B0     		sub	sp, sp, #16
+  37              	.LCFI1:
+  38              		.cfi_def_cfa_offset 24
+  25:HARDWARE/TIM/TIM.c **** 	/*开启时钟*/
+  26:HARDWARE/TIM/TIM.c **** 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);			// 开启TIM2的时钟
+  39              		.loc 1 26 2 view .LVU1
+  40 0004 0121     		movs	r1, #1
+  41 0006 0846     		mov	r0, r1
+  42 0008 FFF7FEFF 		bl	RCC_APB1PeriphClockCmd
+  43              	.LVL0:
+  27:HARDWARE/TIM/TIM.c **** 	
+  28:HARDWARE/TIM/TIM.c **** 	/*配置时钟源*/
+  29:HARDWARE/TIM/TIM.c **** 	TIM_InternalClockConfig(TIM2);		// 选择TIM2为内部时钟，若不调用此函数，TIM默认�
+  44              		.loc 1 29 2 view .LVU2
+  45 000c 4FF08040 		mov	r0, #1073741824
+  46 0010 FFF7FEFF 		bl	TIM_InternalClockConfig
+  47              	.LVL1:
+  30:HARDWARE/TIM/TIM.c **** 	
+  31:HARDWARE/TIM/TIM.c **** 	/*时基单元初始化*/
+  32:HARDWARE/TIM/TIM.c **** 	TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure;				// 定义结构体变量
+  48              		.loc 1 32 2 view .LVU3
+  33:HARDWARE/TIM/TIM.c **** 	TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;		// 时钟分频，选择不分频，�
+  49              		.loc 1 33 2 view .LVU4
+  50              		.loc 1 33 46 is_stmt 0 view .LVU5
+  51 0014 0023     		movs	r3, #0
+  52 0016 ADF80A30 		strh	r3, [sp, #10]	@ movhi
+  34:HARDWARE/TIM/TIM.c **** 	TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up;	// 计数器模式，选择向上�
+  53              		.loc 1 34 2 is_stmt 1 view .LVU6
+  54              		.loc 1 34 44 is_stmt 0 view .LVU7
+  55 001a ADF80630 		strh	r3, [sp, #6]	@ movhi
+  35:HARDWARE/TIM/TIM.c **** 	TIM_TimeBaseInitStructure.TIM_Period = 10000 - 1;				// 计数周期，即ARR的值，10000
+  56              		.loc 1 35 2 is_stmt 1 view .LVU8
+  57              		.loc 1 35 39 is_stmt 0 view .LVU9
+  58 001e 42F20F72 		movw	r2, #9999
+  59 0022 ADF80820 		strh	r2, [sp, #8]	@ movhi
+  36:HARDWARE/TIM/TIM.c **** 	TIM_TimeBaseInitStructure.TIM_Prescaler = 7200 - 1;				// 预分频器，即PSC的值，7200
+  60              		.loc 1 36 2 is_stmt 1 view .LVU10
+  61              		.loc 1 36 42 is_stmt 0 view .LVU11
+  62 0026 41F61F42 		movw	r2, #7199
+  63 002a ADF80420 		strh	r2, [sp, #4]	@ movhi
+  37:HARDWARE/TIM/TIM.c **** 	TIM_TimeBaseInitStructure.TIM_RepetitionCounter = 0;			// 重复计数器，高级定时器才会�
+  64              		.loc 1 37 2 is_stmt 1 view .LVU12
+  65              		.loc 1 37 50 is_stmt 0 view .LVU13
+  66 002e 8DF80C30 		strb	r3, [sp, #12]
+  38:HARDWARE/TIM/TIM.c **** 	TIM_TimeBaseInit(TIM2, &TIM_TimeBaseInitStructure);				// 将结构体变量交给TIM_TimeBaseInit
+  67              		.loc 1 38 2 is_stmt 1 view .LVU14
+  68 0032 01A9     		add	r1, sp, #4
+  69 0034 4FF08040 		mov	r0, #1073741824
+  70 0038 FFF7FEFF 		bl	TIM_TimeBaseInit
+  71              	.LVL2:
+  39:HARDWARE/TIM/TIM.c **** 	
+  40:HARDWARE/TIM/TIM.c **** 	/*中断输出配置*/
+  41:HARDWARE/TIM/TIM.c **** 	TIM_ClearFlag(TIM2, TIM_FLAG_Update);						// 清除定时器更新标志位
+  72              		.loc 1 41 2 view .LVU15
+  73 003c 0121     		movs	r1, #1
+  74 003e 4FF08040 		mov	r0, #1073741824
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cc6eHAak.s 			page 3
+
+
+  75 0042 FFF7FEFF 		bl	TIM_ClearFlag
+  76              	.LVL3:
+  42:HARDWARE/TIM/TIM.c **** 																// TIM_TimeBaseInit函数末尾，手动产生了更新事件
+  43:HARDWARE/TIM/TIM.c **** 																// 若不清除此标志位，则开启中断后，会立刻进入一次中断
+  44:HARDWARE/TIM/TIM.c **** 																// 如果不介意此问题，则不清除此标志位也可
+  45:HARDWARE/TIM/TIM.c **** 	
+  46:HARDWARE/TIM/TIM.c **** 	TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);					// 开启TIM2的更新中断
+  77              		.loc 1 46 2 view .LVU16
+  78 0046 0122     		movs	r2, #1
+  79 0048 1146     		mov	r1, r2
+  80 004a 4FF08040 		mov	r0, #1073741824
+  81 004e FFF7FEFF 		bl	TIM_ITConfig
+  82              	.LVL4:
+  47:HARDWARE/TIM/TIM.c **** 	
+  48:HARDWARE/TIM/TIM.c **** 	/*NVIC中断分组*/
+  49:HARDWARE/TIM/TIM.c **** 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);				// 配置NVIC为分组2
+  83              		.loc 1 49 2 view .LVU17
+  84 0052 4FF4A060 		mov	r0, #1280
+  85 0056 FFF7FEFF 		bl	NVIC_PriorityGroupConfig
+  86              	.LVL5:
+  50:HARDWARE/TIM/TIM.c **** 																// 即抢占优先级范围：0~3，响应优先级范围：0~3
+  51:HARDWARE/TIM/TIM.c **** 																// 此分组配置在整个工程中仅需调用一次
+  52:HARDWARE/TIM/TIM.c **** 																// 若有多个中断，可以把此代码放在main函数内，while循环之前
+  53:HARDWARE/TIM/TIM.c **** 																// 若调用多次配置分组的代码，则后执行的配置会覆盖先执行�
+  54:HARDWARE/TIM/TIM.c **** 	
+  55:HARDWARE/TIM/TIM.c **** 	/*NVIC配置*/
+  56:HARDWARE/TIM/TIM.c **** 	NVIC_InitTypeDef NVIC_InitStructure;						// 定义结构体变量
+  87              		.loc 1 56 2 view .LVU18
+  57:HARDWARE/TIM/TIM.c **** 	NVIC_InitStructure.NVIC_IRQChannel = TIM2_IRQn;				// 选择配置NVIC的TIM2线
+  88              		.loc 1 57 2 view .LVU19
+  89              		.loc 1 57 37 is_stmt 0 view .LVU20
+  90 005a 1C23     		movs	r3, #28
+  91 005c 8DF80030 		strb	r3, [sp]
+  58:HARDWARE/TIM/TIM.c **** 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;				// 指定NVIC线路使能
+  92              		.loc 1 58 2 is_stmt 1 view .LVU21
+  93              		.loc 1 58 40 is_stmt 0 view .LVU22
+  94 0060 0124     		movs	r4, #1
+  95 0062 8DF80340 		strb	r4, [sp, #3]
+  59:HARDWARE/TIM/TIM.c **** 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 3;	// 指定NVIC线路的抢占优先级为
+  96              		.loc 1 59 2 is_stmt 1 view .LVU23
+  97              		.loc 1 59 55 is_stmt 0 view .LVU24
+  98 0066 0323     		movs	r3, #3
+  99 0068 8DF80130 		strb	r3, [sp, #1]
+  60:HARDWARE/TIM/TIM.c **** 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 3;			// 指定NVIC线路的响应优先级为3
+ 100              		.loc 1 60 2 is_stmt 1 view .LVU25
+ 101              		.loc 1 60 48 is_stmt 0 view .LVU26
+ 102 006c 8DF80230 		strb	r3, [sp, #2]
+  61:HARDWARE/TIM/TIM.c **** 	NVIC_Init(&NVIC_InitStructure);								// 将结构体变量交给NVIC_Init，配置NVIC外设
+ 103              		.loc 1 61 2 is_stmt 1 view .LVU27
+ 104 0070 6846     		mov	r0, sp
+ 105 0072 FFF7FEFF 		bl	NVIC_Init
+ 106              	.LVL6:
+  62:HARDWARE/TIM/TIM.c **** 	
+  63:HARDWARE/TIM/TIM.c **** 	/*TIM使能*/
+  64:HARDWARE/TIM/TIM.c **** 	TIM_Cmd(TIM2, ENABLE);			// 使能TIM2，定时器开始运行
+ 107              		.loc 1 64 2 view .LVU28
+ 108 0076 2146     		mov	r1, r4
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cc6eHAak.s 			page 4
+
+
+ 109 0078 4FF08040 		mov	r0, #1073741824
+ 110 007c FFF7FEFF 		bl	TIM_Cmd
+ 111              	.LVL7:
+  65:HARDWARE/TIM/TIM.c **** }
+ 112              		.loc 1 65 1 is_stmt 0 view .LVU29
+ 113 0080 04B0     		add	sp, sp, #16
+ 114              	.LCFI2:
+ 115              		.cfi_def_cfa_offset 8
+ 116              		@ sp needed
+ 117 0082 10BD     		pop	{r4, pc}
+ 118              		.cfi_endproc
+ 119              	.LFE29:
+ 121              		.section	.text.TIM2_IRQHandler,"ax",%progbits
+ 122              		.align	1
+ 123              		.global	TIM2_IRQHandler
+ 124              		.syntax unified
+ 125              		.thumb
+ 126              		.thumb_func
+ 128              	TIM2_IRQHandler:
+ 129              	.LFB30:
+  66:HARDWARE/TIM/TIM.c **** 
+  67:HARDWARE/TIM/TIM.c **** /**
+  68:HARDWARE/TIM/TIM.c ****  * @brief TIM2中断函数
+  69:HARDWARE/TIM/TIM.c ****  * @param 无
+  70:HARDWARE/TIM/TIM.c ****  * @return 无
+  71:HARDWARE/TIM/TIM.c ****  * @note 此函数为中断函数，无需调用，中断触发后自动执行
+  72:HARDWARE/TIM/TIM.c ****  *       函数名为预留的指定名称，可以从启动文件复制
+  73:HARDWARE/TIM/TIM.c ****  *       请确保函数名正确，不能有任何差异，否则中断函数将不能进入
+  74:HARDWARE/TIM/TIM.c ****  */
+  75:HARDWARE/TIM/TIM.c **** void TIM2_IRQHandler(void)
+  76:HARDWARE/TIM/TIM.c **** {
+ 130              		.loc 1 76 1 is_stmt 1 view -0
+ 131              		.cfi_startproc
+ 132              		@ args = 0, pretend = 0, frame = 0
+ 133              		@ frame_needed = 0, uses_anonymous_args = 0
+ 134 0000 08B5     		push	{r3, lr}
+ 135              	.LCFI3:
+ 136              		.cfi_def_cfa_offset 8
+ 137              		.cfi_offset 3, -8
+ 138              		.cfi_offset 14, -4
+  77:HARDWARE/TIM/TIM.c **** 	if (TIM_GetITStatus(TIM2, TIM_IT_Update) == SET)
+ 139              		.loc 1 77 2 view .LVU31
+ 140              		.loc 1 77 6 is_stmt 0 view .LVU32
+ 141 0002 0121     		movs	r1, #1
+ 142 0004 4FF08040 		mov	r0, #1073741824
+ 143 0008 FFF7FEFF 		bl	TIM_GetITStatus
+ 144              	.LVL8:
+ 145              		.loc 1 77 5 discriminator 1 view .LVU33
+ 146 000c 0128     		cmp	r0, #1
+ 147 000e 00D0     		beq	.L6
+ 148              	.L3:
+  78:HARDWARE/TIM/TIM.c **** 	{
+  79:HARDWARE/TIM/TIM.c **** 		// 在这里添加中断处理代码
+  80:HARDWARE/TIM/TIM.c **** 		
+  81:HARDWARE/TIM/TIM.c **** 		TIM_ClearITPendingBit(TIM2, TIM_IT_Update);	// 清除中断标志位
+  82:HARDWARE/TIM/TIM.c **** 	}
+  83:HARDWARE/TIM/TIM.c **** }
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cc6eHAak.s 			page 5
+
+
+ 149              		.loc 1 83 1 view .LVU34
+ 150 0010 08BD     		pop	{r3, pc}
+ 151              	.L6:
+  81:HARDWARE/TIM/TIM.c **** 	}
+ 152              		.loc 1 81 3 is_stmt 1 view .LVU35
+ 153 0012 0121     		movs	r1, #1
+ 154 0014 4FF08040 		mov	r0, #1073741824
+ 155 0018 FFF7FEFF 		bl	TIM_ClearITPendingBit
+ 156              	.LVL9:
+ 157              		.loc 1 83 1 is_stmt 0 view .LVU36
+ 158 001c F8E7     		b	.L3
+ 159              		.cfi_endproc
+ 160              	.LFE30:
+ 162              		.text
+ 163              	.Letext0:
+ 164              		.file 2 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 165              		.file 3 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 166              		.file 4 "USER/stm32f10x.h"
+ 167              		.file 5 "STM32F10x_FWLib/inc/stm32f10x_tim.h"
+ 168              		.file 6 "STM32F10x_FWLib/inc/misc.h"
+ 169              		.file 7 "STM32F10x_FWLib/inc/stm32f10x_rcc.h"
+ARM GAS  C:\Users\31687\AppData\Local\Temp\cc6eHAak.s 			page 6
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 TIM.c
+C:\Users\31687\AppData\Local\Temp\cc6eHAak.s:19     .text.Timer_Init:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cc6eHAak.s:25     .text.Timer_Init:00000000 Timer_Init
+C:\Users\31687\AppData\Local\Temp\cc6eHAak.s:122    .text.TIM2_IRQHandler:00000000 $t
+C:\Users\31687\AppData\Local\Temp\cc6eHAak.s:128    .text.TIM2_IRQHandler:00000000 TIM2_IRQHandler
+
+UNDEFINED SYMBOLS
+RCC_APB1PeriphClockCmd
+TIM_InternalClockConfig
+TIM_TimeBaseInit
+TIM_ClearFlag
+TIM_ITConfig
+NVIC_PriorityGroupConfig
+NVIC_Init
+TIM_Cmd
+TIM_GetITStatus
+TIM_ClearITPendingBit

@@ -1,0 +1,3360 @@
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 1
+
+
+   1              		.cpu cortex-m3
+   2              		.arch armv7-m
+   3              		.fpu softvfp
+   4              		.eabi_attribute 20, 1
+   5              		.eabi_attribute 21, 1
+   6              		.eabi_attribute 23, 3
+   7              		.eabi_attribute 24, 1
+   8              		.eabi_attribute 25, 1
+   9              		.eabi_attribute 26, 1
+  10              		.eabi_attribute 30, 1
+  11              		.eabi_attribute 34, 1
+  12              		.eabi_attribute 18, 4
+  13              		.file	"main.c"
+  14              		.text
+  15              	.Ltext0:
+  16              		.cfi_sections	.debug_frame
+  17              		.file 1 "USER/main.c"
+  18              		.section	.text.TIM2_IRQHandler,"ax",%progbits
+  19              		.align	1
+  20              		.global	TIM2_IRQHandler
+  21              		.syntax unified
+  22              		.thumb
+  23              		.thumb_func
+  25              	TIM2_IRQHandler:
+  26              	.LFB33:
+   1:USER/main.c   **** /**
+   2:USER/main.c   ****  * main.c
+   3:USER/main.c   ****  * 蔬菜恒温库监控系统主文件
+   4:USER/main.c   ****  * 功能：实现温湿度采集、显示、控制以及WiFi远程监控
+   5:USER/main.c   ****  */
+   6:USER/main.c   **** 
+   7:USER/main.c   **** #include "delay.h"
+   8:USER/main.c   **** #include "sys.h"
+   9:USER/main.c   **** #include "OLED.h"
+  10:USER/main.c   **** #include "dht11.h"
+  11:USER/main.c   **** #include "esp8266.h"
+  12:USER/main.c   **** #include "Timer.h"
+  13:USER/main.c   **** #include "AD.h"
+  14:USER/main.c   **** #include "Key.h"
+  15:USER/main.c   **** #include "stmflash.h"
+  16:USER/main.c   **** #include "Usart.h" 
+  17:USER/main.c   **** #include "DS1302.h"
+  18:USER/main.c   **** #include "control.h"
+  19:USER/main.c   **** 
+  20:USER/main.c   **** //C标准库
+  21:USER/main.c   **** #include <string.h>
+  22:USER/main.c   **** #include "stdio.h"
+  23:USER/main.c   **** #include "math.h"
+  24:USER/main.c   **** 
+  25:USER/main.c   **** /**
+  26:USER/main.c   ****  * 函数声明
+  27:USER/main.c   ****  */
+  28:USER/main.c   **** u8 WeekYearday(int years, int months, int days); //计算星期几的函数
+  29:USER/main.c   **** extern unsigned char esp8266_buf[buf_len]; //ESP8266接收缓冲区
+  30:USER/main.c   **** 
+  31:USER/main.c   **** /**
+  32:USER/main.c   ****  * 自定义函数声明
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 2
+
+
+  33:USER/main.c   ****  */
+  34:USER/main.c   **** void show_wendu(void); //显示温度湿度函数
+  35:USER/main.c   **** void show_mode(void);  //显示模式函数
+  36:USER/main.c   **** void show_on_off(void); //显示开关状态函数
+  37:USER/main.c   **** 
+  38:USER/main.c   **** /**
+  39:USER/main.c   ****  * 全局变量定义
+  40:USER/main.c   ****  */
+  41:USER/main.c   **** u8 mode = 1;          //模式选择：1=自动模式，2=手动模式
+  42:USER/main.c   **** int page = 1;         //页面选择：1=主页面，2=控制页面，3=设置页面
+  43:USER/main.c   **** int page_clear = 0;   //页面清屏标志
+  44:USER/main.c   **** int page2_index = 1;  //页面2的索引，用于选择不同的控制项
+  45:USER/main.c   **** int page3_index = 1;  //页面3的索引，用于选择不同的设置项
+  46:USER/main.c   **** int set_wendu_high = 40; //温度上限设置
+  47:USER/main.c   **** int set_wendu_lou = 20;  //温度下限设置
+  48:USER/main.c   **** int set_shidu = 50;      //湿度设置
+  49:USER/main.c   **** 
+  50:USER/main.c   **** /**
+  51:USER/main.c   ****  * 设置数据结构体
+  52:USER/main.c   ****  */
+  53:USER/main.c   **** struct Set_data
+  54:USER/main.c   **** {
+  55:USER/main.c   ****   u16 temp_h;       //温度上限
+  56:USER/main.c   ****   u16 temp_l;       //温度下限
+  57:USER/main.c   ****   u16 humi_l;       //湿度下限
+  58:USER/main.c   ****   u16 soil_humi_l;  //土壤湿度下限
+  59:USER/main.c   **** };
+  60:USER/main.c   **** 
+  61:USER/main.c   **** struct Set_data Out_data = {30, 24, 40, 40}; //初始设置值
+  62:USER/main.c   **** 
+  63:USER/main.c   **** /**
+  64:USER/main.c   ****  * 按键相关变量
+  65:USER/main.c   ****  */
+  66:USER/main.c   **** u8 key_num = 0;      //按键返回值
+  67:USER/main.c   **** u8 led_temp_mode = 0; //温度模式LED标志
+  68:USER/main.c   **** 
+  69:USER/main.c   **** /**
+  70:USER/main.c   ****  * DHT11温湿度传感器数据结构
+  71:USER/main.c   ****  */
+  72:USER/main.c   **** DHT11_Data_TypeDef DHT11_Data;
+  73:USER/main.c   **** 
+  74:USER/main.c   **** /**
+  75:USER/main.c   ****  * WiFi相关变量
+  76:USER/main.c   ****  */
+  77:USER/main.c   **** char TIMER_IT = 0;     //定时器中断标志
+  78:USER/main.c   **** char WiFiInit_time;    //WiFi初始化时间
+  79:USER/main.c   **** char Flagout = 1;      //输出标志
+  80:USER/main.c   **** 
+  81:USER/main.c   **** /**
+  82:USER/main.c   ****  * OLED显示相关变量
+  83:USER/main.c   ****  */
+  84:USER/main.c   **** u8 oled_Fill_flag = 1; //OLED填充标志
+  85:USER/main.c   **** char oled_str[100];     //OLED显示字符串
+  86:USER/main.c   **** char date[200];         //ESP8266发送缓冲区
+  87:USER/main.c   **** u8 buff[30];            //缓冲区，用于显示数据
+  88:USER/main.c   **** 
+  89:USER/main.c   **** int NUM = 0; //通用计数器 //通用计数器
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 3
+
+
+  90:USER/main.c   **** 
+  91:USER/main.c   **** /**
+  92:USER/main.c   ****  * 主函数
+  93:USER/main.c   ****  * 功能：系统初始化、数据采集、显示控制、WiFi通信
+  94:USER/main.c   ****  */
+  95:USER/main.c   **** int main(void)
+  96:USER/main.c   **** {
+  97:USER/main.c   ****     //设置中断优先级分组
+  98:USER/main.c   ****     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
+  99:USER/main.c   ****                     
+ 100:USER/main.c   ****     //初始化各模块
+ 101:USER/main.c   ****     Key_Init();        //按键初始化
+ 102:USER/main.c   ****     OLED_Init();       //OLED显示初始化
+ 103:USER/main.c   ****     OLED_Clear(0);     //清屏
+ 104:USER/main.c   ****     Ds1302_Init();     //DS1302实时时钟初始化
+ 105:USER/main.c   ****     DHT11_Init();      //DHT11温湿度传感器初始化
+ 106:USER/main.c   ****     warm_init();       //加热模块初始化
+ 107:USER/main.c   ****     zhileng_init();    //制冷模块初始化
+ 108:USER/main.c   ****     chushi_init();     //除湿模块初始化
+ 109:USER/main.c   **** 		
+ 110:USER/main.c   ****     //开机界面
+ 111:USER/main.c   ****     do
+ 112:USER/main.c   ****     {
+ 113:USER/main.c   ****         //显示欢迎信息
+ 114:USER/main.c   ****         OLED_ShowCHinese(0, 0, 52); //菜
+ 115:USER/main.c   ****         OLED_ShowCHinese(18, 0, 53); //篮
+ 116:USER/main.c   ****         OLED_ShowCHinese(36, 0, 54); //恒
+ 117:USER/main.c   ****         OLED_ShowCHinese(52, 0, 55); //温
+ 118:USER/main.c   ****         OLED_ShowCHinese(68, 0, 56); //库
+ 119:USER/main.c   ****         OLED_ShowCHinese(84, 0, 57); //监
+ 120:USER/main.c   ****         OLED_ShowCHinese(100, 0, 58); //控 
+ 121:USER/main.c   ****         
+ 122:USER/main.c   ****         //显示菜单选项
+ 123:USER/main.c   ****         OLED_ShowString(8, 4, "1.", 16);  
+ 124:USER/main.c   ****         OLED_ShowCHinese(24, 4, 52); //菜
+ 125:USER/main.c   ****         OLED_ShowString(62, 4, "2.", 16);  
+ 126:USER/main.c   ****         OLED_ShowCHinese(78, 4, 53); //篮
+ 127:USER/main.c   ****         
+ 128:USER/main.c   ****         key_num = KEY_Scan(0); //按键扫描
+ 129:USER/main.c   ****         
+ 130:USER/main.c   ****         if(key_num == 1) //选择菜单
+ 131:USER/main.c   ****         {
+ 132:USER/main.c   ****             OLED_Clear(0);
+ 133:USER/main.c   ****             //显示初始化信息
+ 134:USER/main.c   ****             OLED_ShowCHinese(0, 3, 21); //初
+ 135:USER/main.c   ****             OLED_ShowCHinese(18, 3, 22); //始
+ 136:USER/main.c   ****             OLED_ShowCHinese(36, 3, 23); //化
+ 137:USER/main.c   ****             OLED_ShowCHinese(54, 3, 24); //中
+ 138:USER/main.c   ****             OLED_ShowString(72, 3, "WIFI", 16);
+ 139:USER/main.c   ****             OLED_ShowString(108, 3, "..", 16);
+ 140:USER/main.c   ****             OLED_ShowCHinese(0, 6, 4); //请
+ 141:USER/main.c   ****             OLED_ShowCHinese(18, 6, 5); //稍
+ 142:USER/main.c   ****             OLED_ShowCHinese(36, 6, 13); //等
+ 143:USER/main.c   ****             
+ 144:USER/main.c   ****             ESP8266_Init(115200); //初始化ESP8266模块，波特率115200
+ 145:USER/main.c   ****             Timer_Init();          //初始化定时器
+ 146:USER/main.c   ****             break;
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 4
+
+
+ 147:USER/main.c   ****         }
+ 148:USER/main.c   ****     } while(key_num != 2);  
+ 149:USER/main.c   **** 	
+ 150:USER/main.c   ****     OLED_Clear(0); //清屏
+ 151:USER/main.c   **** 
+ 152:USER/main.c   ****     //主循环
+ 153:USER/main.c   **** 	while(1)
+ 154:USER/main.c   **** 	{
+ 155:USER/main.c   ****         /*********************************数据采集区******************************************
+ 156:USER/main.c   ****         /*******************读取温湿度数据***************************************/
+ 157:USER/main.c   ****         Read_DHT11(&DHT11_Data); //读取DHT11传感器数据
+ 158:USER/main.c   ****         
+ 159:USER/main.c   ****         /*******************上传数据到平台***************************************/
+ 160:USER/main.c   ****         if(TIMER_IT && Flagout == 0)
+ 161:USER/main.c   ****         {
+ 162:USER/main.c   ****             TIMER_IT = 0; //清除定时器标志
+ 163:USER/main.c   ****             //构建数据上传格式
+ 164:USER/main.c   ****             sprintf(date, "cmd=2&uid=%s&topic=data&msg=#%d#%d.%d#%d.%d#\r\n", \
+ 165:USER/main.c   ****             BEMFA_ID, //设备ID
+ 166:USER/main.c   ****             mode,     //当前模式
+ 167:USER/main.c   ****             DHT11_Data.temp_int, DHT11_Data.temp_deci, //温度整数和小数部分
+ 168:USER/main.c   ****             DHT11_Data.humi_int, DHT11_Data.humi_deci); //湿度整数和小数部分
+ 169:USER/main.c   ****             
+ 170:USER/main.c   ****             ESP8266_SendData((unsigned char *)date); //通过ESP8266发送数据
+ 171:USER/main.c   ****         } 	
+ 172:USER/main.c   **** 
+ 173:USER/main.c   ****         /*********************************面板控制区******************************************
+ 174:USER/main.c   ****         key_num = KEY_Scan(0); //按键扫描
+ 175:USER/main.c   ****         
+ 176:USER/main.c   ****         if(key_num == 1) //切换页面
+ 177:USER/main.c   ****         {
+ 178:USER/main.c   ****             page += 1;
+ 179:USER/main.c   ****             OLED_Clear(0);
+ 180:USER/main.c   ****             if(page == 4)  //页面循环
+ 181:USER/main.c   ****                 page = 1;
+ 182:USER/main.c   ****         }
+ 183:USER/main.c   **** 
+ 184:USER/main.c   ****         //页面1：主页面
+ 185:USER/main.c   ****         if(page == 1)
+ 186:USER/main.c   ****         {
+ 187:USER/main.c   ****             if(page_clear == 0)
+ 188:USER/main.c   ****             {
+ 189:USER/main.c   ****                 page_clear = 1;
+ 190:USER/main.c   ****                 OLED_Clear(0);
+ 191:USER/main.c   ****             }
+ 192:USER/main.c   ****             show_mode();    //显示当前模式
+ 193:USER/main.c   ****             TIME();         //显示时间
+ 194:USER/main.c   ****             show_wendu();   //显示温湿度
+ 195:USER/main.c   ****             
+ 196:USER/main.c   ****             if(key_num == 4) //切换到手动模式
+ 197:USER/main.c   ****             {
+ 198:USER/main.c   ****                 mode = 2;
+ 199:USER/main.c   ****                 jiare = 0;    //关闭加热
+ 200:USER/main.c   ****                 zhileng = 0;  //关闭制冷
+ 201:USER/main.c   ****                 chushi = 0;   //关闭除湿
+ 202:USER/main.c   ****             }
+ 203:USER/main.c   ****             if(key_num == 3) //切换到自动模式
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 5
+
+
+ 204:USER/main.c   ****             {
+ 205:USER/main.c   ****                 mode = 1;
+ 206:USER/main.c   ****                 jiare = 0;    //关闭加热
+ 207:USER/main.c   ****                 zhileng = 0;  //关闭制冷
+ 208:USER/main.c   ****                 chushi = 0;   //关闭除湿
+ 209:USER/main.c   ****             }
+ 210:USER/main.c   ****         }
+ 211:USER/main.c   **** 
+ 212:USER/main.c   ****         //页面2：控制页面
+ 213:USER/main.c   ****         if(page == 2)
+ 214:USER/main.c   ****         {
+ 215:USER/main.c   ****             if(page_clear == 1)
+ 216:USER/main.c   ****             {
+ 217:USER/main.c   ****                 page_clear = 2;
+ 218:USER/main.c   ****                 OLED_Clear(0);
+ 219:USER/main.c   ****             }
+ 220:USER/main.c   ****             
+ 221:USER/main.c   ****             if(key_num == 2) //切换控制项
+ 222:USER/main.c   ****             {
+ 223:USER/main.c   ****                 page2_index++;
+ 224:USER/main.c   ****                 if(page2_index == 4)
+ 225:USER/main.c   ****                     page2_index = 1;
+ 226:USER/main.c   ****             }
+ 227:USER/main.c   ****             
+ 228:USER/main.c   ****             //显示加热控制
+ 229:USER/main.c   ****             OLED_ShowCHinese(0, 0, 116); //加
+ 230:USER/main.c   ****             OLED_ShowCHinese(16, 0, 117); //热
+ 231:USER/main.c   ****             OLED_ShowString(32, 0, (u8 *)":", 16);
+ 232:USER/main.c   ****             
+ 233:USER/main.c   ****             //显示制冷控制
+ 234:USER/main.c   ****             OLED_ShowCHinese(0, 2, 118); //制
+ 235:USER/main.c   ****             OLED_ShowCHinese(16, 2, 119); //冷
+ 236:USER/main.c   ****             OLED_ShowString(32, 2, (u8 *)":", 16);
+ 237:USER/main.c   ****             
+ 238:USER/main.c   ****             //显示除湿控制
+ 239:USER/main.c   ****             OLED_ShowCHinese(0, 4, 120); //除
+ 240:USER/main.c   ****             OLED_ShowCHinese(16, 4, 121); //湿
+ 241:USER/main.c   ****             OLED_ShowString(32, 4, (u8 *)":", 16);
+ 242:USER/main.c   ****             
+ 243:USER/main.c   ****             //加热控制
+ 244:USER/main.c   ****             if(page2_index == 1)
+ 245:USER/main.c   ****             {
+ 246:USER/main.c   ****                 OLED_ShowString(60, 0, (u8 *)"<", 16);
+ 247:USER/main.c   ****                 OLED_ShowString(60, 2, (u8 *)" ", 16);   
+ 248:USER/main.c   ****                 OLED_ShowString(60, 4, (u8 *)" ", 16); 
+ 249:USER/main.c   ****                 
+ 250:USER/main.c   ****                 if(mode == 2) //手动模式下才能控制
+ 251:USER/main.c   ****                 {
+ 252:USER/main.c   ****                     if(key_num == 3) //开启加热
+ 253:USER/main.c   ****                     {
+ 254:USER/main.c   ****                         jiare = 1;
+ 255:USER/main.c   ****                     }
+ 256:USER/main.c   ****                     else if(key_num == 4) //关闭加热
+ 257:USER/main.c   ****                     {
+ 258:USER/main.c   ****                         jiare = 0;
+ 259:USER/main.c   ****                     }
+ 260:USER/main.c   ****                 }
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 6
+
+
+ 261:USER/main.c   ****             }
+ 262:USER/main.c   ****             
+ 263:USER/main.c   ****             //制冷控制
+ 264:USER/main.c   ****             if(page2_index == 2)
+ 265:USER/main.c   ****             {
+ 266:USER/main.c   ****                 OLED_ShowString(60, 0, (u8 *)" ", 16);
+ 267:USER/main.c   ****                 OLED_ShowString(60, 2, (u8 *)"<", 16);   
+ 268:USER/main.c   ****                 OLED_ShowString(60, 4, (u8 *)" ", 16); 
+ 269:USER/main.c   ****                 
+ 270:USER/main.c   ****                 if(mode == 2) //手动模式下才能控制
+ 271:USER/main.c   ****                 {
+ 272:USER/main.c   ****                     if(key_num == 3) //开启制冷
+ 273:USER/main.c   ****                     {
+ 274:USER/main.c   ****                         zhileng = 1;
+ 275:USER/main.c   ****                     }
+ 276:USER/main.c   ****                     else if(key_num == 4) //关闭制冷
+ 277:USER/main.c   ****                     {
+ 278:USER/main.c   ****                         zhileng = 0;
+ 279:USER/main.c   ****                     }
+ 280:USER/main.c   ****                 }
+ 281:USER/main.c   ****             }
+ 282:USER/main.c   ****             
+ 283:USER/main.c   ****             //除湿控制
+ 284:USER/main.c   ****             if(page2_index == 3)
+ 285:USER/main.c   ****             {
+ 286:USER/main.c   ****                 OLED_ShowString(60, 0, (u8 *)" ", 16);
+ 287:USER/main.c   ****                 OLED_ShowString(60, 2, (u8 *)" ", 16);   
+ 288:USER/main.c   ****                 OLED_ShowString(60, 4, (u8 *)"<", 16); 
+ 289:USER/main.c   ****                 
+ 290:USER/main.c   ****                 if(mode == 2) //手动模式下才能控制
+ 291:USER/main.c   ****                 {
+ 292:USER/main.c   ****                     if(key_num == 3) //开启除湿
+ 293:USER/main.c   ****                     {
+ 294:USER/main.c   ****                         chushi = 1;
+ 295:USER/main.c   ****                     }
+ 296:USER/main.c   ****                     else if(key_num == 4) //关闭除湿
+ 297:USER/main.c   ****                     {
+ 298:USER/main.c   ****                         chushi = 0;
+ 299:USER/main.c   ****                     }
+ 300:USER/main.c   ****                 }
+ 301:USER/main.c   ****             }
+ 302:USER/main.c   ****             
+ 303:USER/main.c   ****             //显示加热状态
+ 304:USER/main.c   ****             if(jiare == 1)
+ 305:USER/main.c   ****             {
+ 306:USER/main.c   ****                 OLED_ShowCHinese(40, 0, 122); //开
+ 307:USER/main.c   ****             }
+ 308:USER/main.c   ****             else
+ 309:USER/main.c   ****             {
+ 310:USER/main.c   ****                 OLED_ShowCHinese(40, 0, 123); //关
+ 311:USER/main.c   ****             }
+ 312:USER/main.c   ****             
+ 313:USER/main.c   ****             //显示制冷状态
+ 314:USER/main.c   ****             if(zhileng == 1)
+ 315:USER/main.c   ****             {
+ 316:USER/main.c   ****                 OLED_ShowCHinese(40, 2, 122); //开
+ 317:USER/main.c   ****             }
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 7
+
+
+ 318:USER/main.c   ****             else
+ 319:USER/main.c   ****             {
+ 320:USER/main.c   ****                 OLED_ShowCHinese(40, 2, 123); //关
+ 321:USER/main.c   ****             }
+ 322:USER/main.c   ****             
+ 323:USER/main.c   ****             //显示除湿状态
+ 324:USER/main.c   ****             if(chushi == 1)
+ 325:USER/main.c   ****             {
+ 326:USER/main.c   ****                 OLED_ShowCHinese(40, 4, 122); //开
+ 327:USER/main.c   ****             }
+ 328:USER/main.c   ****             else
+ 329:USER/main.c   ****             {
+ 330:USER/main.c   ****                 OLED_ShowCHinese(40, 4, 123); //关
+ 331:USER/main.c   ****             }
+ 332:USER/main.c   ****         }
+ 333:USER/main.c   **** 
+ 334:USER/main.c   ****         //页面3：设置页面
+ 335:USER/main.c   ****         if(page == 3)
+ 336:USER/main.c   ****         {
+ 337:USER/main.c   ****             if(page_clear == 2)
+ 338:USER/main.c   ****             {
+ 339:USER/main.c   ****                 page_clear = 1;
+ 340:USER/main.c   ****                 OLED_Clear(0);
+ 341:USER/main.c   ****             }
+ 342:USER/main.c   ****             
+ 343:USER/main.c   ****             if(key_num == 2) //切换设置项
+ 344:USER/main.c   ****             {
+ 345:USER/main.c   ****                 page3_index++;
+ 346:USER/main.c   ****                 if(page3_index == 4)
+ 347:USER/main.c   ****                     page3_index = 1;
+ 348:USER/main.c   ****             }
+ 349:USER/main.c   ****             
+ 350:USER/main.c   ****             //显示设置标题
+ 351:USER/main.c   ****             OLED_ShowCHinese(16+15, 0, 26);
+ 352:USER/main.c   ****             OLED_ShowCHinese(16+15+16, 0, 27);
+ 353:USER/main.c   ****             OLED_ShowCHinese(16+15+32, 0, 28);
+ 354:USER/main.c   ****             OLED_ShowCHinese(16+15+48, 0, 29);
+ 355:USER/main.c   ****             
+ 356:USER/main.c   ****             //显示温度上限
+ 357:USER/main.c   ****             OLED_ShowCHinese(0, 2, 10); //温
+ 358:USER/main.c   ****             OLED_ShowCHinese(16, 2, 12); //度
+ 359:USER/main.c   ****             OLED_ShowCHinese(32, 2, 124); //上
+ 360:USER/main.c   ****             OLED_ShowCHinese(48, 2, 125); //限
+ 361:USER/main.c   ****             OLED_ShowChar(64, 2, ':', 16);
+ 362:USER/main.c   ****             OLED_ShowNum(72, 2, set_wendu_high, 2, 16);
+ 363:USER/main.c   ****             
+ 364:USER/main.c   ****             //显示温度下限
+ 365:USER/main.c   ****             OLED_ShowCHinese(0, 4, 10); //温
+ 366:USER/main.c   ****             OLED_ShowCHinese(16, 4, 12); //度
+ 367:USER/main.c   ****             OLED_ShowCHinese(32, 4, 126); //下
+ 368:USER/main.c   ****             OLED_ShowCHinese(48, 4, 127); //限
+ 369:USER/main.c   ****             OLED_ShowChar(64, 4, ':', 16);
+ 370:USER/main.c   ****             OLED_ShowNum(72, 4, set_wendu_lou, 2, 16);
+ 371:USER/main.c   ****             
+ 372:USER/main.c   ****             //显示湿度设置
+ 373:USER/main.c   ****             OLED_ShowCHinese(0, 6, 11); //湿
+ 374:USER/main.c   ****             OLED_ShowCHinese(16, 6, 11); //度
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 8
+
+
+ 375:USER/main.c   ****             OLED_ShowCHinese(32, 6, 124); //上
+ 376:USER/main.c   ****             OLED_ShowCHinese(48, 6, 125); //限
+ 377:USER/main.c   ****             OLED_ShowChar(64, 6, ':', 16);
+ 378:USER/main.c   ****             OLED_ShowNum(72, 6, set_shidu, 2, 16);
+ 379:USER/main.c   ****             
+ 380:USER/main.c   ****             //设置温度上限
+ 381:USER/main.c   ****             if(page3_index == 1)
+ 382:USER/main.c   ****             {
+ 383:USER/main.c   ****                 OLED_ShowString(100, 2, (u8 *)"<", 16);
+ 384:USER/main.c   ****                 OLED_ShowString(100, 4, (u8 *)" ", 16);   
+ 385:USER/main.c   ****                 OLED_ShowString(100, 6, (u8 *)" ", 16); 
+ 386:USER/main.c   ****                 
+ 387:USER/main.c   ****                 if(key_num == 3) //增加温度上限
+ 388:USER/main.c   ****                 {
+ 389:USER/main.c   ****                     set_wendu_high++;
+ 390:USER/main.c   ****                 }
+ 391:USER/main.c   ****                 if(key_num == 4) //减少温度上限
+ 392:USER/main.c   ****                 {
+ 393:USER/main.c   ****                     set_wendu_high--;
+ 394:USER/main.c   ****                 }
+ 395:USER/main.c   ****             }
+ 396:USER/main.c   ****             
+ 397:USER/main.c   ****             //设置温度下限
+ 398:USER/main.c   ****             if(page3_index == 2)
+ 399:USER/main.c   ****             {
+ 400:USER/main.c   ****                 OLED_ShowString(100, 2, (u8 *)" ", 16);
+ 401:USER/main.c   ****                 OLED_ShowString(100, 4, (u8 *)"<", 16);   
+ 402:USER/main.c   ****                 OLED_ShowString(100, 6, (u8 *)" ", 16); 
+ 403:USER/main.c   ****                 
+ 404:USER/main.c   ****                 if(key_num == 3) //增加温度下限
+ 405:USER/main.c   ****                 {
+ 406:USER/main.c   ****                     set_wendu_lou++;
+ 407:USER/main.c   ****                 }
+ 408:USER/main.c   ****                 if(key_num == 4) //减少温度下限
+ 409:USER/main.c   ****                 {
+ 410:USER/main.c   ****                     set_wendu_lou--;
+ 411:USER/main.c   ****                 }
+ 412:USER/main.c   ****             }
+ 413:USER/main.c   ****             
+ 414:USER/main.c   ****             //设置湿度
+ 415:USER/main.c   ****             if(page3_index == 3)
+ 416:USER/main.c   ****             {
+ 417:USER/main.c   ****                 OLED_ShowString(100, 2, (u8 *)" ", 16);
+ 418:USER/main.c   ****                 OLED_ShowString(100, 4, (u8 *)" ", 16);   
+ 419:USER/main.c   ****                 OLED_ShowString(100, 6, (u8 *)"<", 16); 
+ 420:USER/main.c   ****                 
+ 421:USER/main.c   ****                 if(key_num == 3) //增加湿度
+ 422:USER/main.c   ****                 {
+ 423:USER/main.c   ****                     set_shidu += 5;
+ 424:USER/main.c   ****                 }
+ 425:USER/main.c   ****                 if(key_num == 4) //减少湿度
+ 426:USER/main.c   ****                 {
+ 427:USER/main.c   ****                     set_shidu -= 5;
+ 428:USER/main.c   ****                 }
+ 429:USER/main.c   ****             }
+ 430:USER/main.c   ****         }
+ 431:USER/main.c   ****         
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 9
+
+
+ 432:USER/main.c   ****         // 从ESP8266接收的数据中解析设置值
+ 433:USER/main.c   ****         if (sscanf((strstr((char *)esp8266_buf, "high") + 4), "=%d", &set_wendu_high)) 
+ 434:USER/main.c   ****         {
+ 435:USER/main.c   ****             ESP8266_Clear(); //清除缓冲区
+ 436:USER/main.c   ****         }
+ 437:USER/main.c   ****         if (sscanf((strstr((char *)esp8266_buf, "lou") + 3), "=%d", &set_wendu_lou)) 
+ 438:USER/main.c   ****         {
+ 439:USER/main.c   ****             ESP8266_Clear(); //清除缓冲区
+ 440:USER/main.c   ****         }
+ 441:USER/main.c   ****         if (sscanf((strstr((char *)esp8266_buf, "shidu") + 5), "=%d", &set_shidu)) 
+ 442:USER/main.c   ****         {
+ 443:USER/main.c   ****             ESP8266_Clear(); //清除缓冲区
+ 444:USER/main.c   ****         }
+ 445:USER/main.c   ****         
+ 446:USER/main.c   ****         /*********************************模式控制区******************************************
+ 447:USER/main.c   ****         //APP模式切换
+ 448:USER/main.c   ****         if(strstr((const char *)esp8266_buf, "ZD") != 0) //自动模式
+ 449:USER/main.c   ****         {
+ 450:USER/main.c   ****             mode = 1;
+ 451:USER/main.c   ****             jiare = 0;    //关闭加热
+ 452:USER/main.c   ****             zhileng = 0;  //关闭制冷
+ 453:USER/main.c   ****             chushi = 0;   //关闭除湿
+ 454:USER/main.c   ****         }
+ 455:USER/main.c   ****         else if(strstr((const char *)esp8266_buf, "SD") != 0) //手动模式
+ 456:USER/main.c   ****         {
+ 457:USER/main.c   ****             mode = 2;
+ 458:USER/main.c   ****             jiare = 0;    //关闭加热
+ 459:USER/main.c   ****             zhileng = 0;  //关闭制冷
+ 460:USER/main.c   ****             chushi = 0;   //关闭除湿
+ 461:USER/main.c   ****         } 
+ 462:USER/main.c   **** 
+ 463:USER/main.c   ****         //自动模式逻辑
+ 464:USER/main.c   ****         if(mode == 1)
+ 465:USER/main.c   ****         {
+ 466:USER/main.c   ****             //温度高于上限，开启制冷
+ 467:USER/main.c   ****             if(DHT11_Data.temp_int > set_wendu_high)
+ 468:USER/main.c   ****                 zhileng = 1;
+ 469:USER/main.c   ****             else
+ 470:USER/main.c   ****                 zhileng = 0;
+ 471:USER/main.c   ****             
+ 472:USER/main.c   ****             //温度低于下限，开启加热
+ 473:USER/main.c   ****             if(DHT11_Data.temp_int < set_wendu_lou)
+ 474:USER/main.c   ****                 jiare = 1;
+ 475:USER/main.c   ****             else
+ 476:USER/main.c   ****                 jiare = 0;
+ 477:USER/main.c   ****             
+ 478:USER/main.c   ****             //湿度高于设置值，开启除湿
+ 479:USER/main.c   ****             if(DHT11_Data.humi_int > set_shidu)
+ 480:USER/main.c   ****                 chushi = 1;
+ 481:USER/main.c   ****             else
+ 482:USER/main.c   ****                 chushi = 0;
+ 483:USER/main.c   ****         }
+ 484:USER/main.c   ****         
+ 485:USER/main.c   ****         //手动模式逻辑
+ 486:USER/main.c   ****         if(mode == 2)
+ 487:USER/main.c   ****         {
+ 488:USER/main.c   ****             if(Flagout == 0)
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 10
+
+
+ 489:USER/main.c   ****             {
+ 490:USER/main.c   ****                 //远程控制加热
+ 491:USER/main.c   ****                 if(strstr((const char *)esp8266_buf, "KJR") != 0) //开启加热
+ 492:USER/main.c   ****                 {
+ 493:USER/main.c   ****                     jiare = 1;
+ 494:USER/main.c   ****                 }
+ 495:USER/main.c   ****                 if(strstr((const char *)esp8266_buf, "GJR") != 0) //关闭加热
+ 496:USER/main.c   ****                 {
+ 497:USER/main.c   ****                     jiare = 0;
+ 498:USER/main.c   ****                 }
+ 499:USER/main.c   ****                 
+ 500:USER/main.c   ****                 //远程控制制冷
+ 501:USER/main.c   ****                 if(strstr((const char *)esp8266_buf, "KZL") != 0) //开启制冷
+ 502:USER/main.c   ****                 {
+ 503:USER/main.c   ****                     zhileng = 1;
+ 504:USER/main.c   ****                 }
+ 505:USER/main.c   ****                 if(strstr((const char *)esp8266_buf, "GZL") != 0) //关闭制冷
+ 506:USER/main.c   ****                 {
+ 507:USER/main.c   ****                     zhileng = 0;
+ 508:USER/main.c   ****                 }
+ 509:USER/main.c   ****                 
+ 510:USER/main.c   ****                 //远程控制除湿
+ 511:USER/main.c   ****                 if(strstr((const char *)esp8266_buf, "KJS") != 0) //开启除湿
+ 512:USER/main.c   ****                 {
+ 513:USER/main.c   ****                     chushi = 1;
+ 514:USER/main.c   ****                 }
+ 515:USER/main.c   ****                 if(strstr((const char *)esp8266_buf, "GJS") != 0) //关闭除湿
+ 516:USER/main.c   ****                 {
+ 517:USER/main.c   ****                     chushi = 0;
+ 518:USER/main.c   ****                 }
+ 519:USER/main.c   ****             }
+ 520:USER/main.c   ****         }
+ 521:USER/main.c   **** 	}
+ 522:USER/main.c   **** }
+ 523:USER/main.c   **** 
+ 524:USER/main.c   **** 
+ 525:USER/main.c   **** 
+ 526:USER/main.c   **** /**
+ 527:USER/main.c   ****  * TIM2定时器中断处理函数
+ 528:USER/main.c   ****  * 功能：定时触发数据上传
+ 529:USER/main.c   ****  */
+ 530:USER/main.c   **** void TIM2_IRQHandler(void)
+ 531:USER/main.c   **** {
+  27              		.loc 1 531 1 view -0
+  28              		.cfi_startproc
+  29              		@ args = 0, pretend = 0, frame = 0
+  30              		@ frame_needed = 0, uses_anonymous_args = 0
+  31 0000 08B5     		push	{r3, lr}
+  32              	.LCFI0:
+  33              		.cfi_def_cfa_offset 8
+  34              		.cfi_offset 3, -8
+  35              		.cfi_offset 14, -4
+ 532:USER/main.c   ****     if (TIM_GetITStatus(TIM2, TIM_IT_Update) == SET)
+  36              		.loc 1 532 5 view .LVU1
+  37              		.loc 1 532 9 is_stmt 0 view .LVU2
+  38 0002 0121     		movs	r1, #1
+  39 0004 4FF08040 		mov	r0, #1073741824
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 11
+
+
+  40 0008 FFF7FEFF 		bl	TIM_GetITStatus
+  41              	.LVL0:
+  42              		.loc 1 532 8 discriminator 1 view .LVU3
+  43 000c 0128     		cmp	r0, #1
+  44 000e 00D0     		beq	.L4
+  45              	.L1:
+ 533:USER/main.c   ****     {
+ 534:USER/main.c   ****         TIMER_IT = 1; //设置定时器标志
+ 535:USER/main.c   ****         TIM_ClearITPendingBit(TIM2, TIM_IT_Update); //清除中断标志
+ 536:USER/main.c   ****     }
+ 537:USER/main.c   **** }
+  46              		.loc 1 537 1 view .LVU4
+  47 0010 08BD     		pop	{r3, pc}
+  48              	.L4:
+ 534:USER/main.c   ****         TIM_ClearITPendingBit(TIM2, TIM_IT_Update); //清除中断标志
+  49              		.loc 1 534 9 is_stmt 1 view .LVU5
+ 534:USER/main.c   ****         TIM_ClearITPendingBit(TIM2, TIM_IT_Update); //清除中断标志
+  50              		.loc 1 534 18 is_stmt 0 view .LVU6
+  51 0012 0121     		movs	r1, #1
+  52 0014 034B     		ldr	r3, .L5
+  53 0016 1970     		strb	r1, [r3]
+ 535:USER/main.c   ****     }
+  54              		.loc 1 535 9 is_stmt 1 view .LVU7
+  55 0018 4FF08040 		mov	r0, #1073741824
+  56 001c FFF7FEFF 		bl	TIM_ClearITPendingBit
+  57              	.LVL1:
+  58              		.loc 1 537 1 is_stmt 0 view .LVU8
+  59 0020 F6E7     		b	.L1
+  60              	.L6:
+  61 0022 00BF     		.align	2
+  62              	.L5:
+  63 0024 00000000 		.word	TIMER_IT
+  64              		.cfi_endproc
+  65              	.LFE33:
+  67              		.section	.text.WeekYearday,"ax",%progbits
+  68              		.align	1
+  69              		.global	WeekYearday
+  70              		.syntax unified
+  71              		.thumb
+  72              		.thumb_func
+  74              	WeekYearday:
+  75              	.LVL2:
+  76              	.LFB34:
+ 538:USER/main.c   **** 
+ 539:USER/main.c   **** /**
+ 540:USER/main.c   ****  * 计算星期几的函数
+ 541:USER/main.c   ****  * @param years 年份
+ 542:USER/main.c   ****  * @param months 月份
+ 543:USER/main.c   ****  * @param days 日期
+ 544:USER/main.c   ****  * @return 星期几（1-7，其中1表示星期一，7表示星期日）
+ 545:USER/main.c   ****  */
+ 546:USER/main.c   **** u8 WeekYearday(int years, int months, int days) 
+ 547:USER/main.c   **** {
+  77              		.loc 1 547 1 is_stmt 1 view -0
+  78              		.cfi_startproc
+  79              		@ args = 0, pretend = 0, frame = 0
+  80              		@ frame_needed = 0, uses_anonymous_args = 0
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 12
+
+
+  81              		@ link register save eliminated.
+  82              		.loc 1 547 1 is_stmt 0 view .LVU10
+  83 0000 0346     		mov	r3, r0
+ 548:USER/main.c   ****     int WeekDay = -1; 
+  84              		.loc 1 548 5 is_stmt 1 view .LVU11
+  85              	.LVL3:
+ 549:USER/main.c   ****     
+ 550:USER/main.c   ****     //处理1月和2月的特殊情况
+ 551:USER/main.c   ****     if(1 == months || 2 == months) 
+  86              		.loc 1 551 5 view .LVU12
+  87              		.loc 1 551 20 is_stmt 0 view .LVU13
+  88 0002 481E     		subs	r0, r1, #1
+  89              	.LVL4:
+  90              		.loc 1 551 7 view .LVU14
+  91 0004 0128     		cmp	r0, #1
+  92 0006 2ED9     		bls	.L20
+  93              	.L8:
+ 552:USER/main.c   ****     {
+ 553:USER/main.c   ****         months += 12; 
+ 554:USER/main.c   ****         years--;
+ 555:USER/main.c   ****     }
+ 556:USER/main.c   ****     
+ 557:USER/main.c   ****     //使用基姆拉尔森计算公式计算星期几
+ 558:USER/main.c   ****     WeekDay = (days + 1 + 2 * months + 3 * (months + 1) / 5 + years + years / 4 - years / 100 + yea
+  94              		.loc 1 558 5 is_stmt 1 view .LVU15
+  95              		.loc 1 558 21 is_stmt 0 view .LVU16
+  96 0008 501C     		adds	r0, r2, #1
+  97              		.loc 1 558 25 view .LVU17
+  98 000a 00EB4100 		add	r0, r0, r1, lsl #1
+  99              		.loc 1 558 52 view .LVU18
+ 100 000e 0131     		adds	r1, r1, #1
+ 101              	.LVL5:
+ 102              		.loc 1 558 42 view .LVU19
+ 103 0010 01EB4101 		add	r1, r1, r1, lsl #1
+ 104              	.LVL6:
+ 105              		.loc 1 558 57 view .LVU20
+ 106 0014 1E4A     		ldr	r2, .L22
+ 107              	.LVL7:
+ 108              		.loc 1 558 57 view .LVU21
+ 109 0016 82FB01C2 		smull	ip, r2, r2, r1
+ 110 001a C917     		asrs	r1, r1, #31
+ 111 001c C1EB6201 		rsb	r1, r1, r2, asr #1
+ 112              		.loc 1 558 38 view .LVU22
+ 113 0020 0844     		add	r0, r0, r1
+ 114              		.loc 1 558 61 view .LVU23
+ 115 0022 1844     		add	r0, r0, r3
+ 116              		.loc 1 558 77 view .LVU24
+ 117 0024 1A46     		mov	r2, r3
+ 118 0026 002B     		cmp	r3, #0
+ 119 0028 20DB     		blt	.L21
+ 120              	.L9:
+ 121              		.loc 1 558 69 view .LVU25
+ 122 002a 00EBA200 		add	r0, r0, r2, asr #2
+ 123              		.loc 1 558 89 view .LVU26
+ 124 002e 194A     		ldr	r2, .L22+4
+ 125 0030 82FB0312 		smull	r1, r2, r2, r3
+ 126 0034 DB17     		asrs	r3, r3, #31
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 13
+
+
+ 127              	.LVL8:
+ 128              		.loc 1 558 89 view .LVU27
+ 129 0036 A3EB6211 		sub	r1, r3, r2, asr #5
+ 130              		.loc 1 558 81 view .LVU28
+ 131 003a 0844     		add	r0, r0, r1
+ 132              		.loc 1 558 103 view .LVU29
+ 133 003c C3EBE213 		rsb	r3, r3, r2, asr #7
+ 134              		.loc 1 558 95 view .LVU30
+ 135 0040 1844     		add	r0, r0, r3
+ 136              		.loc 1 558 13 view .LVU31
+ 137 0042 154A     		ldr	r2, .L22+8
+ 138 0044 82FB0032 		smull	r3, r2, r2, r0
+ 139 0048 0244     		add	r2, r2, r0
+ 140 004a C317     		asrs	r3, r0, #31
+ 141 004c C3EBA203 		rsb	r3, r3, r2, asr #2
+ 142 0050 C3EBC303 		rsb	r3, r3, r3, lsl #3
+ 143 0054 C31A     		subs	r3, r0, r3
+ 144              	.LVL9:
+ 559:USER/main.c   ****     
+ 560:USER/main.c   ****     //转换结果，使1表示星期一，7表示星期日
+ 561:USER/main.c   ****     switch(WeekDay)
+ 145              		.loc 1 561 5 is_stmt 1 view .LVU32
+ 146 0056 062B     		cmp	r3, #6
+ 147 0058 16D8     		bhi	.L10
+ 148 005a DFE803F0 		tbb	[pc, r3]
+ 149              	.L12:
+ 150 005e 09       		.byte	(.L18-.L12)/2
+ 151 005f 17       		.byte	(.L19-.L12)/2
+ 152 0060 0B       		.byte	(.L16-.L12)/2
+ 153 0061 0D       		.byte	(.L15-.L12)/2
+ 154 0062 0F       		.byte	(.L14-.L12)/2
+ 155 0063 11       		.byte	(.L13-.L12)/2
+ 156 0064 13       		.byte	(.L11-.L12)/2
+ 157              	.LVL10:
+ 158 0065 00       		.p2align 1
+ 159              	.L20:
+ 553:USER/main.c   ****         years--;
+ 160              		.loc 1 553 9 view .LVU33
+ 553:USER/main.c   ****         years--;
+ 161              		.loc 1 553 16 is_stmt 0 view .LVU34
+ 162 0066 0C31     		adds	r1, r1, #12
+ 163              	.LVL11:
+ 554:USER/main.c   ****     }
+ 164              		.loc 1 554 9 is_stmt 1 view .LVU35
+ 554:USER/main.c   ****     }
+ 165              		.loc 1 554 14 is_stmt 0 view .LVU36
+ 166 0068 013B     		subs	r3, r3, #1
+ 167              	.LVL12:
+ 554:USER/main.c   ****     }
+ 168              		.loc 1 554 14 view .LVU37
+ 169 006a CDE7     		b	.L8
+ 170              	.LVL13:
+ 171              	.L21:
+ 558:USER/main.c   ****     
+ 172              		.loc 1 558 77 view .LVU38
+ 173 006c DA1C     		adds	r2, r3, #3
+ 174              	.LVL14:
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 14
+
+
+ 558:USER/main.c   ****     
+ 175              		.loc 1 558 77 view .LVU39
+ 176 006e DCE7     		b	.L9
+ 177              	.LVL15:
+ 178              	.L18:
+ 179              		.loc 1 561 5 view .LVU40
+ 180 0070 0720     		movs	r0, #7
+ 181 0072 7047     		bx	lr
+ 182              	.L16:
+ 562:USER/main.c   ****     {
+ 563:USER/main.c   ****         case 0 : 
+ 564:USER/main.c   ****             return 7; //星期日
+ 565:USER/main.c   ****         case 1 : 
+ 566:USER/main.c   ****             return 1; //星期一
+ 567:USER/main.c   ****         case 2 : 
+ 568:USER/main.c   ****             return 2; //星期二
+ 183              		.loc 1 568 13 is_stmt 1 view .LVU41
+ 184              		.loc 1 568 20 is_stmt 0 view .LVU42
+ 185 0074 0220     		movs	r0, #2
+ 186 0076 7047     		bx	lr
+ 187              	.L15:
+ 569:USER/main.c   ****         case 3 : 
+ 570:USER/main.c   ****             return 3; //星期三
+ 188              		.loc 1 570 13 is_stmt 1 view .LVU43
+ 189              		.loc 1 570 20 is_stmt 0 view .LVU44
+ 190 0078 0320     		movs	r0, #3
+ 191 007a 7047     		bx	lr
+ 192              	.L14:
+ 571:USER/main.c   ****         case 4 : 
+ 572:USER/main.c   ****             return 4; //星期四
+ 193              		.loc 1 572 13 is_stmt 1 view .LVU45
+ 194              		.loc 1 572 20 is_stmt 0 view .LVU46
+ 195 007c 0420     		movs	r0, #4
+ 196 007e 7047     		bx	lr
+ 197              	.L13:
+ 573:USER/main.c   ****         case 5 : 
+ 574:USER/main.c   ****             return 5; //星期五                                                           
+ 198              		.loc 1 574 13 is_stmt 1 view .LVU47
+ 199              		.loc 1 574 20 is_stmt 0 view .LVU48
+ 200 0080 0520     		movs	r0, #5
+ 201 0082 7047     		bx	lr
+ 202              	.L11:
+ 575:USER/main.c   ****         case 6 : 
+ 576:USER/main.c   ****             return 6; //星期六
+ 203              		.loc 1 576 13 is_stmt 1 view .LVU49
+ 204              		.loc 1 576 20 is_stmt 0 view .LVU50
+ 205 0084 0620     		movs	r0, #6
+ 206 0086 7047     		bx	lr
+ 207              	.L10:
+ 577:USER/main.c   ****         default : 
+ 578:USER/main.c   ****             return NULL; //错误情况
+ 208              		.loc 1 578 13 is_stmt 1 view .LVU51
+ 209              		.loc 1 578 20 is_stmt 0 view .LVU52
+ 210 0088 0020     		movs	r0, #0
+ 211 008a 7047     		bx	lr
+ 212              	.L19:
+ 566:USER/main.c   ****         case 2 : 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 15
+
+
+ 213              		.loc 1 566 20 view .LVU53
+ 214 008c 0120     		movs	r0, #1
+ 579:USER/main.c   ****     }
+ 580:USER/main.c   ****     return NULL;
+ 581:USER/main.c   **** }
+ 215              		.loc 1 581 1 view .LVU54
+ 216 008e 7047     		bx	lr
+ 217              	.L23:
+ 218              		.align	2
+ 219              	.L22:
+ 220 0090 67666666 		.word	1717986919
+ 221 0094 1F85EB51 		.word	1374389535
+ 222 0098 93244992 		.word	-1840700269
+ 223              		.cfi_endproc
+ 224              	.LFE34:
+ 226              		.section	.rodata.show_wendu.str1.4,"aMS",%progbits,1
+ 227              		.align	2
+ 228              	.LC0:
+ 229 0000 543A2564 		.ascii	"T:%d.%dC  H:%d%% \000"
+ 229      2E256443 
+ 229      2020483A 
+ 229      25642525 
+ 229      2000
+ 230              		.section	.text.show_wendu,"ax",%progbits
+ 231              		.align	1
+ 232              		.global	show_wendu
+ 233              		.syntax unified
+ 234              		.thumb
+ 235              		.thumb_func
+ 237              	show_wendu:
+ 238              	.LFB35:
+ 582:USER/main.c   **** 
+ 583:USER/main.c   **** 
+ 584:USER/main.c   **** /**
+ 585:USER/main.c   ****  * 显示温湿度函数
+ 586:USER/main.c   ****  * 功能：在OLED上显示当前温度和湿度
+ 587:USER/main.c   ****  */
+ 588:USER/main.c   **** void show_wendu(void)
+ 589:USER/main.c   **** {
+ 239              		.loc 1 589 1 is_stmt 1 view -0
+ 240              		.cfi_startproc
+ 241              		@ args = 0, pretend = 0, frame = 0
+ 242              		@ frame_needed = 0, uses_anonymous_args = 0
+ 243 0000 10B5     		push	{r4, lr}
+ 244              	.LCFI1:
+ 245              		.cfi_def_cfa_offset 8
+ 246              		.cfi_offset 4, -8
+ 247              		.cfi_offset 14, -4
+ 248 0002 82B0     		sub	sp, sp, #8
+ 249              	.LCFI2:
+ 250              		.cfi_def_cfa_offset 16
+ 590:USER/main.c   ****     //格式化温湿度字符串
+ 591:USER/main.c   ****     //注：此处温度小数部分固定为0，实际可以使用DHT11_Data.temp_deci获取小数
+ 592:USER/main.c   ****     sprintf(oled_str, "T:%d.%dC  H:%d%% ", DHT11_Data.temp_int, 0, DHT11_Data.humi_int);
+ 251              		.loc 1 592 5 view .LVU56
+ 252              		.loc 1 592 54 is_stmt 0 view .LVU57
+ 253 0004 084A     		ldr	r2, .L26
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 16
+
+
+ 254              		.loc 1 592 78 view .LVU58
+ 255 0006 1378     		ldrb	r3, [r2]	@ zero_extendqisi2
+ 256              		.loc 1 592 5 view .LVU59
+ 257 0008 084C     		ldr	r4, .L26+4
+ 258 000a 0093     		str	r3, [sp]
+ 259 000c 0023     		movs	r3, #0
+ 260 000e 9278     		ldrb	r2, [r2, #2]	@ zero_extendqisi2
+ 261 0010 0749     		ldr	r1, .L26+8
+ 262 0012 2046     		mov	r0, r4
+ 263 0014 FFF7FEFF 		bl	sprintf
+ 264              	.LVL16:
+ 593:USER/main.c   ****     OLED_ShowString(0, 6, (u8 *)oled_str, 16);  
+ 265              		.loc 1 593 5 is_stmt 1 view .LVU60
+ 266 0018 1023     		movs	r3, #16
+ 267 001a 2246     		mov	r2, r4
+ 268 001c 0621     		movs	r1, #6
+ 269 001e 0020     		movs	r0, #0
+ 270 0020 FFF7FEFF 		bl	OLED_ShowString
+ 271              	.LVL17:
+ 594:USER/main.c   **** }
+ 272              		.loc 1 594 1 is_stmt 0 view .LVU61
+ 273 0024 02B0     		add	sp, sp, #8
+ 274              	.LCFI3:
+ 275              		.cfi_def_cfa_offset 8
+ 276              		@ sp needed
+ 277 0026 10BD     		pop	{r4, pc}
+ 278              	.L27:
+ 279              		.align	2
+ 280              	.L26:
+ 281 0028 00000000 		.word	DHT11_Data
+ 282 002c 00000000 		.word	oled_str
+ 283 0030 00000000 		.word	.LC0
+ 284              		.cfi_endproc
+ 285              	.LFE35:
+ 287              		.section	.text.show_mode,"ax",%progbits
+ 288              		.align	1
+ 289              		.global	show_mode
+ 290              		.syntax unified
+ 291              		.thumb
+ 292              		.thumb_func
+ 294              	show_mode:
+ 295              	.LFB36:
+ 595:USER/main.c   **** 
+ 596:USER/main.c   **** 
+ 597:USER/main.c   **** /**
+ 598:USER/main.c   ****  * 显示模式函数
+ 599:USER/main.c   ****  * 功能：在OLED上显示当前运行模式
+ 600:USER/main.c   ****  */
+ 601:USER/main.c   **** void show_mode(void)
+ 602:USER/main.c   **** {
+ 296              		.loc 1 602 1 is_stmt 1 view -0
+ 297              		.cfi_startproc
+ 298              		@ args = 0, pretend = 0, frame = 0
+ 299              		@ frame_needed = 0, uses_anonymous_args = 0
+ 300 0000 08B5     		push	{r3, lr}
+ 301              	.LCFI4:
+ 302              		.cfi_def_cfa_offset 8
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 17
+
+
+ 303              		.cfi_offset 3, -8
+ 304              		.cfi_offset 14, -4
+ 603:USER/main.c   ****     if(mode == 1) //自动模式
+ 305              		.loc 1 603 5 view .LVU63
+ 306              		.loc 1 603 13 is_stmt 0 view .LVU64
+ 307 0002 194B     		ldr	r3, .L34
+ 308 0004 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 309              		.loc 1 603 7 view .LVU65
+ 310 0006 012B     		cmp	r3, #1
+ 311 0008 04D0     		beq	.L32
+ 312              	.L29:
+ 604:USER/main.c   ****     {
+ 605:USER/main.c   ****         OLED_ShowCHinese(0, 0, 31); //自
+ 606:USER/main.c   ****         OLED_ShowCHinese(16, 0, 33); //动
+ 607:USER/main.c   ****         OLED_ShowCHinese(32, 0, 108); //模
+ 608:USER/main.c   ****         OLED_ShowCHinese(48, 0, 109); //式
+ 609:USER/main.c   ****     }
+ 610:USER/main.c   ****     if(mode == 2) //手动模式
+ 313              		.loc 1 610 5 is_stmt 1 view .LVU66
+ 314              		.loc 1 610 13 is_stmt 0 view .LVU67
+ 315 000a 174B     		ldr	r3, .L34
+ 316 000c 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 317              		.loc 1 610 7 view .LVU68
+ 318 000e 022B     		cmp	r3, #2
+ 319 0010 15D0     		beq	.L33
+ 320              	.L28:
+ 611:USER/main.c   ****     {
+ 612:USER/main.c   ****         OLED_ShowCHinese(0, 0, 32); //手
+ 613:USER/main.c   ****         OLED_ShowCHinese(16, 0, 33); //动
+ 614:USER/main.c   ****         OLED_ShowCHinese(32, 0, 108); //模
+ 615:USER/main.c   ****         OLED_ShowCHinese(48, 0, 109); //式
+ 616:USER/main.c   ****     }
+ 617:USER/main.c   **** }
+ 321              		.loc 1 617 1 view .LVU69
+ 322 0012 08BD     		pop	{r3, pc}
+ 323              	.L32:
+ 605:USER/main.c   ****         OLED_ShowCHinese(16, 0, 33); //动
+ 324              		.loc 1 605 9 is_stmt 1 view .LVU70
+ 325 0014 1F22     		movs	r2, #31
+ 326 0016 0021     		movs	r1, #0
+ 327 0018 0846     		mov	r0, r1
+ 328 001a FFF7FEFF 		bl	OLED_ShowCHinese
+ 329              	.LVL18:
+ 606:USER/main.c   ****         OLED_ShowCHinese(32, 0, 108); //模
+ 330              		.loc 1 606 9 view .LVU71
+ 331 001e 2122     		movs	r2, #33
+ 332 0020 0021     		movs	r1, #0
+ 333 0022 1020     		movs	r0, #16
+ 334 0024 FFF7FEFF 		bl	OLED_ShowCHinese
+ 335              	.LVL19:
+ 607:USER/main.c   ****         OLED_ShowCHinese(48, 0, 109); //式
+ 336              		.loc 1 607 9 view .LVU72
+ 337 0028 6C22     		movs	r2, #108
+ 338 002a 0021     		movs	r1, #0
+ 339 002c 2020     		movs	r0, #32
+ 340 002e FFF7FEFF 		bl	OLED_ShowCHinese
+ 341              	.LVL20:
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 18
+
+
+ 608:USER/main.c   ****     }
+ 342              		.loc 1 608 9 view .LVU73
+ 343 0032 6D22     		movs	r2, #109
+ 344 0034 0021     		movs	r1, #0
+ 345 0036 3020     		movs	r0, #48
+ 346 0038 FFF7FEFF 		bl	OLED_ShowCHinese
+ 347              	.LVL21:
+ 348 003c E5E7     		b	.L29
+ 349              	.L33:
+ 612:USER/main.c   ****         OLED_ShowCHinese(16, 0, 33); //动
+ 350              		.loc 1 612 9 view .LVU74
+ 351 003e 2022     		movs	r2, #32
+ 352 0040 0021     		movs	r1, #0
+ 353 0042 0846     		mov	r0, r1
+ 354 0044 FFF7FEFF 		bl	OLED_ShowCHinese
+ 355              	.LVL22:
+ 613:USER/main.c   ****         OLED_ShowCHinese(32, 0, 108); //模
+ 356              		.loc 1 613 9 view .LVU75
+ 357 0048 2122     		movs	r2, #33
+ 358 004a 0021     		movs	r1, #0
+ 359 004c 1020     		movs	r0, #16
+ 360 004e FFF7FEFF 		bl	OLED_ShowCHinese
+ 361              	.LVL23:
+ 614:USER/main.c   ****         OLED_ShowCHinese(48, 0, 109); //式
+ 362              		.loc 1 614 9 view .LVU76
+ 363 0052 6C22     		movs	r2, #108
+ 364 0054 0021     		movs	r1, #0
+ 365 0056 2020     		movs	r0, #32
+ 366 0058 FFF7FEFF 		bl	OLED_ShowCHinese
+ 367              	.LVL24:
+ 615:USER/main.c   ****     }
+ 368              		.loc 1 615 9 view .LVU77
+ 369 005c 6D22     		movs	r2, #109
+ 370 005e 0021     		movs	r1, #0
+ 371 0060 3020     		movs	r0, #48
+ 372 0062 FFF7FEFF 		bl	OLED_ShowCHinese
+ 373              	.LVL25:
+ 374              		.loc 1 617 1 is_stmt 0 view .LVU78
+ 375 0066 D4E7     		b	.L28
+ 376              	.L35:
+ 377              		.align	2
+ 378              	.L34:
+ 379 0068 00000000 		.word	mode
+ 380              		.cfi_endproc
+ 381              	.LFE36:
+ 383              		.section	.rodata.main.str1.4,"aMS",%progbits,1
+ 384              		.align	2
+ 385              	.LC1:
+ 386 0000 312E00   		.ascii	"1.\000"
+ 387 0003 00       		.align	2
+ 388              	.LC2:
+ 389 0004 322E00   		.ascii	"2.\000"
+ 390 0007 00       		.align	2
+ 391              	.LC3:
+ 392 0008 57494649 		.ascii	"WIFI\000"
+ 392      00
+ 393 000d 000000   		.align	2
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 19
+
+
+ 394              	.LC4:
+ 395 0010 2E2E00   		.ascii	"..\000"
+ 396 0013 00       		.align	2
+ 397              	.LC5:
+ 398 0014 34316433 		.ascii	"41d3adaab2fb43c58c0d54a99d037fe5\000"
+ 398      61646161 
+ 398      62326662 
+ 398      34336335 
+ 398      38633064 
+ 399 0035 000000   		.align	2
+ 400              	.LC6:
+ 401 0038 636D643D 		.ascii	"cmd=2&uid=%s&topic=data&msg=#%d#%d.%d#%d.%d#\015\012"
+ 401      32267569 
+ 401      643D2573 
+ 401      26746F70 
+ 401      69633D64 
+ 402 0066 00       		.ascii	"\000"
+ 403 0067 00       		.align	2
+ 404              	.LC7:
+ 405 0068 3A00     		.ascii	":\000"
+ 406 006a 0000     		.align	2
+ 407              	.LC8:
+ 408 006c 3C00     		.ascii	"<\000"
+ 409 006e 0000     		.align	2
+ 410              	.LC9:
+ 411 0070 2000     		.ascii	" \000"
+ 412 0072 0000     		.align	2
+ 413              	.LC10:
+ 414 0074 68696768 		.ascii	"high\000"
+ 414      00
+ 415 0079 000000   		.align	2
+ 416              	.LC11:
+ 417 007c 3D256400 		.ascii	"=%d\000"
+ 418              		.align	2
+ 419              	.LC12:
+ 420 0080 6C6F7500 		.ascii	"lou\000"
+ 421              		.align	2
+ 422              	.LC13:
+ 423 0084 73686964 		.ascii	"shidu\000"
+ 423      7500
+ 424 008a 0000     		.align	2
+ 425              	.LC14:
+ 426 008c 5A4400   		.ascii	"ZD\000"
+ 427 008f 00       		.align	2
+ 428              	.LC15:
+ 429 0090 534400   		.ascii	"SD\000"
+ 430 0093 00       		.align	2
+ 431              	.LC16:
+ 432 0094 4B4A5200 		.ascii	"KJR\000"
+ 433              		.align	2
+ 434              	.LC17:
+ 435 0098 474A5200 		.ascii	"GJR\000"
+ 436              		.align	2
+ 437              	.LC18:
+ 438 009c 4B5A4C00 		.ascii	"KZL\000"
+ 439              		.align	2
+ 440              	.LC19:
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 20
+
+
+ 441 00a0 475A4C00 		.ascii	"GZL\000"
+ 442              		.align	2
+ 443              	.LC20:
+ 444 00a4 4B4A5300 		.ascii	"KJS\000"
+ 445              		.align	2
+ 446              	.LC21:
+ 447 00a8 474A5300 		.ascii	"GJS\000"
+ 448              		.section	.text.main,"ax",%progbits
+ 449              		.align	1
+ 450              		.global	main
+ 451              		.syntax unified
+ 452              		.thumb
+ 453              		.thumb_func
+ 455              	main:
+ 456              	.LFB32:
+  96:USER/main.c   ****     //设置中断优先级分组
+ 457              		.loc 1 96 1 is_stmt 1 view -0
+ 458              		.cfi_startproc
+ 459              		@ Volatile: function does not return.
+ 460              		@ args = 0, pretend = 0, frame = 0
+ 461              		@ frame_needed = 0, uses_anonymous_args = 0
+ 462 0000 00B5     		push	{lr}
+ 463              	.LCFI5:
+ 464              		.cfi_def_cfa_offset 4
+ 465              		.cfi_offset 14, -4
+ 466 0002 85B0     		sub	sp, sp, #20
+ 467              	.LCFI6:
+ 468              		.cfi_def_cfa_offset 24
+  98:USER/main.c   ****                     
+ 469              		.loc 1 98 5 view .LVU80
+ 470 0004 4FF4A060 		mov	r0, #1280
+ 471 0008 FFF7FEFF 		bl	NVIC_PriorityGroupConfig
+ 472              	.LVL26:
+ 101:USER/main.c   ****     OLED_Init();       //OLED显示初始化
+ 473              		.loc 1 101 5 view .LVU81
+ 474 000c FFF7FEFF 		bl	Key_Init
+ 475              	.LVL27:
+ 102:USER/main.c   ****     OLED_Clear(0);     //清屏
+ 476              		.loc 1 102 5 view .LVU82
+ 477 0010 FFF7FEFF 		bl	OLED_Init
+ 478              	.LVL28:
+ 103:USER/main.c   ****     Ds1302_Init();     //DS1302实时时钟初始化
+ 479              		.loc 1 103 5 view .LVU83
+ 480 0014 0020     		movs	r0, #0
+ 481 0016 FFF7FEFF 		bl	OLED_Clear
+ 482              	.LVL29:
+ 104:USER/main.c   ****     DHT11_Init();      //DHT11温湿度传感器初始化
+ 483              		.loc 1 104 5 view .LVU84
+ 484 001a FFF7FEFF 		bl	Ds1302_Init
+ 485              	.LVL30:
+ 105:USER/main.c   ****     warm_init();       //加热模块初始化
+ 486              		.loc 1 105 5 view .LVU85
+ 487 001e FFF7FEFF 		bl	DHT11_Init
+ 488              	.LVL31:
+ 106:USER/main.c   ****     zhileng_init();    //制冷模块初始化
+ 489              		.loc 1 106 5 view .LVU86
+ 490 0022 FFF7FEFF 		bl	warm_init
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 21
+
+
+ 491              	.LVL32:
+ 107:USER/main.c   ****     chushi_init();     //除湿模块初始化
+ 492              		.loc 1 107 5 view .LVU87
+ 493 0026 FFF7FEFF 		bl	zhileng_init
+ 494              	.LVL33:
+ 108:USER/main.c   **** 		
+ 495              		.loc 1 108 5 view .LVU88
+ 496 002a FFF7FEFF 		bl	chushi_init
+ 497              	.LVL34:
+ 498              	.L39:
+ 111:USER/main.c   ****     {
+ 499              		.loc 1 111 5 view .LVU89
+ 114:USER/main.c   ****         OLED_ShowCHinese(18, 0, 53); //篮
+ 500              		.loc 1 114 9 view .LVU90
+ 501 002e 3422     		movs	r2, #52
+ 502 0030 0021     		movs	r1, #0
+ 503 0032 0846     		mov	r0, r1
+ 504 0034 FFF7FEFF 		bl	OLED_ShowCHinese
+ 505              	.LVL35:
+ 115:USER/main.c   ****         OLED_ShowCHinese(36, 0, 54); //恒
+ 506              		.loc 1 115 9 view .LVU91
+ 507 0038 3522     		movs	r2, #53
+ 508 003a 0021     		movs	r1, #0
+ 509 003c 1220     		movs	r0, #18
+ 510 003e FFF7FEFF 		bl	OLED_ShowCHinese
+ 511              	.LVL36:
+ 116:USER/main.c   ****         OLED_ShowCHinese(52, 0, 55); //温
+ 512              		.loc 1 116 9 view .LVU92
+ 513 0042 3622     		movs	r2, #54
+ 514 0044 0021     		movs	r1, #0
+ 515 0046 2420     		movs	r0, #36
+ 516 0048 FFF7FEFF 		bl	OLED_ShowCHinese
+ 517              	.LVL37:
+ 117:USER/main.c   ****         OLED_ShowCHinese(68, 0, 56); //库
+ 518              		.loc 1 117 9 view .LVU93
+ 519 004c 3722     		movs	r2, #55
+ 520 004e 0021     		movs	r1, #0
+ 521 0050 3420     		movs	r0, #52
+ 522 0052 FFF7FEFF 		bl	OLED_ShowCHinese
+ 523              	.LVL38:
+ 118:USER/main.c   ****         OLED_ShowCHinese(84, 0, 57); //监
+ 524              		.loc 1 118 9 view .LVU94
+ 525 0056 3822     		movs	r2, #56
+ 526 0058 0021     		movs	r1, #0
+ 527 005a 4420     		movs	r0, #68
+ 528 005c FFF7FEFF 		bl	OLED_ShowCHinese
+ 529              	.LVL39:
+ 119:USER/main.c   ****         OLED_ShowCHinese(100, 0, 58); //控 
+ 530              		.loc 1 119 9 view .LVU95
+ 531 0060 3922     		movs	r2, #57
+ 532 0062 0021     		movs	r1, #0
+ 533 0064 5420     		movs	r0, #84
+ 534 0066 FFF7FEFF 		bl	OLED_ShowCHinese
+ 535              	.LVL40:
+ 120:USER/main.c   ****         
+ 536              		.loc 1 120 9 view .LVU96
+ 537 006a 3A22     		movs	r2, #58
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 22
+
+
+ 538 006c 0021     		movs	r1, #0
+ 539 006e 6420     		movs	r0, #100
+ 540 0070 FFF7FEFF 		bl	OLED_ShowCHinese
+ 541              	.LVL41:
+ 123:USER/main.c   ****         OLED_ShowCHinese(24, 4, 52); //菜
+ 542              		.loc 1 123 9 view .LVU97
+ 543 0074 1023     		movs	r3, #16
+ 544 0076 BC4A     		ldr	r2, .L116
+ 545 0078 0421     		movs	r1, #4
+ 546 007a 0820     		movs	r0, #8
+ 547 007c FFF7FEFF 		bl	OLED_ShowString
+ 548              	.LVL42:
+ 124:USER/main.c   ****         OLED_ShowString(62, 4, "2.", 16);  
+ 549              		.loc 1 124 9 view .LVU98
+ 550 0080 3422     		movs	r2, #52
+ 551 0082 0421     		movs	r1, #4
+ 552 0084 1820     		movs	r0, #24
+ 553 0086 FFF7FEFF 		bl	OLED_ShowCHinese
+ 554              	.LVL43:
+ 125:USER/main.c   ****         OLED_ShowCHinese(78, 4, 53); //篮
+ 555              		.loc 1 125 9 view .LVU99
+ 556 008a 1023     		movs	r3, #16
+ 557 008c B74A     		ldr	r2, .L116+4
+ 558 008e 0421     		movs	r1, #4
+ 559 0090 3E20     		movs	r0, #62
+ 560 0092 FFF7FEFF 		bl	OLED_ShowString
+ 561              	.LVL44:
+ 126:USER/main.c   ****         
+ 562              		.loc 1 126 9 view .LVU100
+ 563 0096 3522     		movs	r2, #53
+ 564 0098 0421     		movs	r1, #4
+ 565 009a 4E20     		movs	r0, #78
+ 566 009c FFF7FEFF 		bl	OLED_ShowCHinese
+ 567              	.LVL45:
+ 128:USER/main.c   ****         
+ 568              		.loc 1 128 9 view .LVU101
+ 128:USER/main.c   ****         
+ 569              		.loc 1 128 19 is_stmt 0 view .LVU102
+ 570 00a0 0020     		movs	r0, #0
+ 571 00a2 FFF7FEFF 		bl	KEY_Scan
+ 572              	.LVL46:
+ 128:USER/main.c   ****         
+ 573              		.loc 1 128 17 discriminator 1 view .LVU103
+ 574 00a6 B24B     		ldr	r3, .L116+8
+ 575 00a8 1870     		strb	r0, [r3]
+ 130:USER/main.c   ****         {
+ 576              		.loc 1 130 9 is_stmt 1 view .LVU104
+ 130:USER/main.c   ****         {
+ 577              		.loc 1 130 11 is_stmt 0 view .LVU105
+ 578 00aa 0128     		cmp	r0, #1
+ 579 00ac 02D0     		beq	.L86
+ 148:USER/main.c   **** 	
+ 580              		.loc 1 148 21 is_stmt 1 view .LVU106
+ 581 00ae 0228     		cmp	r0, #2
+ 582 00b0 BDD1     		bne	.L39
+ 583 00b2 37E0     		b	.L38
+ 584              	.L86:
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 23
+
+
+ 132:USER/main.c   ****             //显示初始化信息
+ 585              		.loc 1 132 13 view .LVU107
+ 586 00b4 0020     		movs	r0, #0
+ 587 00b6 FFF7FEFF 		bl	OLED_Clear
+ 588              	.LVL47:
+ 134:USER/main.c   ****             OLED_ShowCHinese(18, 3, 22); //始
+ 589              		.loc 1 134 13 view .LVU108
+ 590 00ba 1522     		movs	r2, #21
+ 591 00bc 0321     		movs	r1, #3
+ 592 00be 0020     		movs	r0, #0
+ 593 00c0 FFF7FEFF 		bl	OLED_ShowCHinese
+ 594              	.LVL48:
+ 135:USER/main.c   ****             OLED_ShowCHinese(36, 3, 23); //化
+ 595              		.loc 1 135 13 view .LVU109
+ 596 00c4 1622     		movs	r2, #22
+ 597 00c6 0321     		movs	r1, #3
+ 598 00c8 1220     		movs	r0, #18
+ 599 00ca FFF7FEFF 		bl	OLED_ShowCHinese
+ 600              	.LVL49:
+ 136:USER/main.c   ****             OLED_ShowCHinese(54, 3, 24); //中
+ 601              		.loc 1 136 13 view .LVU110
+ 602 00ce 1722     		movs	r2, #23
+ 603 00d0 0321     		movs	r1, #3
+ 604 00d2 2420     		movs	r0, #36
+ 605 00d4 FFF7FEFF 		bl	OLED_ShowCHinese
+ 606              	.LVL50:
+ 137:USER/main.c   ****             OLED_ShowString(72, 3, "WIFI", 16);
+ 607              		.loc 1 137 13 view .LVU111
+ 608 00d8 1822     		movs	r2, #24
+ 609 00da 0321     		movs	r1, #3
+ 610 00dc 3620     		movs	r0, #54
+ 611 00de FFF7FEFF 		bl	OLED_ShowCHinese
+ 612              	.LVL51:
+ 138:USER/main.c   ****             OLED_ShowString(108, 3, "..", 16);
+ 613              		.loc 1 138 13 view .LVU112
+ 614 00e2 1023     		movs	r3, #16
+ 615 00e4 A34A     		ldr	r2, .L116+12
+ 616 00e6 0321     		movs	r1, #3
+ 617 00e8 4820     		movs	r0, #72
+ 618 00ea FFF7FEFF 		bl	OLED_ShowString
+ 619              	.LVL52:
+ 139:USER/main.c   ****             OLED_ShowCHinese(0, 6, 4); //请
+ 620              		.loc 1 139 13 view .LVU113
+ 621 00ee 1023     		movs	r3, #16
+ 622 00f0 A14A     		ldr	r2, .L116+16
+ 623 00f2 0321     		movs	r1, #3
+ 624 00f4 6C20     		movs	r0, #108
+ 625 00f6 FFF7FEFF 		bl	OLED_ShowString
+ 626              	.LVL53:
+ 140:USER/main.c   ****             OLED_ShowCHinese(18, 6, 5); //稍
+ 627              		.loc 1 140 13 view .LVU114
+ 628 00fa 0422     		movs	r2, #4
+ 629 00fc 0621     		movs	r1, #6
+ 630 00fe 0020     		movs	r0, #0
+ 631 0100 FFF7FEFF 		bl	OLED_ShowCHinese
+ 632              	.LVL54:
+ 141:USER/main.c   ****             OLED_ShowCHinese(36, 6, 13); //等
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 24
+
+
+ 633              		.loc 1 141 13 view .LVU115
+ 634 0104 0522     		movs	r2, #5
+ 635 0106 0621     		movs	r1, #6
+ 636 0108 1220     		movs	r0, #18
+ 637 010a FFF7FEFF 		bl	OLED_ShowCHinese
+ 638              	.LVL55:
+ 142:USER/main.c   ****             
+ 639              		.loc 1 142 13 view .LVU116
+ 640 010e 0D22     		movs	r2, #13
+ 641 0110 0621     		movs	r1, #6
+ 642 0112 2420     		movs	r0, #36
+ 643 0114 FFF7FEFF 		bl	OLED_ShowCHinese
+ 644              	.LVL56:
+ 144:USER/main.c   ****             Timer_Init();          //初始化定时器
+ 645              		.loc 1 144 13 view .LVU117
+ 646 0118 4FF4E130 		mov	r0, #115200
+ 647 011c FFF7FEFF 		bl	ESP8266_Init
+ 648              	.LVL57:
+ 145:USER/main.c   ****             break;
+ 649              		.loc 1 145 13 view .LVU118
+ 650 0120 FFF7FEFF 		bl	Timer_Init
+ 651              	.LVL58:
+ 146:USER/main.c   ****         }
+ 652              		.loc 1 146 13 view .LVU119
+ 653              	.L38:
+ 150:USER/main.c   **** 
+ 654              		.loc 1 150 5 view .LVU120
+ 655 0124 0020     		movs	r0, #0
+ 656 0126 FFF7FEFF 		bl	OLED_Clear
+ 657              	.LVL59:
+ 658 012a 52E0     		b	.L40
+ 659              	.L41:
+ 174:USER/main.c   ****         
+ 660              		.loc 1 174 9 view .LVU121
+ 174:USER/main.c   ****         
+ 661              		.loc 1 174 19 is_stmt 0 view .LVU122
+ 662 012c 0020     		movs	r0, #0
+ 663 012e FFF7FEFF 		bl	KEY_Scan
+ 664              	.LVL60:
+ 174:USER/main.c   ****         
+ 665              		.loc 1 174 17 discriminator 1 view .LVU123
+ 666 0132 8F4B     		ldr	r3, .L116+8
+ 667 0134 1870     		strb	r0, [r3]
+ 176:USER/main.c   ****         {
+ 668              		.loc 1 176 9 is_stmt 1 view .LVU124
+ 176:USER/main.c   ****         {
+ 669              		.loc 1 176 11 is_stmt 0 view .LVU125
+ 670 0136 0128     		cmp	r0, #1
+ 671 0138 6ED0     		beq	.L87
+ 672              	.L42:
+ 185:USER/main.c   ****         {
+ 673              		.loc 1 185 9 is_stmt 1 view .LVU126
+ 185:USER/main.c   ****         {
+ 674              		.loc 1 185 17 is_stmt 0 view .LVU127
+ 675 013a 904B     		ldr	r3, .L116+20
+ 676 013c 1B68     		ldr	r3, [r3]
+ 185:USER/main.c   ****         {
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 25
+
+
+ 677              		.loc 1 185 11 view .LVU128
+ 678 013e 012B     		cmp	r3, #1
+ 679 0140 77D0     		beq	.L88
+ 680              	.L43:
+ 213:USER/main.c   ****         {
+ 681              		.loc 1 213 9 is_stmt 1 view .LVU129
+ 213:USER/main.c   ****         {
+ 682              		.loc 1 213 17 is_stmt 0 view .LVU130
+ 683 0142 8E4B     		ldr	r3, .L116+20
+ 684 0144 1B68     		ldr	r3, [r3]
+ 213:USER/main.c   ****         {
+ 685              		.loc 1 213 11 view .LVU131
+ 686 0146 022B     		cmp	r3, #2
+ 687 0148 00F0A280 		beq	.L89
+ 688              	.L46:
+ 335:USER/main.c   ****         {
+ 689              		.loc 1 335 9 is_stmt 1 view .LVU132
+ 335:USER/main.c   ****         {
+ 690              		.loc 1 335 17 is_stmt 0 view .LVU133
+ 691 014c 8B4B     		ldr	r3, .L116+20
+ 692 014e 1B68     		ldr	r3, [r3]
+ 335:USER/main.c   ****         {
+ 693              		.loc 1 335 11 view .LVU134
+ 694 0150 032B     		cmp	r3, #3
+ 695 0152 00F0DC81 		beq	.L90
+ 696              	.L60:
+ 433:USER/main.c   ****         {
+ 697              		.loc 1 433 9 is_stmt 1 view .LVU135
+ 433:USER/main.c   ****         {
+ 698              		.loc 1 433 21 is_stmt 0 view .LVU136
+ 699 0156 8A49     		ldr	r1, .L116+24
+ 700 0158 8A48     		ldr	r0, .L116+28
+ 701 015a FFF7FEFF 		bl	strstr
+ 702              	.LVL61:
+ 433:USER/main.c   ****         {
+ 703              		.loc 1 433 13 discriminator 1 view .LVU137
+ 704 015e 8A4A     		ldr	r2, .L116+32
+ 705 0160 8A49     		ldr	r1, .L116+36
+ 706 0162 0430     		adds	r0, r0, #4
+ 707 0164 FFF7FEFF 		bl	sscanf
+ 708              	.LVL62:
+ 433:USER/main.c   ****         {
+ 709              		.loc 1 433 12 discriminator 2 view .LVU138
+ 710 0168 0028     		cmp	r0, #0
+ 711 016a 40F0F682 		bne	.L91
+ 712              	.L68:
+ 437:USER/main.c   ****         {
+ 713              		.loc 1 437 9 is_stmt 1 view .LVU139
+ 437:USER/main.c   ****         {
+ 714              		.loc 1 437 21 is_stmt 0 view .LVU140
+ 715 016e 8849     		ldr	r1, .L116+40
+ 716 0170 8448     		ldr	r0, .L116+28
+ 717 0172 FFF7FEFF 		bl	strstr
+ 718              	.LVL63:
+ 437:USER/main.c   ****         {
+ 719              		.loc 1 437 13 discriminator 1 view .LVU141
+ 720 0176 874A     		ldr	r2, .L116+44
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 26
+
+
+ 721 0178 8449     		ldr	r1, .L116+36
+ 722 017a 0330     		adds	r0, r0, #3
+ 723 017c FFF7FEFF 		bl	sscanf
+ 724              	.LVL64:
+ 437:USER/main.c   ****         {
+ 725              		.loc 1 437 12 discriminator 2 view .LVU142
+ 726 0180 0028     		cmp	r0, #0
+ 727 0182 40F0ED82 		bne	.L92
+ 728              	.L69:
+ 441:USER/main.c   ****         {
+ 729              		.loc 1 441 9 is_stmt 1 view .LVU143
+ 441:USER/main.c   ****         {
+ 730              		.loc 1 441 21 is_stmt 0 view .LVU144
+ 731 0186 8449     		ldr	r1, .L116+48
+ 732 0188 7E48     		ldr	r0, .L116+28
+ 733 018a FFF7FEFF 		bl	strstr
+ 734              	.LVL65:
+ 441:USER/main.c   ****         {
+ 735              		.loc 1 441 13 discriminator 1 view .LVU145
+ 736 018e 834A     		ldr	r2, .L116+52
+ 737 0190 7E49     		ldr	r1, .L116+36
+ 738 0192 0530     		adds	r0, r0, #5
+ 739 0194 FFF7FEFF 		bl	sscanf
+ 740              	.LVL66:
+ 441:USER/main.c   ****         {
+ 741              		.loc 1 441 12 discriminator 2 view .LVU146
+ 742 0198 0028     		cmp	r0, #0
+ 743 019a 40F0E482 		bne	.L93
+ 744              	.L70:
+ 448:USER/main.c   ****         {
+ 745              		.loc 1 448 9 is_stmt 1 view .LVU147
+ 448:USER/main.c   ****         {
+ 746              		.loc 1 448 12 is_stmt 0 view .LVU148
+ 747 019e 8049     		ldr	r1, .L116+56
+ 748 01a0 7848     		ldr	r0, .L116+28
+ 749 01a2 FFF7FEFF 		bl	strstr
+ 750              	.LVL67:
+ 448:USER/main.c   ****         {
+ 751              		.loc 1 448 11 discriminator 1 view .LVU149
+ 752 01a6 0028     		cmp	r0, #0
+ 753 01a8 00F0E082 		beq	.L71
+ 450:USER/main.c   ****             jiare = 0;    //关闭加热
+ 754              		.loc 1 450 13 is_stmt 1 view .LVU150
+ 450:USER/main.c   ****             jiare = 0;    //关闭加热
+ 755              		.loc 1 450 18 is_stmt 0 view .LVU151
+ 756 01ac 7D4B     		ldr	r3, .L116+60
+ 757 01ae 0122     		movs	r2, #1
+ 758 01b0 1A70     		strb	r2, [r3]
+ 451:USER/main.c   ****             zhileng = 0;  //关闭制冷
+ 759              		.loc 1 451 13 is_stmt 1 view .LVU152
+ 451:USER/main.c   ****             zhileng = 0;  //关闭制冷
+ 760              		.loc 1 451 19 is_stmt 0 view .LVU153
+ 761 01b2 7D4B     		ldr	r3, .L116+64
+ 762 01b4 0022     		movs	r2, #0
+ 763 01b6 C3F8AC21 		str	r2, [r3, #428]
+ 452:USER/main.c   ****             chushi = 0;   //关闭除湿
+ 764              		.loc 1 452 13 is_stmt 1 view .LVU154
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 27
+
+
+ 452:USER/main.c   ****             chushi = 0;   //关闭除湿
+ 765              		.loc 1 452 21 is_stmt 0 view .LVU155
+ 766 01ba C3F88421 		str	r2, [r3, #388]
+ 453:USER/main.c   ****         }
+ 767              		.loc 1 453 13 is_stmt 1 view .LVU156
+ 453:USER/main.c   ****         }
+ 768              		.loc 1 453 20 is_stmt 0 view .LVU157
+ 769 01be C3F8A821 		str	r2, [r3, #424]
+ 770              	.L72:
+ 464:USER/main.c   ****         {
+ 771              		.loc 1 464 9 is_stmt 1 view .LVU158
+ 464:USER/main.c   ****         {
+ 772              		.loc 1 464 17 is_stmt 0 view .LVU159
+ 773 01c2 784B     		ldr	r3, .L116+60
+ 774 01c4 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 464:USER/main.c   ****         {
+ 775              		.loc 1 464 11 view .LVU160
+ 776 01c6 012B     		cmp	r3, #1
+ 777 01c8 00F0E382 		beq	.L94
+ 778              	.L73:
+ 486:USER/main.c   ****         {
+ 779              		.loc 1 486 9 is_stmt 1 view .LVU161
+ 486:USER/main.c   ****         {
+ 780              		.loc 1 486 11 is_stmt 0 view .LVU162
+ 781 01cc 022B     		cmp	r3, #2
+ 782 01ce 00F00E83 		beq	.L95
+ 783              	.L40:
+ 153:USER/main.c   **** 	{
+ 784              		.loc 1 153 2 is_stmt 1 view .LVU163
+ 157:USER/main.c   ****         
+ 785              		.loc 1 157 9 view .LVU164
+ 786 01d2 7648     		ldr	r0, .L116+68
+ 787 01d4 FFF7FEFF 		bl	Read_DHT11
+ 788              	.LVL68:
+ 160:USER/main.c   ****         {
+ 789              		.loc 1 160 9 view .LVU165
+ 160:USER/main.c   ****         {
+ 790              		.loc 1 160 12 is_stmt 0 view .LVU166
+ 791 01d8 754B     		ldr	r3, .L116+72
+ 792 01da 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 160:USER/main.c   ****         {
+ 793              		.loc 1 160 11 view .LVU167
+ 794 01dc 002B     		cmp	r3, #0
+ 795 01de A5D0     		beq	.L41
+ 160:USER/main.c   ****         {
+ 796              		.loc 1 160 32 discriminator 1 view .LVU168
+ 797 01e0 744B     		ldr	r3, .L116+76
+ 798 01e2 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 160:USER/main.c   ****         {
+ 799              		.loc 1 160 21 discriminator 1 view .LVU169
+ 800 01e4 002B     		cmp	r3, #0
+ 801 01e6 A1D1     		bne	.L41
+ 162:USER/main.c   ****             //构建数据上传格式
+ 802              		.loc 1 162 13 is_stmt 1 view .LVU170
+ 162:USER/main.c   ****             //构建数据上传格式
+ 803              		.loc 1 162 22 is_stmt 0 view .LVU171
+ 804 01e8 714B     		ldr	r3, .L116+72
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 28
+
+
+ 805 01ea 0022     		movs	r2, #0
+ 806 01ec 1A70     		strb	r2, [r3]
+ 164:USER/main.c   ****             BEMFA_ID, //设备ID
+ 807              		.loc 1 164 13 is_stmt 1 view .LVU172
+ 167:USER/main.c   ****             DHT11_Data.humi_int, DHT11_Data.humi_deci); //湿度整数和小数部分
+ 808              		.loc 1 167 23 is_stmt 0 view .LVU173
+ 809 01ee 6F4B     		ldr	r3, .L116+68
+ 810 01f0 9A78     		ldrb	r2, [r3, #2]	@ zero_extendqisi2
+ 167:USER/main.c   ****             DHT11_Data.humi_int, DHT11_Data.humi_deci); //湿度整数和小数部分
+ 811              		.loc 1 167 44 view .LVU174
+ 812 01f2 D978     		ldrb	r1, [r3, #3]	@ zero_extendqisi2
+ 168:USER/main.c   ****             
+ 813              		.loc 1 168 23 view .LVU175
+ 814 01f4 1878     		ldrb	r0, [r3]	@ zero_extendqisi2
+ 168:USER/main.c   ****             
+ 815              		.loc 1 168 44 view .LVU176
+ 816 01f6 5B78     		ldrb	r3, [r3, #1]	@ zero_extendqisi2
+ 164:USER/main.c   ****             BEMFA_ID, //设备ID
+ 817              		.loc 1 164 13 view .LVU177
+ 818 01f8 6F4C     		ldr	r4, .L116+80
+ 819 01fa 0393     		str	r3, [sp, #12]
+ 820 01fc 0290     		str	r0, [sp, #8]
+ 821 01fe 0191     		str	r1, [sp, #4]
+ 822 0200 0092     		str	r2, [sp]
+ 823 0202 684B     		ldr	r3, .L116+60
+ 824 0204 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 825 0206 6D4A     		ldr	r2, .L116+84
+ 826 0208 6D49     		ldr	r1, .L116+88
+ 827 020a 2046     		mov	r0, r4
+ 828 020c FFF7FEFF 		bl	sprintf
+ 829              	.LVL69:
+ 170:USER/main.c   ****         } 	
+ 830              		.loc 1 170 13 is_stmt 1 view .LVU178
+ 831 0210 2046     		mov	r0, r4
+ 832 0212 FFF7FEFF 		bl	ESP8266_SendData
+ 833              	.LVL70:
+ 834 0216 89E7     		b	.L41
+ 835              	.L87:
+ 178:USER/main.c   ****             OLED_Clear(0);
+ 836              		.loc 1 178 13 view .LVU179
+ 178:USER/main.c   ****             OLED_Clear(0);
+ 837              		.loc 1 178 18 is_stmt 0 view .LVU180
+ 838 0218 584C     		ldr	r4, .L116+20
+ 839 021a 2368     		ldr	r3, [r4]
+ 840 021c 0133     		adds	r3, r3, #1
+ 841 021e 2360     		str	r3, [r4]
+ 179:USER/main.c   ****             if(page == 4)  //页面循环
+ 842              		.loc 1 179 13 is_stmt 1 view .LVU181
+ 843 0220 0020     		movs	r0, #0
+ 844 0222 FFF7FEFF 		bl	OLED_Clear
+ 845              	.LVL71:
+ 180:USER/main.c   ****                 page = 1;
+ 846              		.loc 1 180 13 view .LVU182
+ 180:USER/main.c   ****                 page = 1;
+ 847              		.loc 1 180 21 is_stmt 0 view .LVU183
+ 848 0226 2368     		ldr	r3, [r4]
+ 180:USER/main.c   ****                 page = 1;
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 29
+
+
+ 849              		.loc 1 180 15 view .LVU184
+ 850 0228 042B     		cmp	r3, #4
+ 851 022a 86D1     		bne	.L42
+ 181:USER/main.c   ****         }
+ 852              		.loc 1 181 17 is_stmt 1 view .LVU185
+ 181:USER/main.c   ****         }
+ 853              		.loc 1 181 22 is_stmt 0 view .LVU186
+ 854 022c 0122     		movs	r2, #1
+ 855 022e 2260     		str	r2, [r4]
+ 856 0230 83E7     		b	.L42
+ 857              	.L88:
+ 187:USER/main.c   ****             {
+ 858              		.loc 1 187 13 is_stmt 1 view .LVU187
+ 187:USER/main.c   ****             {
+ 859              		.loc 1 187 27 is_stmt 0 view .LVU188
+ 860 0232 644B     		ldr	r3, .L116+92
+ 861 0234 1B68     		ldr	r3, [r3]
+ 187:USER/main.c   ****             {
+ 862              		.loc 1 187 15 view .LVU189
+ 863 0236 C3B1     		cbz	r3, .L96
+ 864              	.L44:
+ 192:USER/main.c   ****             TIME();         //显示时间
+ 865              		.loc 1 192 13 is_stmt 1 view .LVU190
+ 866 0238 FFF7FEFF 		bl	show_mode
+ 867              	.LVL72:
+ 193:USER/main.c   ****             show_wendu();   //显示温湿度
+ 868              		.loc 1 193 13 view .LVU191
+ 869 023c FFF7FEFF 		bl	TIME
+ 870              	.LVL73:
+ 194:USER/main.c   ****             
+ 871              		.loc 1 194 13 view .LVU192
+ 872 0240 FFF7FEFF 		bl	show_wendu
+ 873              	.LVL74:
+ 196:USER/main.c   ****             {
+ 874              		.loc 1 196 13 view .LVU193
+ 196:USER/main.c   ****             {
+ 875              		.loc 1 196 24 is_stmt 0 view .LVU194
+ 876 0244 4A4B     		ldr	r3, .L116+8
+ 877 0246 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 196:USER/main.c   ****             {
+ 878              		.loc 1 196 15 view .LVU195
+ 879 0248 042B     		cmp	r3, #4
+ 880 024a 15D0     		beq	.L97
+ 881              	.L45:
+ 203:USER/main.c   ****             {
+ 882              		.loc 1 203 13 is_stmt 1 view .LVU196
+ 203:USER/main.c   ****             {
+ 883              		.loc 1 203 15 is_stmt 0 view .LVU197
+ 884 024c 032B     		cmp	r3, #3
+ 885 024e 7FF478AF 		bne	.L43
+ 205:USER/main.c   ****                 jiare = 0;    //关闭加热
+ 886              		.loc 1 205 17 is_stmt 1 view .LVU198
+ 205:USER/main.c   ****                 jiare = 0;    //关闭加热
+ 887              		.loc 1 205 22 is_stmt 0 view .LVU199
+ 888 0252 544B     		ldr	r3, .L116+60
+ 889 0254 0122     		movs	r2, #1
+ 890 0256 1A70     		strb	r2, [r3]
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 30
+
+
+ 206:USER/main.c   ****                 zhileng = 0;  //关闭制冷
+ 891              		.loc 1 206 17 is_stmt 1 view .LVU200
+ 206:USER/main.c   ****                 zhileng = 0;  //关闭制冷
+ 892              		.loc 1 206 23 is_stmt 0 view .LVU201
+ 893 0258 534B     		ldr	r3, .L116+64
+ 894 025a 0022     		movs	r2, #0
+ 895 025c C3F8AC21 		str	r2, [r3, #428]
+ 207:USER/main.c   ****                 chushi = 0;   //关闭除湿
+ 896              		.loc 1 207 17 is_stmt 1 view .LVU202
+ 207:USER/main.c   ****                 chushi = 0;   //关闭除湿
+ 897              		.loc 1 207 25 is_stmt 0 view .LVU203
+ 898 0260 C3F88421 		str	r2, [r3, #388]
+ 208:USER/main.c   ****             }
+ 899              		.loc 1 208 17 is_stmt 1 view .LVU204
+ 208:USER/main.c   ****             }
+ 900              		.loc 1 208 24 is_stmt 0 view .LVU205
+ 901 0264 C3F8A821 		str	r2, [r3, #424]
+ 902 0268 6BE7     		b	.L43
+ 903              	.L96:
+ 189:USER/main.c   ****                 OLED_Clear(0);
+ 904              		.loc 1 189 17 is_stmt 1 view .LVU206
+ 189:USER/main.c   ****                 OLED_Clear(0);
+ 905              		.loc 1 189 28 is_stmt 0 view .LVU207
+ 906 026a 564B     		ldr	r3, .L116+92
+ 907 026c 0122     		movs	r2, #1
+ 908 026e 1A60     		str	r2, [r3]
+ 190:USER/main.c   ****             }
+ 909              		.loc 1 190 17 is_stmt 1 view .LVU208
+ 910 0270 0020     		movs	r0, #0
+ 911 0272 FFF7FEFF 		bl	OLED_Clear
+ 912              	.LVL75:
+ 913 0276 DFE7     		b	.L44
+ 914              	.L97:
+ 198:USER/main.c   ****                 jiare = 0;    //关闭加热
+ 915              		.loc 1 198 17 view .LVU209
+ 198:USER/main.c   ****                 jiare = 0;    //关闭加热
+ 916              		.loc 1 198 22 is_stmt 0 view .LVU210
+ 917 0278 4A4A     		ldr	r2, .L116+60
+ 918 027a 0221     		movs	r1, #2
+ 919 027c 1170     		strb	r1, [r2]
+ 199:USER/main.c   ****                 zhileng = 0;  //关闭制冷
+ 920              		.loc 1 199 17 is_stmt 1 view .LVU211
+ 199:USER/main.c   ****                 zhileng = 0;  //关闭制冷
+ 921              		.loc 1 199 23 is_stmt 0 view .LVU212
+ 922 027e 4A4A     		ldr	r2, .L116+64
+ 923 0280 0021     		movs	r1, #0
+ 924 0282 C2F8AC11 		str	r1, [r2, #428]
+ 200:USER/main.c   ****                 chushi = 0;   //关闭除湿
+ 925              		.loc 1 200 17 is_stmt 1 view .LVU213
+ 200:USER/main.c   ****                 chushi = 0;   //关闭除湿
+ 926              		.loc 1 200 25 is_stmt 0 view .LVU214
+ 927 0286 C2F88411 		str	r1, [r2, #388]
+ 201:USER/main.c   ****             }
+ 928              		.loc 1 201 17 is_stmt 1 view .LVU215
+ 201:USER/main.c   ****             }
+ 929              		.loc 1 201 24 is_stmt 0 view .LVU216
+ 930 028a C2F8A811 		str	r1, [r2, #424]
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 31
+
+
+ 931 028e DDE7     		b	.L45
+ 932              	.L89:
+ 215:USER/main.c   ****             {
+ 933              		.loc 1 215 13 is_stmt 1 view .LVU217
+ 215:USER/main.c   ****             {
+ 934              		.loc 1 215 27 is_stmt 0 view .LVU218
+ 935 0290 4C4B     		ldr	r3, .L116+92
+ 936 0292 1B68     		ldr	r3, [r3]
+ 215:USER/main.c   ****             {
+ 937              		.loc 1 215 15 view .LVU219
+ 938 0294 012B     		cmp	r3, #1
+ 939 0296 00F09B80 		beq	.L98
+ 940              	.L47:
+ 221:USER/main.c   ****             {
+ 941              		.loc 1 221 13 is_stmt 1 view .LVU220
+ 221:USER/main.c   ****             {
+ 942              		.loc 1 221 24 is_stmt 0 view .LVU221
+ 943 029a 354B     		ldr	r3, .L116+8
+ 944 029c 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 221:USER/main.c   ****             {
+ 945              		.loc 1 221 15 view .LVU222
+ 946 029e 022B     		cmp	r3, #2
+ 947 02a0 00F09D80 		beq	.L99
+ 948              	.L48:
+ 229:USER/main.c   ****             OLED_ShowCHinese(16, 0, 117); //热
+ 949              		.loc 1 229 13 is_stmt 1 view .LVU223
+ 950 02a4 7422     		movs	r2, #116
+ 951 02a6 0021     		movs	r1, #0
+ 952 02a8 0846     		mov	r0, r1
+ 953 02aa FFF7FEFF 		bl	OLED_ShowCHinese
+ 954              	.LVL76:
+ 230:USER/main.c   ****             OLED_ShowString(32, 0, (u8 *)":", 16);
+ 955              		.loc 1 230 13 view .LVU224
+ 956 02ae 7522     		movs	r2, #117
+ 957 02b0 0021     		movs	r1, #0
+ 958 02b2 1020     		movs	r0, #16
+ 959 02b4 FFF7FEFF 		bl	OLED_ShowCHinese
+ 960              	.LVL77:
+ 231:USER/main.c   ****             
+ 961              		.loc 1 231 13 view .LVU225
+ 962 02b8 434C     		ldr	r4, .L116+96
+ 963 02ba 1023     		movs	r3, #16
+ 964 02bc 2246     		mov	r2, r4
+ 965 02be 0021     		movs	r1, #0
+ 966 02c0 2020     		movs	r0, #32
+ 967 02c2 FFF7FEFF 		bl	OLED_ShowString
+ 968              	.LVL78:
+ 234:USER/main.c   ****             OLED_ShowCHinese(16, 2, 119); //冷
+ 969              		.loc 1 234 13 view .LVU226
+ 970 02c6 7622     		movs	r2, #118
+ 971 02c8 0221     		movs	r1, #2
+ 972 02ca 0020     		movs	r0, #0
+ 973 02cc FFF7FEFF 		bl	OLED_ShowCHinese
+ 974              	.LVL79:
+ 235:USER/main.c   ****             OLED_ShowString(32, 2, (u8 *)":", 16);
+ 975              		.loc 1 235 13 view .LVU227
+ 976 02d0 7722     		movs	r2, #119
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 32
+
+
+ 977 02d2 0221     		movs	r1, #2
+ 978 02d4 1020     		movs	r0, #16
+ 979 02d6 FFF7FEFF 		bl	OLED_ShowCHinese
+ 980              	.LVL80:
+ 236:USER/main.c   ****             
+ 981              		.loc 1 236 13 view .LVU228
+ 982 02da 1023     		movs	r3, #16
+ 983 02dc 2246     		mov	r2, r4
+ 984 02de 0221     		movs	r1, #2
+ 985 02e0 2020     		movs	r0, #32
+ 986 02e2 FFF7FEFF 		bl	OLED_ShowString
+ 987              	.LVL81:
+ 239:USER/main.c   ****             OLED_ShowCHinese(16, 4, 121); //湿
+ 988              		.loc 1 239 13 view .LVU229
+ 989 02e6 7822     		movs	r2, #120
+ 990 02e8 0421     		movs	r1, #4
+ 991 02ea 0020     		movs	r0, #0
+ 992 02ec FFF7FEFF 		bl	OLED_ShowCHinese
+ 993              	.LVL82:
+ 240:USER/main.c   ****             OLED_ShowString(32, 4, (u8 *)":", 16);
+ 994              		.loc 1 240 13 view .LVU230
+ 995 02f0 7922     		movs	r2, #121
+ 996 02f2 0421     		movs	r1, #4
+ 997 02f4 1020     		movs	r0, #16
+ 998 02f6 FFF7FEFF 		bl	OLED_ShowCHinese
+ 999              	.LVL83:
+ 241:USER/main.c   ****             
+ 1000              		.loc 1 241 13 view .LVU231
+ 1001 02fa 1023     		movs	r3, #16
+ 1002 02fc 2246     		mov	r2, r4
+ 1003 02fe 0421     		movs	r1, #4
+ 1004 0300 2020     		movs	r0, #32
+ 1005 0302 FFF7FEFF 		bl	OLED_ShowString
+ 1006              	.LVL84:
+ 244:USER/main.c   ****             {
+ 1007              		.loc 1 244 13 view .LVU232
+ 244:USER/main.c   ****             {
+ 1008              		.loc 1 244 28 is_stmt 0 view .LVU233
+ 1009 0306 314B     		ldr	r3, .L116+100
+ 1010 0308 1B68     		ldr	r3, [r3]
+ 244:USER/main.c   ****             {
+ 1011              		.loc 1 244 15 view .LVU234
+ 1012 030a 012B     		cmp	r3, #1
+ 1013 030c 72D0     		beq	.L100
+ 1014              	.L49:
+ 264:USER/main.c   ****             {
+ 1015              		.loc 1 264 13 is_stmt 1 view .LVU235
+ 264:USER/main.c   ****             {
+ 1016              		.loc 1 264 28 is_stmt 0 view .LVU236
+ 1017 030e 2F4B     		ldr	r3, .L116+100
+ 1018 0310 1B68     		ldr	r3, [r3]
+ 264:USER/main.c   ****             {
+ 1019              		.loc 1 264 15 view .LVU237
+ 1020 0312 022B     		cmp	r3, #2
+ 1021 0314 00F09780 		beq	.L101
+ 1022              	.L51:
+ 284:USER/main.c   ****             {
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 33
+
+
+ 1023              		.loc 1 284 13 is_stmt 1 view .LVU238
+ 284:USER/main.c   ****             {
+ 1024              		.loc 1 284 28 is_stmt 0 view .LVU239
+ 1025 0318 2C4B     		ldr	r3, .L116+100
+ 1026 031a 1B68     		ldr	r3, [r3]
+ 284:USER/main.c   ****             {
+ 1027              		.loc 1 284 15 view .LVU240
+ 1028 031c 032B     		cmp	r3, #3
+ 1029 031e 00F0BB80 		beq	.L102
+ 1030              	.L53:
+ 304:USER/main.c   ****             {
+ 1031              		.loc 1 304 13 is_stmt 1 view .LVU241
+ 304:USER/main.c   ****             {
+ 1032              		.loc 1 304 16 is_stmt 0 view .LVU242
+ 1033 0322 214B     		ldr	r3, .L116+64
+ 1034 0324 D3F8AC31 		ldr	r3, [r3, #428]
+ 304:USER/main.c   ****             {
+ 1035              		.loc 1 304 15 view .LVU243
+ 1036 0328 012B     		cmp	r3, #1
+ 1037 032a 00F0DE80 		beq	.L103
+ 310:USER/main.c   ****             }
+ 1038              		.loc 1 310 17 is_stmt 1 view .LVU244
+ 1039 032e 7B22     		movs	r2, #123
+ 1040 0330 0021     		movs	r1, #0
+ 1041 0332 2820     		movs	r0, #40
+ 1042 0334 FFF7FEFF 		bl	OLED_ShowCHinese
+ 1043              	.LVL85:
+ 1044              	.L56:
+ 314:USER/main.c   ****             {
+ 1045              		.loc 1 314 13 view .LVU245
+ 314:USER/main.c   ****             {
+ 1046              		.loc 1 314 16 is_stmt 0 view .LVU246
+ 1047 0338 1B4B     		ldr	r3, .L116+64
+ 1048 033a D3F88431 		ldr	r3, [r3, #388]
+ 314:USER/main.c   ****             {
+ 1049              		.loc 1 314 15 view .LVU247
+ 1050 033e 012B     		cmp	r3, #1
+ 1051 0340 00F0D980 		beq	.L104
+ 320:USER/main.c   ****             }
+ 1052              		.loc 1 320 17 is_stmt 1 view .LVU248
+ 1053 0344 7B22     		movs	r2, #123
+ 1054 0346 0221     		movs	r1, #2
+ 1055 0348 2820     		movs	r0, #40
+ 1056 034a FFF7FEFF 		bl	OLED_ShowCHinese
+ 1057              	.LVL86:
+ 1058              	.L58:
+ 324:USER/main.c   ****             {
+ 1059              		.loc 1 324 13 view .LVU249
+ 324:USER/main.c   ****             {
+ 1060              		.loc 1 324 16 is_stmt 0 view .LVU250
+ 1061 034e 164B     		ldr	r3, .L116+64
+ 1062 0350 D3F8A831 		ldr	r3, [r3, #424]
+ 324:USER/main.c   ****             {
+ 1063              		.loc 1 324 15 view .LVU251
+ 1064 0354 012B     		cmp	r3, #1
+ 1065 0356 00F0D480 		beq	.L105
+ 330:USER/main.c   ****             }
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 34
+
+
+ 1066              		.loc 1 330 17 is_stmt 1 view .LVU252
+ 1067 035a 7B22     		movs	r2, #123
+ 1068 035c 0421     		movs	r1, #4
+ 1069 035e 2820     		movs	r0, #40
+ 1070 0360 FFF7FEFF 		bl	OLED_ShowCHinese
+ 1071              	.LVL87:
+ 1072 0364 F2E6     		b	.L46
+ 1073              	.L117:
+ 1074 0366 00BF     		.align	2
+ 1075              	.L116:
+ 1076 0368 00000000 		.word	.LC1
+ 1077 036c 04000000 		.word	.LC2
+ 1078 0370 00000000 		.word	key_num
+ 1079 0374 08000000 		.word	.LC3
+ 1080 0378 10000000 		.word	.LC4
+ 1081 037c 00000000 		.word	page
+ 1082 0380 74000000 		.word	.LC10
+ 1083 0384 00000000 		.word	esp8266_buf
+ 1084 0388 00000000 		.word	set_wendu_high
+ 1085 038c 7C000000 		.word	.LC11
+ 1086 0390 80000000 		.word	.LC12
+ 1087 0394 00000000 		.word	set_wendu_lou
+ 1088 0398 84000000 		.word	.LC13
+ 1089 039c 00000000 		.word	set_shidu
+ 1090 03a0 8C000000 		.word	.LC14
+ 1091 03a4 00000000 		.word	mode
+ 1092 03a8 00802142 		.word	1109491712
+ 1093 03ac 00000000 		.word	DHT11_Data
+ 1094 03b0 00000000 		.word	TIMER_IT
+ 1095 03b4 00000000 		.word	Flagout
+ 1096 03b8 00000000 		.word	date
+ 1097 03bc 14000000 		.word	.LC5
+ 1098 03c0 38000000 		.word	.LC6
+ 1099 03c4 00000000 		.word	page_clear
+ 1100 03c8 68000000 		.word	.LC7
+ 1101 03cc 00000000 		.word	page2_index
+ 1102              	.L98:
+ 217:USER/main.c   ****                 OLED_Clear(0);
+ 1103              		.loc 1 217 17 view .LVU253
+ 217:USER/main.c   ****                 OLED_Clear(0);
+ 1104              		.loc 1 217 28 is_stmt 0 view .LVU254
+ 1105 03d0 C24B     		ldr	r3, .L118
+ 1106 03d2 0222     		movs	r2, #2
+ 1107 03d4 1A60     		str	r2, [r3]
+ 218:USER/main.c   ****             }
+ 1108              		.loc 1 218 17 is_stmt 1 view .LVU255
+ 1109 03d6 0020     		movs	r0, #0
+ 1110 03d8 FFF7FEFF 		bl	OLED_Clear
+ 1111              	.LVL88:
+ 1112 03dc 5DE7     		b	.L47
+ 1113              	.L99:
+ 223:USER/main.c   ****                 if(page2_index == 4)
+ 1114              		.loc 1 223 17 view .LVU256
+ 223:USER/main.c   ****                 if(page2_index == 4)
+ 1115              		.loc 1 223 28 is_stmt 0 view .LVU257
+ 1116 03de C04A     		ldr	r2, .L118+4
+ 1117 03e0 1368     		ldr	r3, [r2]
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 35
+
+
+ 1118 03e2 0133     		adds	r3, r3, #1
+ 1119 03e4 1360     		str	r3, [r2]
+ 224:USER/main.c   ****                     page2_index = 1;
+ 1120              		.loc 1 224 17 is_stmt 1 view .LVU258
+ 224:USER/main.c   ****                     page2_index = 1;
+ 1121              		.loc 1 224 19 is_stmt 0 view .LVU259
+ 1122 03e6 042B     		cmp	r3, #4
+ 1123 03e8 7FF45CAF 		bne	.L48
+ 225:USER/main.c   ****             }
+ 1124              		.loc 1 225 21 is_stmt 1 view .LVU260
+ 225:USER/main.c   ****             }
+ 1125              		.loc 1 225 33 is_stmt 0 view .LVU261
+ 1126 03ec 1346     		mov	r3, r2
+ 1127 03ee 0122     		movs	r2, #1
+ 1128 03f0 1A60     		str	r2, [r3]
+ 1129 03f2 57E7     		b	.L48
+ 1130              	.L100:
+ 246:USER/main.c   ****                 OLED_ShowString(60, 2, (u8 *)" ", 16);   
+ 1131              		.loc 1 246 17 is_stmt 1 view .LVU262
+ 1132 03f4 1023     		movs	r3, #16
+ 1133 03f6 BB4A     		ldr	r2, .L118+8
+ 1134 03f8 0021     		movs	r1, #0
+ 1135 03fa 3C20     		movs	r0, #60
+ 1136 03fc FFF7FEFF 		bl	OLED_ShowString
+ 1137              	.LVL89:
+ 247:USER/main.c   ****                 OLED_ShowString(60, 4, (u8 *)" ", 16); 
+ 1138              		.loc 1 247 17 view .LVU263
+ 1139 0400 B94C     		ldr	r4, .L118+12
+ 1140 0402 1023     		movs	r3, #16
+ 1141 0404 2246     		mov	r2, r4
+ 1142 0406 0221     		movs	r1, #2
+ 1143 0408 3C20     		movs	r0, #60
+ 1144 040a FFF7FEFF 		bl	OLED_ShowString
+ 1145              	.LVL90:
+ 248:USER/main.c   ****                 
+ 1146              		.loc 1 248 17 view .LVU264
+ 1147 040e 1023     		movs	r3, #16
+ 1148 0410 2246     		mov	r2, r4
+ 1149 0412 0421     		movs	r1, #4
+ 1150 0414 3C20     		movs	r0, #60
+ 1151 0416 FFF7FEFF 		bl	OLED_ShowString
+ 1152              	.LVL91:
+ 250:USER/main.c   ****                 {
+ 1153              		.loc 1 250 17 view .LVU265
+ 250:USER/main.c   ****                 {
+ 1154              		.loc 1 250 25 is_stmt 0 view .LVU266
+ 1155 041a B44B     		ldr	r3, .L118+16
+ 1156 041c 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 250:USER/main.c   ****                 {
+ 1157              		.loc 1 250 19 view .LVU267
+ 1158 041e 022B     		cmp	r3, #2
+ 1159 0420 7FF475AF 		bne	.L49
+ 252:USER/main.c   ****                     {
+ 1160              		.loc 1 252 21 is_stmt 1 view .LVU268
+ 252:USER/main.c   ****                     {
+ 1161              		.loc 1 252 32 is_stmt 0 view .LVU269
+ 1162 0424 B24B     		ldr	r3, .L118+20
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 36
+
+
+ 1163 0426 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 252:USER/main.c   ****                     {
+ 1164              		.loc 1 252 23 view .LVU270
+ 1165 0428 032B     		cmp	r3, #3
+ 1166 042a 07D0     		beq	.L106
+ 256:USER/main.c   ****                     {
+ 1167              		.loc 1 256 26 is_stmt 1 view .LVU271
+ 256:USER/main.c   ****                     {
+ 1168              		.loc 1 256 28 is_stmt 0 view .LVU272
+ 1169 042c 042B     		cmp	r3, #4
+ 1170 042e 7FF46EAF 		bne	.L49
+ 258:USER/main.c   ****                     }
+ 1171              		.loc 1 258 25 is_stmt 1 view .LVU273
+ 258:USER/main.c   ****                     }
+ 1172              		.loc 1 258 31 is_stmt 0 view .LVU274
+ 1173 0432 B04B     		ldr	r3, .L118+24
+ 1174 0434 0022     		movs	r2, #0
+ 1175 0436 C3F8AC21 		str	r2, [r3, #428]
+ 1176 043a 68E7     		b	.L49
+ 1177              	.L106:
+ 254:USER/main.c   ****                     }
+ 1178              		.loc 1 254 25 is_stmt 1 view .LVU275
+ 254:USER/main.c   ****                     }
+ 1179              		.loc 1 254 31 is_stmt 0 view .LVU276
+ 1180 043c AD4B     		ldr	r3, .L118+24
+ 1181 043e 0122     		movs	r2, #1
+ 1182 0440 C3F8AC21 		str	r2, [r3, #428]
+ 1183 0444 63E7     		b	.L49
+ 1184              	.L101:
+ 266:USER/main.c   ****                 OLED_ShowString(60, 2, (u8 *)"<", 16);   
+ 1185              		.loc 1 266 17 is_stmt 1 view .LVU277
+ 1186 0446 A84C     		ldr	r4, .L118+12
+ 1187 0448 1023     		movs	r3, #16
+ 1188 044a 2246     		mov	r2, r4
+ 1189 044c 0021     		movs	r1, #0
+ 1190 044e 3C20     		movs	r0, #60
+ 1191 0450 FFF7FEFF 		bl	OLED_ShowString
+ 1192              	.LVL92:
+ 267:USER/main.c   ****                 OLED_ShowString(60, 4, (u8 *)" ", 16); 
+ 1193              		.loc 1 267 17 view .LVU278
+ 1194 0454 1023     		movs	r3, #16
+ 1195 0456 A34A     		ldr	r2, .L118+8
+ 1196 0458 0221     		movs	r1, #2
+ 1197 045a 3C20     		movs	r0, #60
+ 1198 045c FFF7FEFF 		bl	OLED_ShowString
+ 1199              	.LVL93:
+ 268:USER/main.c   ****                 
+ 1200              		.loc 1 268 17 view .LVU279
+ 1201 0460 1023     		movs	r3, #16
+ 1202 0462 2246     		mov	r2, r4
+ 1203 0464 0421     		movs	r1, #4
+ 1204 0466 3C20     		movs	r0, #60
+ 1205 0468 FFF7FEFF 		bl	OLED_ShowString
+ 1206              	.LVL94:
+ 270:USER/main.c   ****                 {
+ 1207              		.loc 1 270 17 view .LVU280
+ 270:USER/main.c   ****                 {
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 37
+
+
+ 1208              		.loc 1 270 25 is_stmt 0 view .LVU281
+ 1209 046c 9F4B     		ldr	r3, .L118+16
+ 1210 046e 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 270:USER/main.c   ****                 {
+ 1211              		.loc 1 270 19 view .LVU282
+ 1212 0470 022B     		cmp	r3, #2
+ 1213 0472 7FF451AF 		bne	.L51
+ 272:USER/main.c   ****                     {
+ 1214              		.loc 1 272 21 is_stmt 1 view .LVU283
+ 272:USER/main.c   ****                     {
+ 1215              		.loc 1 272 32 is_stmt 0 view .LVU284
+ 1216 0476 9E4B     		ldr	r3, .L118+20
+ 1217 0478 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 272:USER/main.c   ****                     {
+ 1218              		.loc 1 272 23 view .LVU285
+ 1219 047a 032B     		cmp	r3, #3
+ 1220 047c 07D0     		beq	.L107
+ 276:USER/main.c   ****                     {
+ 1221              		.loc 1 276 26 is_stmt 1 view .LVU286
+ 276:USER/main.c   ****                     {
+ 1222              		.loc 1 276 28 is_stmt 0 view .LVU287
+ 1223 047e 042B     		cmp	r3, #4
+ 1224 0480 7FF44AAF 		bne	.L51
+ 278:USER/main.c   ****                     }
+ 1225              		.loc 1 278 25 is_stmt 1 view .LVU288
+ 278:USER/main.c   ****                     }
+ 1226              		.loc 1 278 33 is_stmt 0 view .LVU289
+ 1227 0484 9B4B     		ldr	r3, .L118+24
+ 1228 0486 0022     		movs	r2, #0
+ 1229 0488 C3F88421 		str	r2, [r3, #388]
+ 1230 048c 44E7     		b	.L51
+ 1231              	.L107:
+ 274:USER/main.c   ****                     }
+ 1232              		.loc 1 274 25 is_stmt 1 view .LVU290
+ 274:USER/main.c   ****                     }
+ 1233              		.loc 1 274 33 is_stmt 0 view .LVU291
+ 1234 048e 994B     		ldr	r3, .L118+24
+ 1235 0490 0122     		movs	r2, #1
+ 1236 0492 C3F88421 		str	r2, [r3, #388]
+ 1237 0496 3FE7     		b	.L51
+ 1238              	.L102:
+ 286:USER/main.c   ****                 OLED_ShowString(60, 2, (u8 *)" ", 16);   
+ 1239              		.loc 1 286 17 is_stmt 1 view .LVU292
+ 1240 0498 934C     		ldr	r4, .L118+12
+ 1241 049a 1023     		movs	r3, #16
+ 1242 049c 2246     		mov	r2, r4
+ 1243 049e 0021     		movs	r1, #0
+ 1244 04a0 3C20     		movs	r0, #60
+ 1245 04a2 FFF7FEFF 		bl	OLED_ShowString
+ 1246              	.LVL95:
+ 287:USER/main.c   ****                 OLED_ShowString(60, 4, (u8 *)"<", 16); 
+ 1247              		.loc 1 287 17 view .LVU293
+ 1248 04a6 1023     		movs	r3, #16
+ 1249 04a8 2246     		mov	r2, r4
+ 1250 04aa 0221     		movs	r1, #2
+ 1251 04ac 3C20     		movs	r0, #60
+ 1252 04ae FFF7FEFF 		bl	OLED_ShowString
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 38
+
+
+ 1253              	.LVL96:
+ 288:USER/main.c   ****                 
+ 1254              		.loc 1 288 17 view .LVU294
+ 1255 04b2 1023     		movs	r3, #16
+ 1256 04b4 8B4A     		ldr	r2, .L118+8
+ 1257 04b6 0421     		movs	r1, #4
+ 1258 04b8 3C20     		movs	r0, #60
+ 1259 04ba FFF7FEFF 		bl	OLED_ShowString
+ 1260              	.LVL97:
+ 290:USER/main.c   ****                 {
+ 1261              		.loc 1 290 17 view .LVU295
+ 290:USER/main.c   ****                 {
+ 1262              		.loc 1 290 25 is_stmt 0 view .LVU296
+ 1263 04be 8B4B     		ldr	r3, .L118+16
+ 1264 04c0 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 290:USER/main.c   ****                 {
+ 1265              		.loc 1 290 19 view .LVU297
+ 1266 04c2 022B     		cmp	r3, #2
+ 1267 04c4 7FF42DAF 		bne	.L53
+ 292:USER/main.c   ****                     {
+ 1268              		.loc 1 292 21 is_stmt 1 view .LVU298
+ 292:USER/main.c   ****                     {
+ 1269              		.loc 1 292 32 is_stmt 0 view .LVU299
+ 1270 04c8 894B     		ldr	r3, .L118+20
+ 1271 04ca 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 292:USER/main.c   ****                     {
+ 1272              		.loc 1 292 23 view .LVU300
+ 1273 04cc 032B     		cmp	r3, #3
+ 1274 04ce 07D0     		beq	.L108
+ 296:USER/main.c   ****                     {
+ 1275              		.loc 1 296 26 is_stmt 1 view .LVU301
+ 296:USER/main.c   ****                     {
+ 1276              		.loc 1 296 28 is_stmt 0 view .LVU302
+ 1277 04d0 042B     		cmp	r3, #4
+ 1278 04d2 7FF426AF 		bne	.L53
+ 298:USER/main.c   ****                     }
+ 1279              		.loc 1 298 25 is_stmt 1 view .LVU303
+ 298:USER/main.c   ****                     }
+ 1280              		.loc 1 298 32 is_stmt 0 view .LVU304
+ 1281 04d6 874B     		ldr	r3, .L118+24
+ 1282 04d8 0022     		movs	r2, #0
+ 1283 04da C3F8A821 		str	r2, [r3, #424]
+ 1284 04de 20E7     		b	.L53
+ 1285              	.L108:
+ 294:USER/main.c   ****                     }
+ 1286              		.loc 1 294 25 is_stmt 1 view .LVU305
+ 294:USER/main.c   ****                     }
+ 1287              		.loc 1 294 32 is_stmt 0 view .LVU306
+ 1288 04e0 844B     		ldr	r3, .L118+24
+ 1289 04e2 0122     		movs	r2, #1
+ 1290 04e4 C3F8A821 		str	r2, [r3, #424]
+ 1291 04e8 1BE7     		b	.L53
+ 1292              	.L103:
+ 306:USER/main.c   ****             }
+ 1293              		.loc 1 306 17 is_stmt 1 view .LVU307
+ 1294 04ea 7A22     		movs	r2, #122
+ 1295 04ec 0021     		movs	r1, #0
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 39
+
+
+ 1296 04ee 2820     		movs	r0, #40
+ 1297 04f0 FFF7FEFF 		bl	OLED_ShowCHinese
+ 1298              	.LVL98:
+ 1299 04f4 20E7     		b	.L56
+ 1300              	.L104:
+ 316:USER/main.c   ****             }
+ 1301              		.loc 1 316 17 view .LVU308
+ 1302 04f6 7A22     		movs	r2, #122
+ 1303 04f8 0221     		movs	r1, #2
+ 1304 04fa 2820     		movs	r0, #40
+ 1305 04fc FFF7FEFF 		bl	OLED_ShowCHinese
+ 1306              	.LVL99:
+ 1307 0500 25E7     		b	.L58
+ 1308              	.L105:
+ 326:USER/main.c   ****             }
+ 1309              		.loc 1 326 17 view .LVU309
+ 1310 0502 7A22     		movs	r2, #122
+ 1311 0504 0421     		movs	r1, #4
+ 1312 0506 2820     		movs	r0, #40
+ 1313 0508 FFF7FEFF 		bl	OLED_ShowCHinese
+ 1314              	.LVL100:
+ 1315 050c 1EE6     		b	.L46
+ 1316              	.L90:
+ 337:USER/main.c   ****             {
+ 1317              		.loc 1 337 13 view .LVU310
+ 337:USER/main.c   ****             {
+ 1318              		.loc 1 337 27 is_stmt 0 view .LVU311
+ 1319 050e 734B     		ldr	r3, .L118
+ 1320 0510 1B68     		ldr	r3, [r3]
+ 337:USER/main.c   ****             {
+ 1321              		.loc 1 337 15 view .LVU312
+ 1322 0512 022B     		cmp	r3, #2
+ 1323 0514 00F0AC80 		beq	.L109
+ 1324              	.L61:
+ 343:USER/main.c   ****             {
+ 1325              		.loc 1 343 13 is_stmt 1 view .LVU313
+ 343:USER/main.c   ****             {
+ 1326              		.loc 1 343 24 is_stmt 0 view .LVU314
+ 1327 0518 754B     		ldr	r3, .L118+20
+ 1328 051a 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 343:USER/main.c   ****             {
+ 1329              		.loc 1 343 15 view .LVU315
+ 1330 051c 022B     		cmp	r3, #2
+ 1331 051e 00F0AE80 		beq	.L110
+ 1332              	.L62:
+ 351:USER/main.c   ****             OLED_ShowCHinese(16+15+16, 0, 27);
+ 1333              		.loc 1 351 13 is_stmt 1 view .LVU316
+ 1334 0522 1A22     		movs	r2, #26
+ 1335 0524 0021     		movs	r1, #0
+ 1336 0526 1F20     		movs	r0, #31
+ 1337 0528 FFF7FEFF 		bl	OLED_ShowCHinese
+ 1338              	.LVL101:
+ 352:USER/main.c   ****             OLED_ShowCHinese(16+15+32, 0, 28);
+ 1339              		.loc 1 352 13 view .LVU317
+ 1340 052c 1B22     		movs	r2, #27
+ 1341 052e 0021     		movs	r1, #0
+ 1342 0530 2F20     		movs	r0, #47
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 40
+
+
+ 1343 0532 FFF7FEFF 		bl	OLED_ShowCHinese
+ 1344              	.LVL102:
+ 353:USER/main.c   ****             OLED_ShowCHinese(16+15+48, 0, 29);
+ 1345              		.loc 1 353 13 view .LVU318
+ 1346 0536 1C22     		movs	r2, #28
+ 1347 0538 0021     		movs	r1, #0
+ 1348 053a 3F20     		movs	r0, #63
+ 1349 053c FFF7FEFF 		bl	OLED_ShowCHinese
+ 1350              	.LVL103:
+ 354:USER/main.c   ****             
+ 1351              		.loc 1 354 13 view .LVU319
+ 1352 0540 1D22     		movs	r2, #29
+ 1353 0542 0021     		movs	r1, #0
+ 1354 0544 4F20     		movs	r0, #79
+ 1355 0546 FFF7FEFF 		bl	OLED_ShowCHinese
+ 1356              	.LVL104:
+ 357:USER/main.c   ****             OLED_ShowCHinese(16, 2, 12); //度
+ 1357              		.loc 1 357 13 view .LVU320
+ 1358 054a 0A22     		movs	r2, #10
+ 1359 054c 0221     		movs	r1, #2
+ 1360 054e 0020     		movs	r0, #0
+ 1361 0550 FFF7FEFF 		bl	OLED_ShowCHinese
+ 1362              	.LVL105:
+ 358:USER/main.c   ****             OLED_ShowCHinese(32, 2, 124); //上
+ 1363              		.loc 1 358 13 view .LVU321
+ 1364 0554 0C22     		movs	r2, #12
+ 1365 0556 0221     		movs	r1, #2
+ 1366 0558 1020     		movs	r0, #16
+ 1367 055a FFF7FEFF 		bl	OLED_ShowCHinese
+ 1368              	.LVL106:
+ 359:USER/main.c   ****             OLED_ShowCHinese(48, 2, 125); //限
+ 1369              		.loc 1 359 13 view .LVU322
+ 1370 055e 7C22     		movs	r2, #124
+ 1371 0560 0221     		movs	r1, #2
+ 1372 0562 2020     		movs	r0, #32
+ 1373 0564 FFF7FEFF 		bl	OLED_ShowCHinese
+ 1374              	.LVL107:
+ 360:USER/main.c   ****             OLED_ShowChar(64, 2, ':', 16);
+ 1375              		.loc 1 360 13 view .LVU323
+ 1376 0568 7D22     		movs	r2, #125
+ 1377 056a 0221     		movs	r1, #2
+ 1378 056c 3020     		movs	r0, #48
+ 1379 056e FFF7FEFF 		bl	OLED_ShowCHinese
+ 1380              	.LVL108:
+ 361:USER/main.c   ****             OLED_ShowNum(72, 2, set_wendu_high, 2, 16);
+ 1381              		.loc 1 361 13 view .LVU324
+ 1382 0572 1023     		movs	r3, #16
+ 1383 0574 3A22     		movs	r2, #58
+ 1384 0576 0221     		movs	r1, #2
+ 1385 0578 4020     		movs	r0, #64
+ 1386 057a FFF7FEFF 		bl	OLED_ShowChar
+ 1387              	.LVL109:
+ 362:USER/main.c   ****             
+ 1388              		.loc 1 362 13 view .LVU325
+ 1389 057e 1024     		movs	r4, #16
+ 1390 0580 0094     		str	r4, [sp]
+ 1391 0582 0223     		movs	r3, #2
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 41
+
+
+ 1392 0584 5C4A     		ldr	r2, .L118+28
+ 1393 0586 1268     		ldr	r2, [r2]
+ 1394 0588 1946     		mov	r1, r3
+ 1395 058a 4820     		movs	r0, #72
+ 1396 058c FFF7FEFF 		bl	OLED_ShowNum
+ 1397              	.LVL110:
+ 365:USER/main.c   ****             OLED_ShowCHinese(16, 4, 12); //度
+ 1398              		.loc 1 365 13 view .LVU326
+ 1399 0590 0A22     		movs	r2, #10
+ 1400 0592 0421     		movs	r1, #4
+ 1401 0594 0020     		movs	r0, #0
+ 1402 0596 FFF7FEFF 		bl	OLED_ShowCHinese
+ 1403              	.LVL111:
+ 366:USER/main.c   ****             OLED_ShowCHinese(32, 4, 126); //下
+ 1404              		.loc 1 366 13 view .LVU327
+ 1405 059a 0C22     		movs	r2, #12
+ 1406 059c 0421     		movs	r1, #4
+ 1407 059e 2046     		mov	r0, r4
+ 1408 05a0 FFF7FEFF 		bl	OLED_ShowCHinese
+ 1409              	.LVL112:
+ 367:USER/main.c   ****             OLED_ShowCHinese(48, 4, 127); //限
+ 1410              		.loc 1 367 13 view .LVU328
+ 1411 05a4 7E22     		movs	r2, #126
+ 1412 05a6 0421     		movs	r1, #4
+ 1413 05a8 2020     		movs	r0, #32
+ 1414 05aa FFF7FEFF 		bl	OLED_ShowCHinese
+ 1415              	.LVL113:
+ 368:USER/main.c   ****             OLED_ShowChar(64, 4, ':', 16);
+ 1416              		.loc 1 368 13 view .LVU329
+ 1417 05ae 7F22     		movs	r2, #127
+ 1418 05b0 0421     		movs	r1, #4
+ 1419 05b2 3020     		movs	r0, #48
+ 1420 05b4 FFF7FEFF 		bl	OLED_ShowCHinese
+ 1421              	.LVL114:
+ 369:USER/main.c   ****             OLED_ShowNum(72, 4, set_wendu_lou, 2, 16);
+ 1422              		.loc 1 369 13 view .LVU330
+ 1423 05b8 2346     		mov	r3, r4
+ 1424 05ba 3A22     		movs	r2, #58
+ 1425 05bc 0421     		movs	r1, #4
+ 1426 05be 4020     		movs	r0, #64
+ 1427 05c0 FFF7FEFF 		bl	OLED_ShowChar
+ 1428              	.LVL115:
+ 370:USER/main.c   ****             
+ 1429              		.loc 1 370 13 view .LVU331
+ 1430 05c4 0094     		str	r4, [sp]
+ 1431 05c6 0223     		movs	r3, #2
+ 1432 05c8 4C4A     		ldr	r2, .L118+32
+ 1433 05ca 1268     		ldr	r2, [r2]
+ 1434 05cc 0421     		movs	r1, #4
+ 1435 05ce 4820     		movs	r0, #72
+ 1436 05d0 FFF7FEFF 		bl	OLED_ShowNum
+ 1437              	.LVL116:
+ 373:USER/main.c   ****             OLED_ShowCHinese(16, 6, 11); //度
+ 1438              		.loc 1 373 13 view .LVU332
+ 1439 05d4 0B22     		movs	r2, #11
+ 1440 05d6 0621     		movs	r1, #6
+ 1441 05d8 0020     		movs	r0, #0
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 42
+
+
+ 1442 05da FFF7FEFF 		bl	OLED_ShowCHinese
+ 1443              	.LVL117:
+ 374:USER/main.c   ****             OLED_ShowCHinese(32, 6, 124); //上
+ 1444              		.loc 1 374 13 view .LVU333
+ 1445 05de 0B22     		movs	r2, #11
+ 1446 05e0 0621     		movs	r1, #6
+ 1447 05e2 2046     		mov	r0, r4
+ 1448 05e4 FFF7FEFF 		bl	OLED_ShowCHinese
+ 1449              	.LVL118:
+ 375:USER/main.c   ****             OLED_ShowCHinese(48, 6, 125); //限
+ 1450              		.loc 1 375 13 view .LVU334
+ 1451 05e8 7C22     		movs	r2, #124
+ 1452 05ea 0621     		movs	r1, #6
+ 1453 05ec 2020     		movs	r0, #32
+ 1454 05ee FFF7FEFF 		bl	OLED_ShowCHinese
+ 1455              	.LVL119:
+ 376:USER/main.c   ****             OLED_ShowChar(64, 6, ':', 16);
+ 1456              		.loc 1 376 13 view .LVU335
+ 1457 05f2 7D22     		movs	r2, #125
+ 1458 05f4 0621     		movs	r1, #6
+ 1459 05f6 3020     		movs	r0, #48
+ 1460 05f8 FFF7FEFF 		bl	OLED_ShowCHinese
+ 1461              	.LVL120:
+ 377:USER/main.c   ****             OLED_ShowNum(72, 6, set_shidu, 2, 16);
+ 1462              		.loc 1 377 13 view .LVU336
+ 1463 05fc 2346     		mov	r3, r4
+ 1464 05fe 3A22     		movs	r2, #58
+ 1465 0600 0621     		movs	r1, #6
+ 1466 0602 4020     		movs	r0, #64
+ 1467 0604 FFF7FEFF 		bl	OLED_ShowChar
+ 1468              	.LVL121:
+ 378:USER/main.c   ****             
+ 1469              		.loc 1 378 13 view .LVU337
+ 1470 0608 0094     		str	r4, [sp]
+ 1471 060a 0223     		movs	r3, #2
+ 1472 060c 3C4A     		ldr	r2, .L118+36
+ 1473 060e 1268     		ldr	r2, [r2]
+ 1474 0610 0621     		movs	r1, #6
+ 1475 0612 4820     		movs	r0, #72
+ 1476 0614 FFF7FEFF 		bl	OLED_ShowNum
+ 1477              	.LVL122:
+ 381:USER/main.c   ****             {
+ 1478              		.loc 1 381 13 view .LVU338
+ 381:USER/main.c   ****             {
+ 1479              		.loc 1 381 28 is_stmt 0 view .LVU339
+ 1480 0618 3A4B     		ldr	r3, .L118+40
+ 1481 061a 1B68     		ldr	r3, [r3]
+ 381:USER/main.c   ****             {
+ 1482              		.loc 1 381 15 view .LVU340
+ 1483 061c 012B     		cmp	r3, #1
+ 1484 061e 39D0     		beq	.L111
+ 1485              	.L63:
+ 398:USER/main.c   ****             {
+ 1486              		.loc 1 398 13 is_stmt 1 view .LVU341
+ 398:USER/main.c   ****             {
+ 1487              		.loc 1 398 28 is_stmt 0 view .LVU342
+ 1488 0620 384B     		ldr	r3, .L118+40
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 43
+
+
+ 1489 0622 1B68     		ldr	r3, [r3]
+ 398:USER/main.c   ****             {
+ 1490              		.loc 1 398 15 view .LVU343
+ 1491 0624 022B     		cmp	r3, #2
+ 1492 0626 6FD0     		beq	.L112
+ 1493              	.L65:
+ 415:USER/main.c   ****             {
+ 1494              		.loc 1 415 13 is_stmt 1 view .LVU344
+ 415:USER/main.c   ****             {
+ 1495              		.loc 1 415 28 is_stmt 0 view .LVU345
+ 1496 0628 364B     		ldr	r3, .L118+40
+ 1497 062a 1B68     		ldr	r3, [r3]
+ 415:USER/main.c   ****             {
+ 1498              		.loc 1 415 15 view .LVU346
+ 1499 062c 032B     		cmp	r3, #3
+ 1500 062e 7FF492AD 		bne	.L60
+ 417:USER/main.c   ****                 OLED_ShowString(100, 4, (u8 *)" ", 16);   
+ 1501              		.loc 1 417 17 is_stmt 1 view .LVU347
+ 1502 0632 2D4C     		ldr	r4, .L118+12
+ 1503 0634 1023     		movs	r3, #16
+ 1504 0636 2246     		mov	r2, r4
+ 1505 0638 0221     		movs	r1, #2
+ 1506 063a 6420     		movs	r0, #100
+ 1507 063c FFF7FEFF 		bl	OLED_ShowString
+ 1508              	.LVL123:
+ 418:USER/main.c   ****                 OLED_ShowString(100, 6, (u8 *)"<", 16); 
+ 1509              		.loc 1 418 17 view .LVU348
+ 1510 0640 1023     		movs	r3, #16
+ 1511 0642 2246     		mov	r2, r4
+ 1512 0644 0421     		movs	r1, #4
+ 1513 0646 6420     		movs	r0, #100
+ 1514 0648 FFF7FEFF 		bl	OLED_ShowString
+ 1515              	.LVL124:
+ 419:USER/main.c   ****                 
+ 1516              		.loc 1 419 17 view .LVU349
+ 1517 064c 1023     		movs	r3, #16
+ 1518 064e 254A     		ldr	r2, .L118+8
+ 1519 0650 0621     		movs	r1, #6
+ 1520 0652 6420     		movs	r0, #100
+ 1521 0654 FFF7FEFF 		bl	OLED_ShowString
+ 1522              	.LVL125:
+ 421:USER/main.c   ****                 {
+ 1523              		.loc 1 421 17 view .LVU350
+ 421:USER/main.c   ****                 {
+ 1524              		.loc 1 421 28 is_stmt 0 view .LVU351
+ 1525 0658 254B     		ldr	r3, .L118+20
+ 1526 065a 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 421:USER/main.c   ****                 {
+ 1527              		.loc 1 421 19 view .LVU352
+ 1528 065c 032B     		cmp	r3, #3
+ 1529 065e 77D0     		beq	.L113
+ 1530              	.L67:
+ 425:USER/main.c   ****                 {
+ 1531              		.loc 1 425 17 is_stmt 1 view .LVU353
+ 425:USER/main.c   ****                 {
+ 1532              		.loc 1 425 19 is_stmt 0 view .LVU354
+ 1533 0660 042B     		cmp	r3, #4
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 44
+
+
+ 1534 0662 7FF478AD 		bne	.L60
+ 427:USER/main.c   ****                 }
+ 1535              		.loc 1 427 21 is_stmt 1 view .LVU355
+ 427:USER/main.c   ****                 }
+ 1536              		.loc 1 427 31 is_stmt 0 view .LVU356
+ 1537 0666 264A     		ldr	r2, .L118+36
+ 1538 0668 1368     		ldr	r3, [r2]
+ 1539 066a 053B     		subs	r3, r3, #5
+ 1540 066c 1360     		str	r3, [r2]
+ 1541 066e 72E5     		b	.L60
+ 1542              	.L109:
+ 339:USER/main.c   ****                 OLED_Clear(0);
+ 1543              		.loc 1 339 17 is_stmt 1 view .LVU357
+ 339:USER/main.c   ****                 OLED_Clear(0);
+ 1544              		.loc 1 339 28 is_stmt 0 view .LVU358
+ 1545 0670 1A4B     		ldr	r3, .L118
+ 1546 0672 0122     		movs	r2, #1
+ 1547 0674 1A60     		str	r2, [r3]
+ 340:USER/main.c   ****             }
+ 1548              		.loc 1 340 17 is_stmt 1 view .LVU359
+ 1549 0676 0020     		movs	r0, #0
+ 1550 0678 FFF7FEFF 		bl	OLED_Clear
+ 1551              	.LVL126:
+ 1552 067c 4CE7     		b	.L61
+ 1553              	.L110:
+ 345:USER/main.c   ****                 if(page3_index == 4)
+ 1554              		.loc 1 345 17 view .LVU360
+ 345:USER/main.c   ****                 if(page3_index == 4)
+ 1555              		.loc 1 345 28 is_stmt 0 view .LVU361
+ 1556 067e 214A     		ldr	r2, .L118+40
+ 1557 0680 1368     		ldr	r3, [r2]
+ 1558 0682 0133     		adds	r3, r3, #1
+ 1559 0684 1360     		str	r3, [r2]
+ 346:USER/main.c   ****                     page3_index = 1;
+ 1560              		.loc 1 346 17 is_stmt 1 view .LVU362
+ 346:USER/main.c   ****                     page3_index = 1;
+ 1561              		.loc 1 346 19 is_stmt 0 view .LVU363
+ 1562 0686 042B     		cmp	r3, #4
+ 1563 0688 7FF44BAF 		bne	.L62
+ 347:USER/main.c   ****             }
+ 1564              		.loc 1 347 21 is_stmt 1 view .LVU364
+ 347:USER/main.c   ****             }
+ 1565              		.loc 1 347 33 is_stmt 0 view .LVU365
+ 1566 068c 1346     		mov	r3, r2
+ 1567 068e 0122     		movs	r2, #1
+ 1568 0690 1A60     		str	r2, [r3]
+ 1569 0692 46E7     		b	.L62
+ 1570              	.L111:
+ 383:USER/main.c   ****                 OLED_ShowString(100, 4, (u8 *)" ", 16);   
+ 1571              		.loc 1 383 17 is_stmt 1 view .LVU366
+ 1572 0694 2346     		mov	r3, r4
+ 1573 0696 134A     		ldr	r2, .L118+8
+ 1574 0698 0221     		movs	r1, #2
+ 1575 069a 6420     		movs	r0, #100
+ 1576 069c FFF7FEFF 		bl	OLED_ShowString
+ 1577              	.LVL127:
+ 384:USER/main.c   ****                 OLED_ShowString(100, 6, (u8 *)" ", 16); 
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 45
+
+
+ 1578              		.loc 1 384 17 view .LVU367
+ 1579 06a0 114C     		ldr	r4, .L118+12
+ 1580 06a2 1023     		movs	r3, #16
+ 1581 06a4 2246     		mov	r2, r4
+ 1582 06a6 0421     		movs	r1, #4
+ 1583 06a8 6420     		movs	r0, #100
+ 1584 06aa FFF7FEFF 		bl	OLED_ShowString
+ 1585              	.LVL128:
+ 385:USER/main.c   ****                 
+ 1586              		.loc 1 385 17 view .LVU368
+ 1587 06ae 1023     		movs	r3, #16
+ 1588 06b0 2246     		mov	r2, r4
+ 1589 06b2 0621     		movs	r1, #6
+ 1590 06b4 6420     		movs	r0, #100
+ 1591 06b6 FFF7FEFF 		bl	OLED_ShowString
+ 1592              	.LVL129:
+ 387:USER/main.c   ****                 {
+ 1593              		.loc 1 387 17 view .LVU369
+ 387:USER/main.c   ****                 {
+ 1594              		.loc 1 387 28 is_stmt 0 view .LVU370
+ 1595 06ba 0D4B     		ldr	r3, .L118+20
+ 1596 06bc 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 387:USER/main.c   ****                 {
+ 1597              		.loc 1 387 19 view .LVU371
+ 1598 06be 032B     		cmp	r3, #3
+ 1599 06c0 06D0     		beq	.L114
+ 1600              	.L64:
+ 391:USER/main.c   ****                 {
+ 1601              		.loc 1 391 17 is_stmt 1 view .LVU372
+ 391:USER/main.c   ****                 {
+ 1602              		.loc 1 391 19 is_stmt 0 view .LVU373
+ 1603 06c2 042B     		cmp	r3, #4
+ 1604 06c4 ACD1     		bne	.L63
+ 393:USER/main.c   ****                 }
+ 1605              		.loc 1 393 21 is_stmt 1 view .LVU374
+ 393:USER/main.c   ****                 }
+ 1606              		.loc 1 393 35 is_stmt 0 view .LVU375
+ 1607 06c6 0C4A     		ldr	r2, .L118+28
+ 1608 06c8 1368     		ldr	r3, [r2]
+ 1609 06ca 013B     		subs	r3, r3, #1
+ 1610 06cc 1360     		str	r3, [r2]
+ 1611 06ce A7E7     		b	.L63
+ 1612              	.L114:
+ 389:USER/main.c   ****                 }
+ 1613              		.loc 1 389 21 is_stmt 1 view .LVU376
+ 389:USER/main.c   ****                 }
+ 1614              		.loc 1 389 35 is_stmt 0 view .LVU377
+ 1615 06d0 0949     		ldr	r1, .L118+28
+ 1616 06d2 0A68     		ldr	r2, [r1]
+ 1617 06d4 0132     		adds	r2, r2, #1
+ 1618 06d6 0A60     		str	r2, [r1]
+ 1619 06d8 F3E7     		b	.L64
+ 1620              	.L119:
+ 1621 06da 00BF     		.align	2
+ 1622              	.L118:
+ 1623 06dc 00000000 		.word	page_clear
+ 1624 06e0 00000000 		.word	page2_index
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 46
+
+
+ 1625 06e4 6C000000 		.word	.LC8
+ 1626 06e8 70000000 		.word	.LC9
+ 1627 06ec 00000000 		.word	mode
+ 1628 06f0 00000000 		.word	key_num
+ 1629 06f4 00802142 		.word	1109491712
+ 1630 06f8 00000000 		.word	set_wendu_high
+ 1631 06fc 00000000 		.word	set_wendu_lou
+ 1632 0700 00000000 		.word	set_shidu
+ 1633 0704 00000000 		.word	page3_index
+ 1634              	.L112:
+ 400:USER/main.c   ****                 OLED_ShowString(100, 4, (u8 *)"<", 16);   
+ 1635              		.loc 1 400 17 is_stmt 1 view .LVU378
+ 1636 0708 584C     		ldr	r4, .L120
+ 1637 070a 1023     		movs	r3, #16
+ 1638 070c 2246     		mov	r2, r4
+ 1639 070e 0221     		movs	r1, #2
+ 1640 0710 6420     		movs	r0, #100
+ 1641 0712 FFF7FEFF 		bl	OLED_ShowString
+ 1642              	.LVL130:
+ 401:USER/main.c   ****                 OLED_ShowString(100, 6, (u8 *)" ", 16); 
+ 1643              		.loc 1 401 17 view .LVU379
+ 1644 0716 1023     		movs	r3, #16
+ 1645 0718 554A     		ldr	r2, .L120+4
+ 1646 071a 0421     		movs	r1, #4
+ 1647 071c 6420     		movs	r0, #100
+ 1648 071e FFF7FEFF 		bl	OLED_ShowString
+ 1649              	.LVL131:
+ 402:USER/main.c   ****                 
+ 1650              		.loc 1 402 17 view .LVU380
+ 1651 0722 1023     		movs	r3, #16
+ 1652 0724 2246     		mov	r2, r4
+ 1653 0726 0621     		movs	r1, #6
+ 1654 0728 6420     		movs	r0, #100
+ 1655 072a FFF7FEFF 		bl	OLED_ShowString
+ 1656              	.LVL132:
+ 404:USER/main.c   ****                 {
+ 1657              		.loc 1 404 17 view .LVU381
+ 404:USER/main.c   ****                 {
+ 1658              		.loc 1 404 28 is_stmt 0 view .LVU382
+ 1659 072e 514B     		ldr	r3, .L120+8
+ 1660 0730 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 404:USER/main.c   ****                 {
+ 1661              		.loc 1 404 19 view .LVU383
+ 1662 0732 032B     		cmp	r3, #3
+ 1663 0734 07D0     		beq	.L115
+ 1664              	.L66:
+ 408:USER/main.c   ****                 {
+ 1665              		.loc 1 408 17 is_stmt 1 view .LVU384
+ 408:USER/main.c   ****                 {
+ 1666              		.loc 1 408 19 is_stmt 0 view .LVU385
+ 1667 0736 042B     		cmp	r3, #4
+ 1668 0738 7FF476AF 		bne	.L65
+ 410:USER/main.c   ****                 }
+ 1669              		.loc 1 410 21 is_stmt 1 view .LVU386
+ 410:USER/main.c   ****                 }
+ 1670              		.loc 1 410 34 is_stmt 0 view .LVU387
+ 1671 073c 4E4A     		ldr	r2, .L120+12
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 47
+
+
+ 1672 073e 1368     		ldr	r3, [r2]
+ 1673 0740 013B     		subs	r3, r3, #1
+ 1674 0742 1360     		str	r3, [r2]
+ 1675 0744 70E7     		b	.L65
+ 1676              	.L115:
+ 406:USER/main.c   ****                 }
+ 1677              		.loc 1 406 21 is_stmt 1 view .LVU388
+ 406:USER/main.c   ****                 }
+ 1678              		.loc 1 406 34 is_stmt 0 view .LVU389
+ 1679 0746 4C49     		ldr	r1, .L120+12
+ 1680 0748 0A68     		ldr	r2, [r1]
+ 1681 074a 0132     		adds	r2, r2, #1
+ 1682 074c 0A60     		str	r2, [r1]
+ 1683 074e F2E7     		b	.L66
+ 1684              	.L113:
+ 423:USER/main.c   ****                 }
+ 1685              		.loc 1 423 21 is_stmt 1 view .LVU390
+ 423:USER/main.c   ****                 }
+ 1686              		.loc 1 423 31 is_stmt 0 view .LVU391
+ 1687 0750 4A49     		ldr	r1, .L120+16
+ 1688 0752 0A68     		ldr	r2, [r1]
+ 1689 0754 0532     		adds	r2, r2, #5
+ 1690 0756 0A60     		str	r2, [r1]
+ 1691 0758 82E7     		b	.L67
+ 1692              	.L91:
+ 435:USER/main.c   ****         }
+ 1693              		.loc 1 435 13 is_stmt 1 view .LVU392
+ 1694 075a FFF7FEFF 		bl	ESP8266_Clear
+ 1695              	.LVL133:
+ 1696 075e 06E5     		b	.L68
+ 1697              	.L92:
+ 439:USER/main.c   ****         }
+ 1698              		.loc 1 439 13 view .LVU393
+ 1699 0760 FFF7FEFF 		bl	ESP8266_Clear
+ 1700              	.LVL134:
+ 1701 0764 0FE5     		b	.L69
+ 1702              	.L93:
+ 443:USER/main.c   ****         }
+ 1703              		.loc 1 443 13 view .LVU394
+ 1704 0766 FFF7FEFF 		bl	ESP8266_Clear
+ 1705              	.LVL135:
+ 1706 076a 18E5     		b	.L70
+ 1707              	.L71:
+ 455:USER/main.c   ****         {
+ 1708              		.loc 1 455 14 view .LVU395
+ 455:USER/main.c   ****         {
+ 1709              		.loc 1 455 17 is_stmt 0 view .LVU396
+ 1710 076c 4449     		ldr	r1, .L120+20
+ 1711 076e 4548     		ldr	r0, .L120+24
+ 1712 0770 FFF7FEFF 		bl	strstr
+ 1713              	.LVL136:
+ 455:USER/main.c   ****         {
+ 1714              		.loc 1 455 16 discriminator 1 view .LVU397
+ 1715 0774 0028     		cmp	r0, #0
+ 1716 0776 3FF424AD 		beq	.L72
+ 457:USER/main.c   ****             jiare = 0;    //关闭加热
+ 1717              		.loc 1 457 13 is_stmt 1 view .LVU398
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 48
+
+
+ 457:USER/main.c   ****             jiare = 0;    //关闭加热
+ 1718              		.loc 1 457 18 is_stmt 0 view .LVU399
+ 1719 077a 434B     		ldr	r3, .L120+28
+ 1720 077c 0222     		movs	r2, #2
+ 1721 077e 1A70     		strb	r2, [r3]
+ 458:USER/main.c   ****             zhileng = 0;  //关闭制冷
+ 1722              		.loc 1 458 13 is_stmt 1 view .LVU400
+ 458:USER/main.c   ****             zhileng = 0;  //关闭制冷
+ 1723              		.loc 1 458 19 is_stmt 0 view .LVU401
+ 1724 0780 424B     		ldr	r3, .L120+32
+ 1725 0782 0022     		movs	r2, #0
+ 1726 0784 C3F8AC21 		str	r2, [r3, #428]
+ 459:USER/main.c   ****             chushi = 0;   //关闭除湿
+ 1727              		.loc 1 459 13 is_stmt 1 view .LVU402
+ 459:USER/main.c   ****             chushi = 0;   //关闭除湿
+ 1728              		.loc 1 459 21 is_stmt 0 view .LVU403
+ 1729 0788 C3F88421 		str	r2, [r3, #388]
+ 460:USER/main.c   ****         } 
+ 1730              		.loc 1 460 13 is_stmt 1 view .LVU404
+ 460:USER/main.c   ****         } 
+ 1731              		.loc 1 460 20 is_stmt 0 view .LVU405
+ 1732 078c C3F8A821 		str	r2, [r3, #424]
+ 1733 0790 17E5     		b	.L72
+ 1734              	.L94:
+ 467:USER/main.c   ****                 zhileng = 1;
+ 1735              		.loc 1 467 13 is_stmt 1 view .LVU406
+ 467:USER/main.c   ****                 zhileng = 1;
+ 1736              		.loc 1 467 26 is_stmt 0 view .LVU407
+ 1737 0792 3F4A     		ldr	r2, .L120+36
+ 1738 0794 9178     		ldrb	r1, [r2, #2]	@ zero_extendqisi2
+ 467:USER/main.c   ****                 zhileng = 1;
+ 1739              		.loc 1 467 36 view .LVU408
+ 1740 0796 3F4A     		ldr	r2, .L120+40
+ 1741 0798 1268     		ldr	r2, [r2]
+ 467:USER/main.c   ****                 zhileng = 1;
+ 1742              		.loc 1 467 15 view .LVU409
+ 1743 079a 9142     		cmp	r1, r2
+ 1744 079c 18DD     		ble	.L74
+ 468:USER/main.c   ****             else
+ 1745              		.loc 1 468 17 is_stmt 1 view .LVU410
+ 468:USER/main.c   ****             else
+ 1746              		.loc 1 468 25 is_stmt 0 view .LVU411
+ 1747 079e 3B4A     		ldr	r2, .L120+32
+ 1748 07a0 0121     		movs	r1, #1
+ 1749 07a2 C2F88411 		str	r1, [r2, #388]
+ 1750              	.L75:
+ 473:USER/main.c   ****                 jiare = 1;
+ 1751              		.loc 1 473 13 is_stmt 1 view .LVU412
+ 473:USER/main.c   ****                 jiare = 1;
+ 1752              		.loc 1 473 26 is_stmt 0 view .LVU413
+ 1753 07a6 3A4A     		ldr	r2, .L120+36
+ 1754 07a8 9178     		ldrb	r1, [r2, #2]	@ zero_extendqisi2
+ 473:USER/main.c   ****                 jiare = 1;
+ 1755              		.loc 1 473 36 view .LVU414
+ 1756 07aa 334A     		ldr	r2, .L120+12
+ 1757 07ac 1268     		ldr	r2, [r2]
+ 473:USER/main.c   ****                 jiare = 1;
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 49
+
+
+ 1758              		.loc 1 473 15 view .LVU415
+ 1759 07ae 9142     		cmp	r1, r2
+ 1760 07b0 13DA     		bge	.L76
+ 474:USER/main.c   ****             else
+ 1761              		.loc 1 474 17 is_stmt 1 view .LVU416
+ 474:USER/main.c   ****             else
+ 1762              		.loc 1 474 23 is_stmt 0 view .LVU417
+ 1763 07b2 364A     		ldr	r2, .L120+32
+ 1764 07b4 0121     		movs	r1, #1
+ 1765 07b6 C2F8AC11 		str	r1, [r2, #428]
+ 1766              	.L77:
+ 479:USER/main.c   ****                 chushi = 1;
+ 1767              		.loc 1 479 13 is_stmt 1 view .LVU418
+ 479:USER/main.c   ****                 chushi = 1;
+ 1768              		.loc 1 479 26 is_stmt 0 view .LVU419
+ 1769 07ba 354A     		ldr	r2, .L120+36
+ 1770 07bc 1178     		ldrb	r1, [r2]	@ zero_extendqisi2
+ 479:USER/main.c   ****                 chushi = 1;
+ 1771              		.loc 1 479 36 view .LVU420
+ 1772 07be 2F4A     		ldr	r2, .L120+16
+ 1773 07c0 1268     		ldr	r2, [r2]
+ 479:USER/main.c   ****                 chushi = 1;
+ 1774              		.loc 1 479 15 view .LVU421
+ 1775 07c2 9142     		cmp	r1, r2
+ 1776 07c4 0EDD     		ble	.L78
+ 480:USER/main.c   ****             else
+ 1777              		.loc 1 480 17 is_stmt 1 view .LVU422
+ 480:USER/main.c   ****             else
+ 1778              		.loc 1 480 24 is_stmt 0 view .LVU423
+ 1779 07c6 314A     		ldr	r2, .L120+32
+ 1780 07c8 0121     		movs	r1, #1
+ 1781 07ca C2F8A811 		str	r1, [r2, #424]
+ 1782 07ce FDE4     		b	.L73
+ 1783              	.L74:
+ 470:USER/main.c   ****             
+ 1784              		.loc 1 470 17 is_stmt 1 view .LVU424
+ 470:USER/main.c   ****             
+ 1785              		.loc 1 470 25 is_stmt 0 view .LVU425
+ 1786 07d0 2E4A     		ldr	r2, .L120+32
+ 1787 07d2 0021     		movs	r1, #0
+ 1788 07d4 C2F88411 		str	r1, [r2, #388]
+ 1789 07d8 E5E7     		b	.L75
+ 1790              	.L76:
+ 476:USER/main.c   ****             
+ 1791              		.loc 1 476 17 is_stmt 1 view .LVU426
+ 476:USER/main.c   ****             
+ 1792              		.loc 1 476 23 is_stmt 0 view .LVU427
+ 1793 07da 2C4A     		ldr	r2, .L120+32
+ 1794 07dc 0021     		movs	r1, #0
+ 1795 07de C2F8AC11 		str	r1, [r2, #428]
+ 1796 07e2 EAE7     		b	.L77
+ 1797              	.L78:
+ 482:USER/main.c   ****         }
+ 1798              		.loc 1 482 17 is_stmt 1 view .LVU428
+ 482:USER/main.c   ****         }
+ 1799              		.loc 1 482 24 is_stmt 0 view .LVU429
+ 1800 07e4 294A     		ldr	r2, .L120+32
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 50
+
+
+ 1801 07e6 0021     		movs	r1, #0
+ 1802 07e8 C2F8A811 		str	r1, [r2, #424]
+ 1803 07ec EEE4     		b	.L73
+ 1804              	.L95:
+ 488:USER/main.c   ****             {
+ 1805              		.loc 1 488 13 is_stmt 1 view .LVU430
+ 488:USER/main.c   ****             {
+ 1806              		.loc 1 488 24 is_stmt 0 view .LVU431
+ 1807 07ee 2A4B     		ldr	r3, .L120+44
+ 1808 07f0 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 488:USER/main.c   ****             {
+ 1809              		.loc 1 488 15 view .LVU432
+ 1810 07f2 002B     		cmp	r3, #0
+ 1811 07f4 7FF4EDAC 		bne	.L40
+ 491:USER/main.c   ****                 {
+ 1812              		.loc 1 491 17 is_stmt 1 view .LVU433
+ 491:USER/main.c   ****                 {
+ 1813              		.loc 1 491 20 is_stmt 0 view .LVU434
+ 1814 07f8 2849     		ldr	r1, .L120+48
+ 1815 07fa 2248     		ldr	r0, .L120+24
+ 1816 07fc FFF7FEFF 		bl	strstr
+ 1817              	.LVL137:
+ 491:USER/main.c   ****                 {
+ 1818              		.loc 1 491 19 discriminator 1 view .LVU435
+ 1819 0800 18B1     		cbz	r0, .L80
+ 493:USER/main.c   ****                 }
+ 1820              		.loc 1 493 21 is_stmt 1 view .LVU436
+ 493:USER/main.c   ****                 }
+ 1821              		.loc 1 493 27 is_stmt 0 view .LVU437
+ 1822 0802 224B     		ldr	r3, .L120+32
+ 1823 0804 0122     		movs	r2, #1
+ 1824 0806 C3F8AC21 		str	r2, [r3, #428]
+ 1825              	.L80:
+ 495:USER/main.c   ****                 {
+ 1826              		.loc 1 495 17 is_stmt 1 view .LVU438
+ 495:USER/main.c   ****                 {
+ 1827              		.loc 1 495 20 is_stmt 0 view .LVU439
+ 1828 080a 2549     		ldr	r1, .L120+52
+ 1829 080c 1D48     		ldr	r0, .L120+24
+ 1830 080e FFF7FEFF 		bl	strstr
+ 1831              	.LVL138:
+ 495:USER/main.c   ****                 {
+ 1832              		.loc 1 495 19 discriminator 1 view .LVU440
+ 1833 0812 18B1     		cbz	r0, .L81
+ 497:USER/main.c   ****                 }
+ 1834              		.loc 1 497 21 is_stmt 1 view .LVU441
+ 497:USER/main.c   ****                 }
+ 1835              		.loc 1 497 27 is_stmt 0 view .LVU442
+ 1836 0814 1D4B     		ldr	r3, .L120+32
+ 1837 0816 0022     		movs	r2, #0
+ 1838 0818 C3F8AC21 		str	r2, [r3, #428]
+ 1839              	.L81:
+ 501:USER/main.c   ****                 {
+ 1840              		.loc 1 501 17 is_stmt 1 view .LVU443
+ 501:USER/main.c   ****                 {
+ 1841              		.loc 1 501 20 is_stmt 0 view .LVU444
+ 1842 081c 2149     		ldr	r1, .L120+56
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 51
+
+
+ 1843 081e 1948     		ldr	r0, .L120+24
+ 1844 0820 FFF7FEFF 		bl	strstr
+ 1845              	.LVL139:
+ 501:USER/main.c   ****                 {
+ 1846              		.loc 1 501 19 discriminator 1 view .LVU445
+ 1847 0824 18B1     		cbz	r0, .L82
+ 503:USER/main.c   ****                 }
+ 1848              		.loc 1 503 21 is_stmt 1 view .LVU446
+ 503:USER/main.c   ****                 }
+ 1849              		.loc 1 503 29 is_stmt 0 view .LVU447
+ 1850 0826 194B     		ldr	r3, .L120+32
+ 1851 0828 0122     		movs	r2, #1
+ 1852 082a C3F88421 		str	r2, [r3, #388]
+ 1853              	.L82:
+ 505:USER/main.c   ****                 {
+ 1854              		.loc 1 505 17 is_stmt 1 view .LVU448
+ 505:USER/main.c   ****                 {
+ 1855              		.loc 1 505 20 is_stmt 0 view .LVU449
+ 1856 082e 1E49     		ldr	r1, .L120+60
+ 1857 0830 1448     		ldr	r0, .L120+24
+ 1858 0832 FFF7FEFF 		bl	strstr
+ 1859              	.LVL140:
+ 505:USER/main.c   ****                 {
+ 1860              		.loc 1 505 19 discriminator 1 view .LVU450
+ 1861 0836 18B1     		cbz	r0, .L83
+ 507:USER/main.c   ****                 }
+ 1862              		.loc 1 507 21 is_stmt 1 view .LVU451
+ 507:USER/main.c   ****                 }
+ 1863              		.loc 1 507 29 is_stmt 0 view .LVU452
+ 1864 0838 144B     		ldr	r3, .L120+32
+ 1865 083a 0022     		movs	r2, #0
+ 1866 083c C3F88421 		str	r2, [r3, #388]
+ 1867              	.L83:
+ 511:USER/main.c   ****                 {
+ 1868              		.loc 1 511 17 is_stmt 1 view .LVU453
+ 511:USER/main.c   ****                 {
+ 1869              		.loc 1 511 20 is_stmt 0 view .LVU454
+ 1870 0840 1A49     		ldr	r1, .L120+64
+ 1871 0842 1048     		ldr	r0, .L120+24
+ 1872 0844 FFF7FEFF 		bl	strstr
+ 1873              	.LVL141:
+ 511:USER/main.c   ****                 {
+ 1874              		.loc 1 511 19 discriminator 1 view .LVU455
+ 1875 0848 18B1     		cbz	r0, .L84
+ 513:USER/main.c   ****                 }
+ 1876              		.loc 1 513 21 is_stmt 1 view .LVU456
+ 513:USER/main.c   ****                 }
+ 1877              		.loc 1 513 28 is_stmt 0 view .LVU457
+ 1878 084a 104B     		ldr	r3, .L120+32
+ 1879 084c 0122     		movs	r2, #1
+ 1880 084e C3F8A821 		str	r2, [r3, #424]
+ 1881              	.L84:
+ 515:USER/main.c   ****                 {
+ 1882              		.loc 1 515 17 is_stmt 1 view .LVU458
+ 515:USER/main.c   ****                 {
+ 1883              		.loc 1 515 20 is_stmt 0 view .LVU459
+ 1884 0852 1749     		ldr	r1, .L120+68
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 52
+
+
+ 1885 0854 0B48     		ldr	r0, .L120+24
+ 1886 0856 FFF7FEFF 		bl	strstr
+ 1887              	.LVL142:
+ 515:USER/main.c   ****                 {
+ 1888              		.loc 1 515 19 discriminator 1 view .LVU460
+ 1889 085a 0028     		cmp	r0, #0
+ 1890 085c 3FF4B9AC 		beq	.L40
+ 517:USER/main.c   ****                 }
+ 1891              		.loc 1 517 21 is_stmt 1 view .LVU461
+ 517:USER/main.c   ****                 }
+ 1892              		.loc 1 517 28 is_stmt 0 view .LVU462
+ 1893 0860 0A4B     		ldr	r3, .L120+32
+ 1894 0862 0022     		movs	r2, #0
+ 1895 0864 C3F8A821 		str	r2, [r3, #424]
+ 1896 0868 B3E4     		b	.L40
+ 1897              	.L121:
+ 1898 086a 00BF     		.align	2
+ 1899              	.L120:
+ 1900 086c 70000000 		.word	.LC9
+ 1901 0870 6C000000 		.word	.LC8
+ 1902 0874 00000000 		.word	key_num
+ 1903 0878 00000000 		.word	set_wendu_lou
+ 1904 087c 00000000 		.word	set_shidu
+ 1905 0880 90000000 		.word	.LC15
+ 1906 0884 00000000 		.word	esp8266_buf
+ 1907 0888 00000000 		.word	mode
+ 1908 088c 00802142 		.word	1109491712
+ 1909 0890 00000000 		.word	DHT11_Data
+ 1910 0894 00000000 		.word	set_wendu_high
+ 1911 0898 00000000 		.word	Flagout
+ 1912 089c 94000000 		.word	.LC16
+ 1913 08a0 98000000 		.word	.LC17
+ 1914 08a4 9C000000 		.word	.LC18
+ 1915 08a8 A0000000 		.word	.LC19
+ 1916 08ac A4000000 		.word	.LC20
+ 1917 08b0 A8000000 		.word	.LC21
+ 1918              		.cfi_endproc
+ 1919              	.LFE32:
+ 1921              		.section	.text.show_on_off,"ax",%progbits
+ 1922              		.align	1
+ 1923              		.global	show_on_off
+ 1924              		.syntax unified
+ 1925              		.thumb
+ 1926              		.thumb_func
+ 1928              	show_on_off:
+ 1929              	.LFB37:
+ 618:USER/main.c   **** 
+ 619:USER/main.c   **** /**
+ 620:USER/main.c   ****  * 显示开关状态函数
+ 621:USER/main.c   ****  * 功能：预留函数，用于显示设备开关状态
+ 622:USER/main.c   ****  */
+ 623:USER/main.c   **** void show_on_off(void)
+ 624:USER/main.c   **** {
+ 1930              		.loc 1 624 1 is_stmt 1 view -0
+ 1931              		.cfi_startproc
+ 1932              		@ args = 0, pretend = 0, frame = 0
+ 1933              		@ frame_needed = 0, uses_anonymous_args = 0
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 53
+
+
+ 1934              		@ link register save eliminated.
+ 625:USER/main.c   ****     //预留函数，可根据需要实现
+ 626:USER/main.c   **** }...
+ 1935              		.loc 1 626 1 view .LVU464
+ 1936 0000 7047     		bx	lr
+ 1937              		.cfi_endproc
+ 1938              	.LFE37:
+ 1940              		.global	NUM
+ 1941              		.section	.bss.NUM,"aw",%nobits
+ 1942              		.align	2
+ 1945              	NUM:
+ 1946 0000 00000000 		.space	4
+ 1947              		.global	buff
+ 1948              		.section	.bss.buff,"aw",%nobits
+ 1949              		.align	2
+ 1952              	buff:
+ 1953 0000 00000000 		.space	30
+ 1953      00000000 
+ 1953      00000000 
+ 1953      00000000 
+ 1953      00000000 
+ 1954              		.global	date
+ 1955              		.section	.bss.date,"aw",%nobits
+ 1956              		.align	2
+ 1959              	date:
+ 1960 0000 00000000 		.space	200
+ 1960      00000000 
+ 1960      00000000 
+ 1960      00000000 
+ 1960      00000000 
+ 1961              		.global	oled_str
+ 1962              		.section	.bss.oled_str,"aw",%nobits
+ 1963              		.align	2
+ 1966              	oled_str:
+ 1967 0000 00000000 		.space	100
+ 1967      00000000 
+ 1967      00000000 
+ 1967      00000000 
+ 1967      00000000 
+ 1968              		.global	oled_Fill_flag
+ 1969              		.section	.data.oled_Fill_flag,"aw"
+ 1972              	oled_Fill_flag:
+ 1973 0000 01       		.byte	1
+ 1974              		.global	Flagout
+ 1975              		.section	.data.Flagout,"aw"
+ 1978              	Flagout:
+ 1979 0000 01       		.byte	1
+ 1980              		.global	WiFiInit_time
+ 1981              		.section	.bss.WiFiInit_time,"aw",%nobits
+ 1984              	WiFiInit_time:
+ 1985 0000 00       		.space	1
+ 1986              		.global	TIMER_IT
+ 1987              		.section	.bss.TIMER_IT,"aw",%nobits
+ 1990              	TIMER_IT:
+ 1991 0000 00       		.space	1
+ 1992              		.global	DHT11_Data
+ 1993              		.section	.bss.DHT11_Data,"aw",%nobits
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 54
+
+
+ 1994              		.align	2
+ 1997              	DHT11_Data:
+ 1998 0000 00000000 		.space	5
+ 1998      00
+ 1999              		.global	led_temp_mode
+ 2000              		.section	.bss.led_temp_mode,"aw",%nobits
+ 2003              	led_temp_mode:
+ 2004 0000 00       		.space	1
+ 2005              		.global	key_num
+ 2006              		.section	.bss.key_num,"aw",%nobits
+ 2009              	key_num:
+ 2010 0000 00       		.space	1
+ 2011              		.global	Out_data
+ 2012              		.section	.data.Out_data,"aw"
+ 2013              		.align	2
+ 2016              	Out_data:
+ 2017 0000 1E00     		.short	30
+ 2018 0002 1800     		.short	24
+ 2019 0004 2800     		.short	40
+ 2020 0006 2800     		.short	40
+ 2021              		.global	set_shidu
+ 2022              		.section	.data.set_shidu,"aw"
+ 2023              		.align	2
+ 2026              	set_shidu:
+ 2027 0000 32000000 		.word	50
+ 2028              		.global	set_wendu_lou
+ 2029              		.section	.data.set_wendu_lou,"aw"
+ 2030              		.align	2
+ 2033              	set_wendu_lou:
+ 2034 0000 14000000 		.word	20
+ 2035              		.global	set_wendu_high
+ 2036              		.section	.data.set_wendu_high,"aw"
+ 2037              		.align	2
+ 2040              	set_wendu_high:
+ 2041 0000 28000000 		.word	40
+ 2042              		.global	page3_index
+ 2043              		.section	.data.page3_index,"aw"
+ 2044              		.align	2
+ 2047              	page3_index:
+ 2048 0000 01000000 		.word	1
+ 2049              		.global	page2_index
+ 2050              		.section	.data.page2_index,"aw"
+ 2051              		.align	2
+ 2054              	page2_index:
+ 2055 0000 01000000 		.word	1
+ 2056              		.global	page_clear
+ 2057              		.section	.bss.page_clear,"aw",%nobits
+ 2058              		.align	2
+ 2061              	page_clear:
+ 2062 0000 00000000 		.space	4
+ 2063              		.global	page
+ 2064              		.section	.data.page,"aw"
+ 2065              		.align	2
+ 2068              	page:
+ 2069 0000 01000000 		.word	1
+ 2070              		.global	mode
+ 2071              		.section	.data.mode,"aw"
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 55
+
+
+ 2074              	mode:
+ 2075 0000 01       		.byte	1
+ 2076              		.text
+ 2077              	.Letext0:
+ 2078              		.file 2 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 2079              		.file 3 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 2080              		.file 4 "USER/stm32f10x.h"
+ 2081              		.file 5 "HARDWARE/DHT11/dht11.h"
+ 2082              		.file 6 "STM32F10x_FWLib/inc/stm32f10x_tim.h"
+ 2083              		.file 7 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 2084              		.file 8 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 2085              		.file 9 "HARDWARE/OLED/OLED.h"
+ 2086              		.file 10 "HARDWARE/ESP8266/esp8266.h"
+ 2087              		.file 11 "HARDWARE/DS1302/DS1302.h"
+ 2088              		.file 12 "HARDWARE/Timer/Timer.h"
+ 2089              		.file 13 "HARDWARE/KEY/Key.h"
+ 2090              		.file 14 "HARDWARE/control/control.h"
+ 2091              		.file 15 "STM32F10x_FWLib/inc/misc.h"
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 56
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 main.c
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:19     .text.TIM2_IRQHandler:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:25     .text.TIM2_IRQHandler:00000000 TIM2_IRQHandler
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:63     .text.TIM2_IRQHandler:00000024 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1990   .bss.TIMER_IT:00000000 TIMER_IT
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:68     .text.WeekYearday:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:74     .text.WeekYearday:00000000 WeekYearday
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:150    .text.WeekYearday:0000005e $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:220    .text.WeekYearday:00000090 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:227    .rodata.show_wendu.str1.4:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:231    .text.show_wendu:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:237    .text.show_wendu:00000000 show_wendu
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:281    .text.show_wendu:00000028 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1997   .bss.DHT11_Data:00000000 DHT11_Data
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1966   .bss.oled_str:00000000 oled_str
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:288    .text.show_mode:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:294    .text.show_mode:00000000 show_mode
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:379    .text.show_mode:00000068 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:2074   .data.mode:00000000 mode
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:384    .rodata.main.str1.4:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:449    .text.main:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:455    .text.main:00000000 main
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1076   .text.main:00000368 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:2009   .bss.key_num:00000000 key_num
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:2068   .data.page:00000000 page
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:2040   .data.set_wendu_high:00000000 set_wendu_high
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:2033   .data.set_wendu_lou:00000000 set_wendu_lou
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:2026   .data.set_shidu:00000000 set_shidu
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1978   .data.Flagout:00000000 Flagout
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1959   .bss.date:00000000 date
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:2061   .bss.page_clear:00000000 page_clear
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:2054   .data.page2_index:00000000 page2_index
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1105   .text.main:000003d0 $t
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1623   .text.main:000006dc $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:2047   .data.page3_index:00000000 page3_index
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1636   .text.main:00000708 $t
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1900   .text.main:0000086c $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1922   .text.show_on_off:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1928   .text.show_on_off:00000000 show_on_off
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1945   .bss.NUM:00000000 NUM
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1942   .bss.NUM:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1952   .bss.buff:00000000 buff
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1949   .bss.buff:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1956   .bss.date:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1963   .bss.oled_str:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1972   .data.oled_Fill_flag:00000000 oled_Fill_flag
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1984   .bss.WiFiInit_time:00000000 WiFiInit_time
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1985   .bss.WiFiInit_time:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1991   .bss.TIMER_IT:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:1994   .bss.DHT11_Data:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:2003   .bss.led_temp_mode:00000000 led_temp_mode
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:2004   .bss.led_temp_mode:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:2010   .bss.key_num:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:2016   .data.Out_data:00000000 Out_data
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:2013   .data.Out_data:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:2023   .data.set_shidu:00000000 $d
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s 			page 57
+
+
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:2030   .data.set_wendu_lou:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:2037   .data.set_wendu_high:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:2044   .data.page3_index:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:2051   .data.page2_index:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:2058   .bss.page_clear:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:2065   .data.page:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:158    .text.WeekYearday:00000065 $d
+C:\Users\31687\AppData\Local\Temp\ccUIWBIj.s:158    .text.WeekYearday:00000066 $t
+
+UNDEFINED SYMBOLS
+TIM_GetITStatus
+TIM_ClearITPendingBit
+sprintf
+OLED_ShowString
+OLED_ShowCHinese
+NVIC_PriorityGroupConfig
+Key_Init
+OLED_Init
+OLED_Clear
+Ds1302_Init
+DHT11_Init
+warm_init
+zhileng_init
+chushi_init
+KEY_Scan
+ESP8266_Init
+Timer_Init
+strstr
+sscanf
+Read_DHT11
+ESP8266_SendData
+TIME
+esp8266_buf
+OLED_ShowChar
+OLED_ShowNum
+ESP8266_Clear

@@ -1,0 +1,1391 @@
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 1
+
+
+   1              		.cpu cortex-m3
+   2              		.arch armv7-m
+   3              		.fpu softvfp
+   4              		.eabi_attribute 20, 1
+   5              		.eabi_attribute 21, 1
+   6              		.eabi_attribute 23, 3
+   7              		.eabi_attribute 24, 1
+   8              		.eabi_attribute 25, 1
+   9              		.eabi_attribute 26, 1
+  10              		.eabi_attribute 30, 1
+  11              		.eabi_attribute 34, 1
+  12              		.eabi_attribute 18, 4
+  13              		.file	"Usart.c"
+  14              		.text
+  15              	.Ltext0:
+  16              		.cfi_sections	.debug_frame
+  17              		.file 1 "HARDWARE/USART/Usart.c"
+  18              		.section	.text._sys_exit,"ax",%progbits
+  19              		.align	1
+  20              		.global	_sys_exit
+  21              		.syntax unified
+  22              		.thumb
+  23              		.thumb_func
+  25              	_sys_exit:
+  26              	.LVL0:
+  27              	.LFB32:
+   1:HARDWARE/USART/Usart.c **** /**
+   2:HARDWARE/USART/Usart.c ****  * Usart.c
+   3:HARDWARE/USART/Usart.c ****  * 串口驱动实现文件
+   4:HARDWARE/USART/Usart.c ****  * 功能：实现串口初始化和数据收发功能
+   5:HARDWARE/USART/Usart.c ****  * 版本：V1.0
+   6:HARDWARE/USART/Usart.c ****  * 测试硬件：STM32F103RCT6
+   7:HARDWARE/USART/Usart.c ****  * 作者：蔬菜恒温库监控系统开发团队
+   8:HARDWARE/USART/Usart.c ****  * 创建日期：2026-03-08
+   9:HARDWARE/USART/Usart.c ****  * 项目：蔬菜恒温库监控系统
+  10:HARDWARE/USART/Usart.c ****  */
+  11:HARDWARE/USART/Usart.c **** 
+  12:HARDWARE/USART/Usart.c **** #include "sys.h"
+  13:HARDWARE/USART/Usart.c **** #include <stdio.h>
+  14:HARDWARE/USART/Usart.c **** #include <stdarg.h>
+  15:HARDWARE/USART/Usart.c **** #include "Usart.h" 
+  16:HARDWARE/USART/Usart.c **** #include "OLED.h" 
+  17:HARDWARE/USART/Usart.c **** #include <string.h>
+  18:HARDWARE/USART/Usart.c **** 
+  19:HARDWARE/USART/Usart.c **** ////////////////////////////////////////////////////////////////////////////////// 	 
+  20:HARDWARE/USART/Usart.c **** //如果使用ucos,则包括下面的头文件即可.
+  21:HARDWARE/USART/Usart.c **** #if SYSTEM_SUPPORT_UCOS
+  22:HARDWARE/USART/Usart.c **** #include "includes.h"					//ucos 使用	 
+  23:HARDWARE/USART/Usart.c **** #endif
+  24:HARDWARE/USART/Usart.c **** 
+  25:HARDWARE/USART/Usart.c **** /**
+  26:HARDWARE/USART/Usart.c ****  * @brief 全局变量定义
+  27:HARDWARE/USART/Usart.c ****  */
+  28:HARDWARE/USART/Usart.c **** unsigned short data_cnt = 0;                 // 数据计数器
+  29:HARDWARE/USART/Usart.c **** uint8_t Seria1_TxPacket[Packet_Len] = {0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0xEF}; // 发送�
+  30:HARDWARE/USART/Usart.c **** char Serial_RxPacket[50];                    // 接收数据包
+  31:HARDWARE/USART/Usart.c **** uint8_t Serial_RxFlag;                       // 接收标志位
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 2
+
+
+  32:HARDWARE/USART/Usart.c **** /**
+  33:HARDWARE/USART/Usart.c ****  * @brief 支持printf函数的实现
+  34:HARDWARE/USART/Usart.c ****  * @note 不需要选择use MicroLIB
+  35:HARDWARE/USART/Usart.c ****  */
+  36:HARDWARE/USART/Usart.c **** #if 1
+  37:HARDWARE/USART/Usart.c **** #pragma import(__use_no_semihosting)             
+  38:HARDWARE/USART/Usart.c **** //标准库需要的支持函数                 
+  39:HARDWARE/USART/Usart.c **** struct __FILE 
+  40:HARDWARE/USART/Usart.c **** {
+  41:HARDWARE/USART/Usart.c **** 	int handle; 
+  42:HARDWARE/USART/Usart.c **** 
+  43:HARDWARE/USART/Usart.c **** };
+  44:HARDWARE/USART/Usart.c **** 
+  45:HARDWARE/USART/Usart.c **** FILE __stdout;       
+  46:HARDWARE/USART/Usart.c **** //定义_sys_exit()以避免使用半主机模式    
+  47:HARDWARE/USART/Usart.c **** void _sys_exit(int x) 
+  48:HARDWARE/USART/Usart.c **** {
+  28              		.loc 1 48 1 view -0
+  29              		.cfi_startproc
+  30              		@ args = 0, pretend = 0, frame = 0
+  31              		@ frame_needed = 0, uses_anonymous_args = 0
+  32              		@ link register save eliminated.
+  49:HARDWARE/USART/Usart.c **** 	x = x;
+  33              		.loc 1 49 2 view .LVU1
+  50:HARDWARE/USART/Usart.c **** }
+  34              		.loc 1 50 1 is_stmt 0 view .LVU2
+  35 0000 7047     		bx	lr
+  36              		.cfi_endproc
+  37              	.LFE32:
+  39              		.section	.text.fputc,"ax",%progbits
+  40              		.align	1
+  41              		.global	fputc
+  42              		.syntax unified
+  43              		.thumb
+  44              		.thumb_func
+  46              	fputc:
+  47              	.LVL1:
+  48              	.LFB33:
+  51:HARDWARE/USART/Usart.c **** //重定义fputc函数 
+  52:HARDWARE/USART/Usart.c **** int fputc(int ch, FILE *f)
+  53:HARDWARE/USART/Usart.c **** {
+  49              		.loc 1 53 1 is_stmt 1 view -0
+  50              		.cfi_startproc
+  51              		@ args = 0, pretend = 0, frame = 0
+  52              		@ frame_needed = 0, uses_anonymous_args = 0
+  53              		@ link register save eliminated.
+  54:HARDWARE/USART/Usart.c **** 	while((USART1->SR&0X40)==0) // 循环发送,直到发送完毕   
+  54              		.loc 1 54 2 view .LVU4
+  55              		.loc 1 54 7 is_stmt 0 view .LVU5
+  56 0000 02E0     		b	.L3
+  57              	.L4:
+  55:HARDWARE/USART/Usart.c ****     USART1->DR = (u8) ch;      
+  58              		.loc 1 55 5 is_stmt 1 view .LVU6
+  59              		.loc 1 55 18 is_stmt 0 view .LVU7
+  60 0002 C3B2     		uxtb	r3, r0
+  61              		.loc 1 55 16 view .LVU8
+  62 0004 034A     		ldr	r2, .L5
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 3
+
+
+  63 0006 9380     		strh	r3, [r2, #4]	@ movhi
+  64              	.L3:
+  54:HARDWARE/USART/Usart.c **** 	while((USART1->SR&0X40)==0) // 循环发送,直到发送完毕   
+  65              		.loc 1 54 25 is_stmt 1 view .LVU9
+  54:HARDWARE/USART/Usart.c **** 	while((USART1->SR&0X40)==0) // 循环发送,直到发送完毕   
+  66              		.loc 1 54 15 is_stmt 0 view .LVU10
+  67 0008 024B     		ldr	r3, .L5
+  68 000a 1B88     		ldrh	r3, [r3]
+  54:HARDWARE/USART/Usart.c **** 	while((USART1->SR&0X40)==0) // 循环发送,直到发送完毕   
+  69              		.loc 1 54 25 view .LVU11
+  70 000c 13F0400F 		tst	r3, #64
+  71 0010 F7D0     		beq	.L4
+  56:HARDWARE/USART/Usart.c **** 	return ch;
+  72              		.loc 1 56 2 is_stmt 1 view .LVU12
+  57:HARDWARE/USART/Usart.c **** }
+  73              		.loc 1 57 1 is_stmt 0 view .LVU13
+  74 0012 7047     		bx	lr
+  75              	.L6:
+  76              		.align	2
+  77              	.L5:
+  78 0014 00380140 		.word	1073821696
+  79              		.cfi_endproc
+  80              	.LFE33:
+  82              		.section	.text.Serial_Iint,"ax",%progbits
+  83              		.align	1
+  84              		.global	Serial_Iint
+  85              		.syntax unified
+  86              		.thumb
+  87              		.thumb_func
+  89              	Serial_Iint:
+  90              	.LVL2:
+  91              	.LFB34:
+  58:HARDWARE/USART/Usart.c **** #endif 
+  59:HARDWARE/USART/Usart.c **** 
+  60:HARDWARE/USART/Usart.c **** /**
+  61:HARDWARE/USART/Usart.c ****  * @brief 使用microLib的方法
+  62:HARDWARE/USART/Usart.c ****  * @note 此部分代码被注释，如需使用请取消注释
+  63:HARDWARE/USART/Usart.c ****  */
+  64:HARDWARE/USART/Usart.c ****  /* 
+  65:HARDWARE/USART/Usart.c **** int fputc(int ch, FILE *f)
+  66:HARDWARE/USART/Usart.c **** {
+  67:HARDWARE/USART/Usart.c **** 	USART_SendData(USART1, (uint8_t) ch);
+  68:HARDWARE/USART/Usart.c **** 
+  69:HARDWARE/USART/Usart.c **** 	while (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET) {}	
+  70:HARDWARE/USART/Usart.c ****    
+  71:HARDWARE/USART/Usart.c ****     return ch;
+  72:HARDWARE/USART/Usart.c **** }
+  73:HARDWARE/USART/Usart.c **** int GetKey (void)  {
+  74:HARDWARE/USART/Usart.c **** 
+  75:HARDWARE/USART/Usart.c ****     while (!(USART1->SR & USART_FLAG_RXNE));
+  76:HARDWARE/USART/Usart.c **** 
+  77:HARDWARE/USART/Usart.c ****     return ((int)(USART1->DR & 0x1FF));
+  78:HARDWARE/USART/Usart.c **** }
+  79:HARDWARE/USART/Usart.c **** */
+  80:HARDWARE/USART/Usart.c ****  
+  81:HARDWARE/USART/Usart.c **** 
+  82:HARDWARE/USART/Usart.c **** /**
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 4
+
+
+  83:HARDWARE/USART/Usart.c ****  * @brief 串口初始化函数
+  84:HARDWARE/USART/Usart.c ****  * @param bound: 波特率
+  85:HARDWARE/USART/Usart.c ****  * @return 无
+  86:HARDWARE/USART/Usart.c ****  * @note 根据USART1_ENABLE、USART2_ENABLE、USART3_ENABLE宏定义选择初始化对应串口
+  87:HARDWARE/USART/Usart.c ****  */
+  88:HARDWARE/USART/Usart.c **** void Serial_Iint(u32 bound)
+  89:HARDWARE/USART/Usart.c **** {
+  92              		.loc 1 89 1 is_stmt 1 view -0
+  93              		.cfi_startproc
+  94              		@ args = 0, pretend = 0, frame = 24
+  95              		@ frame_needed = 0, uses_anonymous_args = 0
+  96              		.loc 1 89 1 is_stmt 0 view .LVU15
+  97 0000 70B5     		push	{r4, r5, r6, lr}
+  98              	.LCFI0:
+  99              		.cfi_def_cfa_offset 16
+ 100              		.cfi_offset 4, -16
+ 101              		.cfi_offset 5, -12
+ 102              		.cfi_offset 6, -8
+ 103              		.cfi_offset 14, -4
+ 104 0002 86B0     		sub	sp, sp, #24
+ 105              	.LCFI1:
+ 106              		.cfi_def_cfa_offset 40
+ 107 0004 0646     		mov	r6, r0
+  90:HARDWARE/USART/Usart.c **** #if USART1_ENABLE
+  91:HARDWARE/USART/Usart.c ****   //GPIO端口设置
+  92:HARDWARE/USART/Usart.c ****     GPIO_InitTypeDef GPIO_InitStructure;
+ 108              		.loc 1 92 5 is_stmt 1 view .LVU16
+  93:HARDWARE/USART/Usart.c **** 	USART_InitTypeDef USART_InitStructure;
+ 109              		.loc 1 93 2 view .LVU17
+  94:HARDWARE/USART/Usart.c **** 	NVIC_InitTypeDef NVIC_InitStructure;
+ 110              		.loc 1 94 2 view .LVU18
+  95:HARDWARE/USART/Usart.c **** 	 
+  96:HARDWARE/USART/Usart.c **** 	// 使能USART1，GPIOA时钟
+  97:HARDWARE/USART/Usart.c **** 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1|RCC_APB2Periph_GPIOA, ENABLE);	
+ 111              		.loc 1 97 2 view .LVU19
+ 112 0006 0121     		movs	r1, #1
+ 113 0008 44F20400 		movw	r0, #16388
+ 114              	.LVL3:
+ 115              		.loc 1 97 2 is_stmt 0 view .LVU20
+ 116 000c FFF7FEFF 		bl	RCC_APB2PeriphClockCmd
+ 117              	.LVL4:
+  98:HARDWARE/USART/Usart.c ****   
+  99:HARDWARE/USART/Usart.c ****     // USART1_TX   GPIOA.9
+ 100:HARDWARE/USART/Usart.c ****     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9; // PA.9
+ 118              		.loc 1 100 5 is_stmt 1 view .LVU21
+ 119              		.loc 1 100 33 is_stmt 0 view .LVU22
+ 120 0010 4FF40073 		mov	r3, #512
+ 121 0014 ADF81430 		strh	r3, [sp, #20]	@ movhi
+ 101:HARDWARE/USART/Usart.c ****     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+ 122              		.loc 1 101 5 is_stmt 1 view .LVU23
+ 123              		.loc 1 101 35 is_stmt 0 view .LVU24
+ 124 0018 0323     		movs	r3, #3
+ 125 001a 8DF81630 		strb	r3, [sp, #22]
+ 102:HARDWARE/USART/Usart.c ****     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP; // 复用推挽输出
+ 126              		.loc 1 102 5 is_stmt 1 view .LVU25
+ 127              		.loc 1 102 34 is_stmt 0 view .LVU26
+ 128 001e 1823     		movs	r3, #24
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 5
+
+
+ 129 0020 8DF81730 		strb	r3, [sp, #23]
+ 103:HARDWARE/USART/Usart.c ****     GPIO_Init(GPIOA, &GPIO_InitStructure); // 初始化GPIOA.9
+ 130              		.loc 1 103 5 is_stmt 1 view .LVU27
+ 131 0024 1D4C     		ldr	r4, .L9
+ 132 0026 05A9     		add	r1, sp, #20
+ 133 0028 2046     		mov	r0, r4
+ 134 002a FFF7FEFF 		bl	GPIO_Init
+ 135              	.LVL5:
+ 104:HARDWARE/USART/Usart.c **** 
+ 105:HARDWARE/USART/Usart.c ****     // USART1_RX  GPIOA.10初始化
+ 106:HARDWARE/USART/Usart.c ****     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10; // PA10
+ 136              		.loc 1 106 5 view .LVU28
+ 137              		.loc 1 106 33 is_stmt 0 view .LVU29
+ 138 002e 4FF48063 		mov	r3, #1024
+ 139 0032 ADF81430 		strh	r3, [sp, #20]	@ movhi
+ 107:HARDWARE/USART/Usart.c ****     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING; // 浮空输入
+ 140              		.loc 1 107 5 is_stmt 1 view .LVU30
+ 141              		.loc 1 107 34 is_stmt 0 view .LVU31
+ 142 0036 0423     		movs	r3, #4
+ 143 0038 8DF81730 		strb	r3, [sp, #23]
+ 108:HARDWARE/USART/Usart.c ****     GPIO_Init(GPIOA, &GPIO_InitStructure); // 初始化GPIOA.10  
+ 144              		.loc 1 108 5 is_stmt 1 view .LVU32
+ 145 003c 05A9     		add	r1, sp, #20
+ 146 003e 2046     		mov	r0, r4
+ 147 0040 FFF7FEFF 		bl	GPIO_Init
+ 148              	.LVL6:
+ 109:HARDWARE/USART/Usart.c **** 
+ 110:HARDWARE/USART/Usart.c ****     // Usart1 NVIC 配置
+ 111:HARDWARE/USART/Usart.c ****     NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;
+ 149              		.loc 1 111 5 view .LVU33
+ 150              		.loc 1 111 40 is_stmt 0 view .LVU34
+ 151 0044 2523     		movs	r3, #37
+ 152 0046 8DF80030 		strb	r3, [sp]
+ 112:HARDWARE/USART/Usart.c ****     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1; // 抢占优先级1
+ 153              		.loc 1 112 5 is_stmt 1 view .LVU35
+ 154              		.loc 1 112 58 is_stmt 0 view .LVU36
+ 155 004a 0125     		movs	r5, #1
+ 156 004c 8DF80150 		strb	r5, [sp, #1]
+ 113:HARDWARE/USART/Usart.c ****     NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0; // 子优先级0
+ 157              		.loc 1 113 5 is_stmt 1 view .LVU37
+ 158              		.loc 1 113 51 is_stmt 0 view .LVU38
+ 159 0050 0024     		movs	r4, #0
+ 160 0052 8DF80240 		strb	r4, [sp, #2]
+ 114:HARDWARE/USART/Usart.c ****     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE; // IRQ通道使能
+ 161              		.loc 1 114 5 is_stmt 1 view .LVU39
+ 162              		.loc 1 114 43 is_stmt 0 view .LVU40
+ 163 0056 8DF80350 		strb	r5, [sp, #3]
+ 115:HARDWARE/USART/Usart.c ****     NVIC_Init(&NVIC_InitStructure); // 根据指定的参数初始化VIC寄存器
+ 164              		.loc 1 115 5 is_stmt 1 view .LVU41
+ 165 005a 6846     		mov	r0, sp
+ 166 005c FFF7FEFF 		bl	NVIC_Init
+ 167              	.LVL7:
+ 116:HARDWARE/USART/Usart.c ****   
+ 117:HARDWARE/USART/Usart.c ****    // USART 初始化设置
+ 118:HARDWARE/USART/Usart.c **** 
+ 119:HARDWARE/USART/Usart.c **** 	USART_InitStructure.USART_BaudRate = bound; // 串口波特率
+ 168              		.loc 1 119 2 view .LVU42
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 6
+
+
+ 169              		.loc 1 119 37 is_stmt 0 view .LVU43
+ 170 0060 0196     		str	r6, [sp, #4]
+ 120:HARDWARE/USART/Usart.c **** 	USART_InitStructure.USART_WordLength = USART_WordLength_8b; // 字长为8位数据格式
+ 171              		.loc 1 120 2 is_stmt 1 view .LVU44
+ 172              		.loc 1 120 39 is_stmt 0 view .LVU45
+ 173 0062 ADF80840 		strh	r4, [sp, #8]	@ movhi
+ 121:HARDWARE/USART/Usart.c **** 	USART_InitStructure.USART_StopBits = USART_StopBits_1; // 一个停止位
+ 174              		.loc 1 121 2 is_stmt 1 view .LVU46
+ 175              		.loc 1 121 37 is_stmt 0 view .LVU47
+ 176 0066 ADF80A40 		strh	r4, [sp, #10]	@ movhi
+ 122:HARDWARE/USART/Usart.c **** 	USART_InitStructure.USART_Parity = USART_Parity_No; // 无奇偶校验位
+ 177              		.loc 1 122 2 is_stmt 1 view .LVU48
+ 178              		.loc 1 122 35 is_stmt 0 view .LVU49
+ 179 006a ADF80C40 		strh	r4, [sp, #12]	@ movhi
+ 123:HARDWARE/USART/Usart.c **** 	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None; // 无硬件数据
+ 180              		.loc 1 123 2 is_stmt 1 view .LVU50
+ 181              		.loc 1 123 48 is_stmt 0 view .LVU51
+ 182 006e ADF81040 		strh	r4, [sp, #16]	@ movhi
+ 124:HARDWARE/USART/Usart.c **** 	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx; // 收发模式
+ 183              		.loc 1 124 2 is_stmt 1 view .LVU52
+ 184              		.loc 1 124 33 is_stmt 0 view .LVU53
+ 185 0072 0C23     		movs	r3, #12
+ 186 0074 ADF80E30 		strh	r3, [sp, #14]	@ movhi
+ 125:HARDWARE/USART/Usart.c **** 
+ 126:HARDWARE/USART/Usart.c ****     USART_Init(USART1, &USART_InitStructure); // 初始化串口1
+ 187              		.loc 1 126 5 is_stmt 1 view .LVU54
+ 188 0078 094C     		ldr	r4, .L9+4
+ 189 007a 01A9     		add	r1, sp, #4
+ 190 007c 2046     		mov	r0, r4
+ 191 007e FFF7FEFF 		bl	USART_Init
+ 192              	.LVL8:
+ 127:HARDWARE/USART/Usart.c ****     USART_ITConfig(USART1, USART_IT_RXNE, ENABLE); // 开启串口接受中断
+ 193              		.loc 1 127 5 view .LVU55
+ 194 0082 2A46     		mov	r2, r5
+ 195 0084 40F22551 		movw	r1, #1317
+ 196 0088 2046     		mov	r0, r4
+ 197 008a FFF7FEFF 		bl	USART_ITConfig
+ 198              	.LVL9:
+ 128:HARDWARE/USART/Usart.c ****     USART_Cmd(USART1, ENABLE); // 使能串口1 
+ 199              		.loc 1 128 5 view .LVU56
+ 200 008e 2946     		mov	r1, r5
+ 201 0090 2046     		mov	r0, r4
+ 202 0092 FFF7FEFF 		bl	USART_Cmd
+ 203              	.LVL10:
+ 129:HARDWARE/USART/Usart.c ****     
+ 130:HARDWARE/USART/Usart.c **** #elif USART2_ENABLE
+ 131:HARDWARE/USART/Usart.c **** 	GPIO_InitTypeDef gpio_initstruct;
+ 132:HARDWARE/USART/Usart.c **** 	USART_InitTypeDef usart_initstruct;
+ 133:HARDWARE/USART/Usart.c **** 	NVIC_InitTypeDef nvic_initstruct;
+ 134:HARDWARE/USART/Usart.c **** 	
+ 135:HARDWARE/USART/Usart.c **** 	// 使能GPIOA和USART2时钟
+ 136:HARDWARE/USART/Usart.c **** 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+ 137:HARDWARE/USART/Usart.c **** 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
+ 138:HARDWARE/USART/Usart.c **** 	
+ 139:HARDWARE/USART/Usart.c **** 	// PA2 TXD
+ 140:HARDWARE/USART/Usart.c **** 	gpio_initstruct.GPIO_Mode = GPIO_Mode_AF_PP;
+ 141:HARDWARE/USART/Usart.c **** 	gpio_initstruct.GPIO_Pin = GPIO_Pin_2;
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 7
+
+
+ 142:HARDWARE/USART/Usart.c **** 	gpio_initstruct.GPIO_Speed = GPIO_Speed_50MHz;
+ 143:HARDWARE/USART/Usart.c **** 	GPIO_Init(GPIOA, &gpio_initstruct);
+ 144:HARDWARE/USART/Usart.c **** 	
+ 145:HARDWARE/USART/Usart.c **** 	// PA3 RXD
+ 146:HARDWARE/USART/Usart.c **** 	gpio_initstruct.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+ 147:HARDWARE/USART/Usart.c **** 	gpio_initstruct.GPIO_Pin = GPIO_Pin_3;
+ 148:HARDWARE/USART/Usart.c **** 	gpio_initstruct.GPIO_Speed = GPIO_Speed_50MHz;
+ 149:HARDWARE/USART/Usart.c **** 	GPIO_Init(GPIOA, &gpio_initstruct);
+ 150:HARDWARE/USART/Usart.c **** 	
+ 151:HARDWARE/USART/Usart.c **** 	// USART2初始化
+ 152:HARDWARE/USART/Usart.c **** 	usart_initstruct.USART_BaudRate = bound;
+ 153:HARDWARE/USART/Usart.c **** 	usart_initstruct.USART_HardwareFlowControl = USART_HardwareFlowControl_None; // 无硬件流控
+ 154:HARDWARE/USART/Usart.c **** 	usart_initstruct.USART_Mode = USART_Mode_Rx | USART_Mode_Tx; // 接收和发送
+ 155:HARDWARE/USART/Usart.c **** 	usart_initstruct.USART_Parity = USART_Parity_No; // 无校验
+ 156:HARDWARE/USART/Usart.c **** 	usart_initstruct.USART_StopBits = USART_StopBits_1; // 1位停止位
+ 157:HARDWARE/USART/Usart.c **** 	usart_initstruct.USART_WordLength = USART_WordLength_8b; // 8位数据位
+ 158:HARDWARE/USART/Usart.c **** 	USART_Init(USART2, &usart_initstruct);
+ 159:HARDWARE/USART/Usart.c **** 	
+ 160:HARDWARE/USART/Usart.c **** 	USART_Cmd(USART2, ENABLE); // 使能串口
+ 161:HARDWARE/USART/Usart.c **** 	
+ 162:HARDWARE/USART/Usart.c **** 	USART_ITConfig(USART2, USART_IT_RXNE, ENABLE); // 使能接收中断
+ 163:HARDWARE/USART/Usart.c **** 	
+ 164:HARDWARE/USART/Usart.c **** 	// NVIC配置
+ 165:HARDWARE/USART/Usart.c **** 	nvic_initstruct.NVIC_IRQChannel = USART2_IRQn;
+ 166:HARDWARE/USART/Usart.c **** 	nvic_initstruct.NVIC_IRQChannelCmd = ENABLE;
+ 167:HARDWARE/USART/Usart.c **** 	nvic_initstruct.NVIC_IRQChannelPreemptionPriority = 1;
+ 168:HARDWARE/USART/Usart.c **** 	nvic_initstruct.NVIC_IRQChannelSubPriority = 0;
+ 169:HARDWARE/USART/Usart.c **** 	NVIC_Init(&nvic_initstruct);
+ 170:HARDWARE/USART/Usart.c **** 
+ 171:HARDWARE/USART/Usart.c **** #elif USART3_ENABLE
+ 172:HARDWARE/USART/Usart.c **** 	NVIC_InitTypeDef NVIC_InitStructure;
+ 173:HARDWARE/USART/Usart.c **** 	GPIO_InitTypeDef GPIO_InitStructure;
+ 174:HARDWARE/USART/Usart.c **** 	USART_InitTypeDef USART_InitStructure;
+ 175:HARDWARE/USART/Usart.c **** 
+ 176:HARDWARE/USART/Usart.c **** 	// 使能GPIOB和USART3时钟
+ 177:HARDWARE/USART/Usart.c **** 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE); // GPIOB时钟
+ 178:HARDWARE/USART/Usart.c **** 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);
+ 179:HARDWARE/USART/Usart.c **** 
+ 180:HARDWARE/USART/Usart.c ****   	USART_DeInit(USART3);  // 复位串口
+ 181:HARDWARE/USART/Usart.c **** 	// USART3_TX   PB10
+ 182:HARDWARE/USART/Usart.c ****     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10; // PB10
+ 183:HARDWARE/USART/Usart.c ****     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+ 184:HARDWARE/USART/Usart.c ****     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP; // 复用推挽输出
+ 185:HARDWARE/USART/Usart.c ****     GPIO_Init(GPIOB, &GPIO_InitStructure); // 初始化PB10
+ 186:HARDWARE/USART/Usart.c ****    
+ 187:HARDWARE/USART/Usart.c ****     // USART3_RX  PB11
+ 188:HARDWARE/USART/Usart.c ****     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11;
+ 189:HARDWARE/USART/Usart.c ****     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING; // 浮空输入
+ 190:HARDWARE/USART/Usart.c ****     GPIO_Init(GPIOB, &GPIO_InitStructure);  // 初始化PB11
+ 191:HARDWARE/USART/Usart.c **** 	
+ 192:HARDWARE/USART/Usart.c **** 	// USART3初始化
+ 193:HARDWARE/USART/Usart.c **** 	USART_InitStructure.USART_BaudRate = bound; // 一般设置为9600
+ 194:HARDWARE/USART/Usart.c **** 	USART_InitStructure.USART_WordLength = USART_WordLength_8b; // 字长为8位数据格式
+ 195:HARDWARE/USART/Usart.c **** 	USART_InitStructure.USART_StopBits = USART_StopBits_1; // 一个停止位
+ 196:HARDWARE/USART/Usart.c **** 	USART_InitStructure.USART_Parity = USART_Parity_No; // 无奇偶校验位
+ 197:HARDWARE/USART/Usart.c **** 	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None; // 无硬件数据
+ 198:HARDWARE/USART/Usart.c **** 	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx; // 收发模式
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 8
+
+
+ 199:HARDWARE/USART/Usart.c ****   
+ 200:HARDWARE/USART/Usart.c **** 	USART_Init(USART3, &USART_InitStructure); // 初始化串口3
+ 201:HARDWARE/USART/Usart.c **** 
+ 202:HARDWARE/USART/Usart.c **** 	USART_Cmd(USART3, ENABLE); // 使能串口 
+ 203:HARDWARE/USART/Usart.c **** 	// 使能接收中断
+ 204:HARDWARE/USART/Usart.c ****     USART_ITConfig(USART3, USART_IT_RXNE, ENABLE); // 开启中断   
+ 205:HARDWARE/USART/Usart.c **** 	
+ 206:HARDWARE/USART/Usart.c **** 	// NVIC配置
+ 207:HARDWARE/USART/Usart.c **** 	NVIC_InitStructure.NVIC_IRQChannel = USART3_IRQn;
+ 208:HARDWARE/USART/Usart.c **** 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1; // 抢占优先级1
+ 209:HARDWARE/USART/Usart.c **** 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 3; // 子优先级3
+ 210:HARDWARE/USART/Usart.c **** 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE; // IRQ通道使能
+ 211:HARDWARE/USART/Usart.c **** 	NVIC_Init(&NVIC_InitStructure); // 根据指定的参数初始化VIC寄存器	
+ 212:HARDWARE/USART/Usart.c **** #endif
+ 213:HARDWARE/USART/Usart.c **** }
+ 204              		.loc 1 213 1 is_stmt 0 view .LVU57
+ 205 0096 06B0     		add	sp, sp, #24
+ 206              	.LCFI2:
+ 207              		.cfi_def_cfa_offset 16
+ 208              		@ sp needed
+ 209 0098 70BD     		pop	{r4, r5, r6, pc}
+ 210              	.LVL11:
+ 211              	.L10:
+ 212              		.loc 1 213 1 view .LVU58
+ 213 009a 00BF     		.align	2
+ 214              	.L9:
+ 215 009c 00080140 		.word	1073809408
+ 216 00a0 00380140 		.word	1073821696
+ 217              		.cfi_endproc
+ 218              	.LFE34:
+ 220              		.section	.text.Serial_SendByte,"ax",%progbits
+ 221              		.align	1
+ 222              		.global	Serial_SendByte
+ 223              		.syntax unified
+ 224              		.thumb
+ 225              		.thumb_func
+ 227              	Serial_SendByte:
+ 228              	.LVL12:
+ 229              	.LFB35:
+ 214:HARDWARE/USART/Usart.c **** 
+ 215:HARDWARE/USART/Usart.c **** 
+ 216:HARDWARE/USART/Usart.c **** /**
+ 217:HARDWARE/USART/Usart.c ****  * @brief 发送单个字节
+ 218:HARDWARE/USART/Usart.c ****  * @param Byte: 要发送的字节
+ 219:HARDWARE/USART/Usart.c ****  * @return 无
+ 220:HARDWARE/USART/Usart.c ****  */
+ 221:HARDWARE/USART/Usart.c **** void Serial_SendByte(uint8_t Byte)
+ 222:HARDWARE/USART/Usart.c **** {
+ 230              		.loc 1 222 1 is_stmt 1 view -0
+ 231              		.cfi_startproc
+ 232              		@ args = 0, pretend = 0, frame = 0
+ 233              		@ frame_needed = 0, uses_anonymous_args = 0
+ 234              		.loc 1 222 1 is_stmt 0 view .LVU60
+ 235 0000 08B5     		push	{r3, lr}
+ 236              	.LCFI3:
+ 237              		.cfi_def_cfa_offset 8
+ 238              		.cfi_offset 3, -8
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 9
+
+
+ 239              		.cfi_offset 14, -4
+ 240 0002 0146     		mov	r1, r0
+ 223:HARDWARE/USART/Usart.c **** 	USART_SendData(SEND_USART, Byte);
+ 241              		.loc 1 223 2 is_stmt 1 view .LVU61
+ 242 0004 0448     		ldr	r0, .L14
+ 243              	.LVL13:
+ 244              		.loc 1 223 2 is_stmt 0 view .LVU62
+ 245 0006 FFF7FEFF 		bl	USART_SendData
+ 246              	.LVL14:
+ 224:HARDWARE/USART/Usart.c **** 	while (USART_GetFlagStatus(SEND_USART, USART_FLAG_TXE) == RESET); // 等待发送完成
+ 247              		.loc 1 224 2 is_stmt 1 view .LVU63
+ 248              	.L12:
+ 249              		.loc 1 224 57 discriminator 1 view .LVU64
+ 250              		.loc 1 224 9 is_stmt 0 discriminator 1 view .LVU65
+ 251 000a 8021     		movs	r1, #128
+ 252 000c 0248     		ldr	r0, .L14
+ 253 000e FFF7FEFF 		bl	USART_GetFlagStatus
+ 254              	.LVL15:
+ 255              		.loc 1 224 57 discriminator 1 view .LVU66
+ 256 0012 0028     		cmp	r0, #0
+ 257 0014 F9D0     		beq	.L12
+ 225:HARDWARE/USART/Usart.c **** }
+ 258              		.loc 1 225 1 view .LVU67
+ 259 0016 08BD     		pop	{r3, pc}
+ 260              	.L15:
+ 261              		.align	2
+ 262              	.L14:
+ 263 0018 00380140 		.word	1073821696
+ 264              		.cfi_endproc
+ 265              	.LFE35:
+ 267              		.section	.text.Serial_SendArray,"ax",%progbits
+ 268              		.align	1
+ 269              		.global	Serial_SendArray
+ 270              		.syntax unified
+ 271              		.thumb
+ 272              		.thumb_func
+ 274              	Serial_SendArray:
+ 275              	.LVL16:
+ 276              	.LFB36:
+ 226:HARDWARE/USART/Usart.c **** 
+ 227:HARDWARE/USART/Usart.c **** /**
+ 228:HARDWARE/USART/Usart.c ****  * @brief 发送数组
+ 229:HARDWARE/USART/Usart.c ****  * @param Array: 要发送的数组指针
+ 230:HARDWARE/USART/Usart.c ****  * @param Length: 数组长度
+ 231:HARDWARE/USART/Usart.c ****  * @return 无
+ 232:HARDWARE/USART/Usart.c ****  */
+ 233:HARDWARE/USART/Usart.c **** void Serial_SendArray(uint8_t *Array, uint16_t Length)
+ 234:HARDWARE/USART/Usart.c **** {
+ 277              		.loc 1 234 1 is_stmt 1 view -0
+ 278              		.cfi_startproc
+ 279              		@ args = 0, pretend = 0, frame = 0
+ 280              		@ frame_needed = 0, uses_anonymous_args = 0
+ 281              		.loc 1 234 1 is_stmt 0 view .LVU69
+ 282 0000 70B5     		push	{r4, r5, r6, lr}
+ 283              	.LCFI4:
+ 284              		.cfi_def_cfa_offset 16
+ 285              		.cfi_offset 4, -16
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 10
+
+
+ 286              		.cfi_offset 5, -12
+ 287              		.cfi_offset 6, -8
+ 288              		.cfi_offset 14, -4
+ 289 0002 0646     		mov	r6, r0
+ 290 0004 0D46     		mov	r5, r1
+ 235:HARDWARE/USART/Usart.c **** 	uint16_t i;
+ 291              		.loc 1 235 2 is_stmt 1 view .LVU70
+ 236:HARDWARE/USART/Usart.c **** 	for (i = 0; i < Length; i ++)
+ 292              		.loc 1 236 2 view .LVU71
+ 293              	.LVL17:
+ 294              		.loc 1 236 9 is_stmt 0 view .LVU72
+ 295 0006 0024     		movs	r4, #0
+ 296              		.loc 1 236 2 view .LVU73
+ 297 0008 04E0     		b	.L17
+ 298              	.LVL18:
+ 299              	.L18:
+ 237:HARDWARE/USART/Usart.c **** 	{
+ 238:HARDWARE/USART/Usart.c **** 		Serial_SendByte(Array[i]);
+ 300              		.loc 1 238 3 is_stmt 1 view .LVU74
+ 301 000a 305D     		ldrb	r0, [r6, r4]	@ zero_extendqisi2
+ 302 000c FFF7FEFF 		bl	Serial_SendByte
+ 303              	.LVL19:
+ 236:HARDWARE/USART/Usart.c **** 	for (i = 0; i < Length; i ++)
+ 304              		.loc 1 236 28 discriminator 3 view .LVU75
+ 305 0010 0134     		adds	r4, r4, #1
+ 306              	.LVL20:
+ 236:HARDWARE/USART/Usart.c **** 	for (i = 0; i < Length; i ++)
+ 307              		.loc 1 236 28 is_stmt 0 discriminator 3 view .LVU76
+ 308 0012 A4B2     		uxth	r4, r4
+ 309              	.LVL21:
+ 310              	.L17:
+ 236:HARDWARE/USART/Usart.c **** 	for (i = 0; i < Length; i ++)
+ 311              		.loc 1 236 16 is_stmt 1 discriminator 1 view .LVU77
+ 312 0014 AC42     		cmp	r4, r5
+ 313 0016 F8D3     		bcc	.L18
+ 239:HARDWARE/USART/Usart.c **** 	}
+ 240:HARDWARE/USART/Usart.c **** }
+ 314              		.loc 1 240 1 is_stmt 0 view .LVU78
+ 315 0018 70BD     		pop	{r4, r5, r6, pc}
+ 316              		.loc 1 240 1 view .LVU79
+ 317              		.cfi_endproc
+ 318              	.LFE36:
+ 320              		.section	.text.Serial_SendString,"ax",%progbits
+ 321              		.align	1
+ 322              		.global	Serial_SendString
+ 323              		.syntax unified
+ 324              		.thumb
+ 325              		.thumb_func
+ 327              	Serial_SendString:
+ 328              	.LVL22:
+ 329              	.LFB37:
+ 241:HARDWARE/USART/Usart.c **** 
+ 242:HARDWARE/USART/Usart.c **** /**
+ 243:HARDWARE/USART/Usart.c ****  * @brief 发送字符串
+ 244:HARDWARE/USART/Usart.c ****  * @param String: 要发送的字符串指针
+ 245:HARDWARE/USART/Usart.c ****  * @return 无
+ 246:HARDWARE/USART/Usart.c ****  */
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 11
+
+
+ 247:HARDWARE/USART/Usart.c **** void Serial_SendString(char *String)
+ 248:HARDWARE/USART/Usart.c **** {
+ 330              		.loc 1 248 1 is_stmt 1 view -0
+ 331              		.cfi_startproc
+ 332              		@ args = 0, pretend = 0, frame = 0
+ 333              		@ frame_needed = 0, uses_anonymous_args = 0
+ 334              		.loc 1 248 1 is_stmt 0 view .LVU81
+ 335 0000 38B5     		push	{r3, r4, r5, lr}
+ 336              	.LCFI5:
+ 337              		.cfi_def_cfa_offset 16
+ 338              		.cfi_offset 3, -16
+ 339              		.cfi_offset 4, -12
+ 340              		.cfi_offset 5, -8
+ 341              		.cfi_offset 14, -4
+ 342 0002 0546     		mov	r5, r0
+ 249:HARDWARE/USART/Usart.c **** 	uint8_t i;
+ 343              		.loc 1 249 2 is_stmt 1 view .LVU82
+ 250:HARDWARE/USART/Usart.c **** 	for (i = 0; String[i] != '\0'; i ++)
+ 344              		.loc 1 250 2 view .LVU83
+ 345              	.LVL23:
+ 346              		.loc 1 250 9 is_stmt 0 view .LVU84
+ 347 0004 0024     		movs	r4, #0
+ 348              		.loc 1 250 2 view .LVU85
+ 349 0006 03E0     		b	.L21
+ 350              	.LVL24:
+ 351              	.L22:
+ 251:HARDWARE/USART/Usart.c **** 	{
+ 252:HARDWARE/USART/Usart.c **** 		Serial_SendByte(String[i]);
+ 352              		.loc 1 252 3 is_stmt 1 view .LVU86
+ 353 0008 FFF7FEFF 		bl	Serial_SendByte
+ 354              	.LVL25:
+ 250:HARDWARE/USART/Usart.c **** 	for (i = 0; String[i] != '\0'; i ++)
+ 355              		.loc 1 250 35 discriminator 3 view .LVU87
+ 356 000c 0134     		adds	r4, r4, #1
+ 357              	.LVL26:
+ 250:HARDWARE/USART/Usart.c **** 	for (i = 0; String[i] != '\0'; i ++)
+ 358              		.loc 1 250 35 is_stmt 0 discriminator 3 view .LVU88
+ 359 000e E4B2     		uxtb	r4, r4
+ 360              	.LVL27:
+ 361              	.L21:
+ 250:HARDWARE/USART/Usart.c **** 	for (i = 0; String[i] != '\0'; i ++)
+ 362              		.loc 1 250 24 is_stmt 1 discriminator 1 view .LVU89
+ 250:HARDWARE/USART/Usart.c **** 	for (i = 0; String[i] != '\0'; i ++)
+ 363              		.loc 1 250 20 is_stmt 0 discriminator 1 view .LVU90
+ 364 0010 285D     		ldrb	r0, [r5, r4]	@ zero_extendqisi2
+ 250:HARDWARE/USART/Usart.c **** 	for (i = 0; String[i] != '\0'; i ++)
+ 365              		.loc 1 250 24 discriminator 1 view .LVU91
+ 366 0012 0028     		cmp	r0, #0
+ 367 0014 F8D1     		bne	.L22
+ 253:HARDWARE/USART/Usart.c **** 	}
+ 254:HARDWARE/USART/Usart.c **** }
+ 368              		.loc 1 254 1 view .LVU92
+ 369 0016 38BD     		pop	{r3, r4, r5, pc}
+ 370              		.loc 1 254 1 view .LVU93
+ 371              		.cfi_endproc
+ 372              	.LFE37:
+ 374              		.section	.text.Serial_Pow,"ax",%progbits
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 12
+
+
+ 375              		.align	1
+ 376              		.global	Serial_Pow
+ 377              		.syntax unified
+ 378              		.thumb
+ 379              		.thumb_func
+ 381              	Serial_Pow:
+ 382              	.LVL28:
+ 383              	.LFB38:
+ 255:HARDWARE/USART/Usart.c **** 
+ 256:HARDWARE/USART/Usart.c **** /**
+ 257:HARDWARE/USART/Usart.c ****  * @brief 计算幂函数
+ 258:HARDWARE/USART/Usart.c ****  * @param X: 底数
+ 259:HARDWARE/USART/Usart.c ****  * @param Y: 指数
+ 260:HARDWARE/USART/Usart.c ****  * @return 计算结果
+ 261:HARDWARE/USART/Usart.c ****  */
+ 262:HARDWARE/USART/Usart.c **** uint32_t Serial_Pow(uint32_t X, uint32_t Y)
+ 263:HARDWARE/USART/Usart.c **** {
+ 384              		.loc 1 263 1 is_stmt 1 view -0
+ 385              		.cfi_startproc
+ 386              		@ args = 0, pretend = 0, frame = 0
+ 387              		@ frame_needed = 0, uses_anonymous_args = 0
+ 388              		@ link register save eliminated.
+ 389              		.loc 1 263 1 is_stmt 0 view .LVU95
+ 390 0000 0246     		mov	r2, r0
+ 264:HARDWARE/USART/Usart.c **** 	uint32_t Result = 1;
+ 391              		.loc 1 264 2 is_stmt 1 view .LVU96
+ 392              	.LVL29:
+ 265:HARDWARE/USART/Usart.c **** 	while (Y --)
+ 393              		.loc 1 265 2 view .LVU97
+ 264:HARDWARE/USART/Usart.c **** 	uint32_t Result = 1;
+ 394              		.loc 1 264 11 is_stmt 0 view .LVU98
+ 395 0002 0120     		movs	r0, #1
+ 396              	.LVL30:
+ 397              		.loc 1 265 8 view .LVU99
+ 398 0004 02E0     		b	.L25
+ 399              	.LVL31:
+ 400              	.L26:
+ 266:HARDWARE/USART/Usart.c **** 	{
+ 267:HARDWARE/USART/Usart.c **** 		Result *= X;
+ 401              		.loc 1 267 3 is_stmt 1 view .LVU100
+ 402              		.loc 1 267 10 is_stmt 0 view .LVU101
+ 403 0006 02FB00F0 		mul	r0, r2, r0
+ 404              	.LVL32:
+ 265:HARDWARE/USART/Usart.c **** 	while (Y --)
+ 405              		.loc 1 265 11 view .LVU102
+ 406 000a 1946     		mov	r1, r3
+ 407              	.LVL33:
+ 408              	.L25:
+ 265:HARDWARE/USART/Usart.c **** 	while (Y --)
+ 409              		.loc 1 265 9 is_stmt 1 view .LVU103
+ 265:HARDWARE/USART/Usart.c **** 	while (Y --)
+ 410              		.loc 1 265 11 is_stmt 0 view .LVU104
+ 411 000c 4B1E     		subs	r3, r1, #1
+ 412              	.LVL34:
+ 265:HARDWARE/USART/Usart.c **** 	while (Y --)
+ 413              		.loc 1 265 9 view .LVU105
+ 414 000e 0029     		cmp	r1, #0
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 13
+
+
+ 415 0010 F9D1     		bne	.L26
+ 268:HARDWARE/USART/Usart.c **** 	}
+ 269:HARDWARE/USART/Usart.c **** 	return Result;
+ 416              		.loc 1 269 2 is_stmt 1 view .LVU106
+ 270:HARDWARE/USART/Usart.c **** }
+ 417              		.loc 1 270 1 is_stmt 0 view .LVU107
+ 418 0012 7047     		bx	lr
+ 419              		.cfi_endproc
+ 420              	.LFE38:
+ 422              		.section	.text.Serial_SendNumber,"ax",%progbits
+ 423              		.align	1
+ 424              		.global	Serial_SendNumber
+ 425              		.syntax unified
+ 426              		.thumb
+ 427              		.thumb_func
+ 429              	Serial_SendNumber:
+ 430              	.LVL35:
+ 431              	.LFB39:
+ 271:HARDWARE/USART/Usart.c **** 
+ 272:HARDWARE/USART/Usart.c **** /**
+ 273:HARDWARE/USART/Usart.c ****  * @brief 发送数字
+ 274:HARDWARE/USART/Usart.c ****  * @param Number: 要发送的数字
+ 275:HARDWARE/USART/Usart.c ****  * @param Length: 数字长度
+ 276:HARDWARE/USART/Usart.c ****  * @return 无
+ 277:HARDWARE/USART/Usart.c ****  */
+ 278:HARDWARE/USART/Usart.c **** void Serial_SendNumber(uint32_t Number, uint8_t Length)
+ 279:HARDWARE/USART/Usart.c **** {
+ 432              		.loc 1 279 1 is_stmt 1 view -0
+ 433              		.cfi_startproc
+ 434              		@ args = 0, pretend = 0, frame = 0
+ 435              		@ frame_needed = 0, uses_anonymous_args = 0
+ 436              		.loc 1 279 1 is_stmt 0 view .LVU109
+ 437 0000 70B5     		push	{r4, r5, r6, lr}
+ 438              	.LCFI6:
+ 439              		.cfi_def_cfa_offset 16
+ 440              		.cfi_offset 4, -16
+ 441              		.cfi_offset 5, -12
+ 442              		.cfi_offset 6, -8
+ 443              		.cfi_offset 14, -4
+ 444 0002 0646     		mov	r6, r0
+ 445 0004 0D46     		mov	r5, r1
+ 280:HARDWARE/USART/Usart.c **** 	uint8_t i;
+ 446              		.loc 1 280 2 is_stmt 1 view .LVU110
+ 281:HARDWARE/USART/Usart.c **** 	for (i = 0; i < Length; i ++)
+ 447              		.loc 1 281 2 view .LVU111
+ 448              	.LVL36:
+ 449              		.loc 1 281 9 is_stmt 0 view .LVU112
+ 450 0006 0024     		movs	r4, #0
+ 451              		.loc 1 281 2 view .LVU113
+ 452 0008 14E0     		b	.L28
+ 453              	.LVL37:
+ 454              	.L29:
+ 282:HARDWARE/USART/Usart.c **** 	{
+ 283:HARDWARE/USART/Usart.c **** 		Serial_SendByte(Number / Serial_Pow(10, Length - i - 1) % 10 + '0');
+ 455              		.loc 1 283 3 is_stmt 1 view .LVU114
+ 456              		.loc 1 283 50 is_stmt 0 view .LVU115
+ 457 000a 291B     		subs	r1, r5, r4
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 14
+
+
+ 458              		.loc 1 283 28 view .LVU116
+ 459 000c 0139     		subs	r1, r1, #1
+ 460 000e 0A20     		movs	r0, #10
+ 461 0010 FFF7FEFF 		bl	Serial_Pow
+ 462              	.LVL38:
+ 463              		.loc 1 283 26 discriminator 1 view .LVU117
+ 464 0014 B6FBF0F0 		udiv	r0, r6, r0
+ 465              		.loc 1 283 59 discriminator 1 view .LVU118
+ 466 0018 084B     		ldr	r3, .L31
+ 467 001a A3FB0023 		umull	r2, r3, r3, r0
+ 468 001e DB08     		lsrs	r3, r3, #3
+ 469 0020 03EB8303 		add	r3, r3, r3, lsl #2
+ 470 0024 A0EB4303 		sub	r3, r0, r3, lsl #1
+ 471              		.loc 1 283 3 discriminator 1 view .LVU119
+ 472 0028 3033     		adds	r3, r3, #48
+ 473 002a D8B2     		uxtb	r0, r3
+ 474 002c FFF7FEFF 		bl	Serial_SendByte
+ 475              	.LVL39:
+ 281:HARDWARE/USART/Usart.c **** 	for (i = 0; i < Length; i ++)
+ 476              		.loc 1 281 28 is_stmt 1 discriminator 3 view .LVU120
+ 477 0030 0134     		adds	r4, r4, #1
+ 478              	.LVL40:
+ 281:HARDWARE/USART/Usart.c **** 	for (i = 0; i < Length; i ++)
+ 479              		.loc 1 281 28 is_stmt 0 discriminator 3 view .LVU121
+ 480 0032 E4B2     		uxtb	r4, r4
+ 481              	.LVL41:
+ 482              	.L28:
+ 281:HARDWARE/USART/Usart.c **** 	for (i = 0; i < Length; i ++)
+ 483              		.loc 1 281 16 is_stmt 1 discriminator 1 view .LVU122
+ 484 0034 AC42     		cmp	r4, r5
+ 485 0036 E8D3     		bcc	.L29
+ 284:HARDWARE/USART/Usart.c **** 	}
+ 285:HARDWARE/USART/Usart.c **** }
+ 486              		.loc 1 285 1 is_stmt 0 view .LVU123
+ 487 0038 70BD     		pop	{r4, r5, r6, pc}
+ 488              	.LVL42:
+ 489              	.L32:
+ 490              		.loc 1 285 1 view .LVU124
+ 491 003a 00BF     		.align	2
+ 492              	.L31:
+ 493 003c CDCCCCCC 		.word	-858993459
+ 494              		.cfi_endproc
+ 495              	.LFE39:
+ 497              		.section	.text.Serial_Printf,"ax",%progbits
+ 498              		.align	1
+ 499              		.global	Serial_Printf
+ 500              		.syntax unified
+ 501              		.thumb
+ 502              		.thumb_func
+ 504              	Serial_Printf:
+ 505              	.LVL43:
+ 506              	.LFB40:
+ 286:HARDWARE/USART/Usart.c **** 
+ 287:HARDWARE/USART/Usart.c **** /**
+ 288:HARDWARE/USART/Usart.c ****  * @brief 格式化发送函数
+ 289:HARDWARE/USART/Usart.c ****  * @param format: 格式化字符串
+ 290:HARDWARE/USART/Usart.c ****  * @param ...: 可变参数
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 15
+
+
+ 291:HARDWARE/USART/Usart.c ****  * @return 无
+ 292:HARDWARE/USART/Usart.c ****  */
+ 293:HARDWARE/USART/Usart.c **** void Serial_Printf(char *format, ...)
+ 294:HARDWARE/USART/Usart.c **** {
+ 507              		.loc 1 294 1 is_stmt 1 view -0
+ 508              		.cfi_startproc
+ 509              		@ args = 4, pretend = 16, frame = 104
+ 510              		@ frame_needed = 0, uses_anonymous_args = 1
+ 511              		.loc 1 294 1 is_stmt 0 view .LVU126
+ 512 0000 0FB4     		push	{r0, r1, r2, r3}
+ 513              	.LCFI7:
+ 514              		.cfi_def_cfa_offset 16
+ 515              		.cfi_offset 0, -16
+ 516              		.cfi_offset 1, -12
+ 517              		.cfi_offset 2, -8
+ 518              		.cfi_offset 3, -4
+ 519 0002 00B5     		push	{lr}
+ 520              	.LCFI8:
+ 521              		.cfi_def_cfa_offset 20
+ 522              		.cfi_offset 14, -20
+ 523 0004 9BB0     		sub	sp, sp, #108
+ 524              	.LCFI9:
+ 525              		.cfi_def_cfa_offset 128
+ 526 0006 1CAA     		add	r2, sp, #112
+ 527 0008 52F8041B 		ldr	r1, [r2], #4
+ 295:HARDWARE/USART/Usart.c **** 	char String[100];
+ 528              		.loc 1 295 2 is_stmt 1 view .LVU127
+ 296:HARDWARE/USART/Usart.c **** 	va_list arg;
+ 529              		.loc 1 296 2 view .LVU128
+ 297:HARDWARE/USART/Usart.c **** 	va_start(arg, format);
+ 530              		.loc 1 297 2 view .LVU129
+ 531 000c 0092     		str	r2, [sp]
+ 298:HARDWARE/USART/Usart.c **** 	vsprintf(String, format, arg);
+ 532              		.loc 1 298 2 view .LVU130
+ 533 000e 01A8     		add	r0, sp, #4
+ 534 0010 FFF7FEFF 		bl	vsprintf
+ 535              	.LVL44:
+ 299:HARDWARE/USART/Usart.c **** 	va_end(arg);
+ 536              		.loc 1 299 2 view .LVU131
+ 300:HARDWARE/USART/Usart.c **** 	Serial_SendString(String);
+ 537              		.loc 1 300 2 view .LVU132
+ 538 0014 01A8     		add	r0, sp, #4
+ 539 0016 FFF7FEFF 		bl	Serial_SendString
+ 540              	.LVL45:
+ 301:HARDWARE/USART/Usart.c **** }
+ 541              		.loc 1 301 1 is_stmt 0 view .LVU133
+ 542 001a 1BB0     		add	sp, sp, #108
+ 543              	.LCFI10:
+ 544              		.cfi_def_cfa_offset 20
+ 545              		@ sp needed
+ 546 001c 5DF804EB 		ldr	lr, [sp], #4
+ 547              	.LCFI11:
+ 548              		.cfi_restore 14
+ 549              		.cfi_def_cfa_offset 16
+ 550 0020 04B0     		add	sp, sp, #16
+ 551              	.LCFI12:
+ 552              		.cfi_restore 3
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 16
+
+
+ 553              		.cfi_restore 2
+ 554              		.cfi_restore 1
+ 555              		.cfi_restore 0
+ 556              		.cfi_def_cfa_offset 0
+ 557 0022 7047     		bx	lr
+ 558              		.cfi_endproc
+ 559              	.LFE40:
+ 561              		.section	.text.Serial_SendPacket,"ax",%progbits
+ 562              		.align	1
+ 563              		.global	Serial_SendPacket
+ 564              		.syntax unified
+ 565              		.thumb
+ 566              		.thumb_func
+ 568              	Serial_SendPacket:
+ 569              	.LFB41:
+ 302:HARDWARE/USART/Usart.c **** 
+ 303:HARDWARE/USART/Usart.c **** /**
+ 304:HARDWARE/USART/Usart.c ****  * @brief 发送数据包
+ 305:HARDWARE/USART/Usart.c ****  * @param 无
+ 306:HARDWARE/USART/Usart.c ****  * @return 无
+ 307:HARDWARE/USART/Usart.c ****  */
+ 308:HARDWARE/USART/Usart.c **** void Serial_SendPacket(void)
+ 309:HARDWARE/USART/Usart.c **** {
+ 570              		.loc 1 309 1 is_stmt 1 view -0
+ 571              		.cfi_startproc
+ 572              		@ args = 0, pretend = 0, frame = 0
+ 573              		@ frame_needed = 0, uses_anonymous_args = 0
+ 574 0000 08B5     		push	{r3, lr}
+ 575              	.LCFI13:
+ 576              		.cfi_def_cfa_offset 8
+ 577              		.cfi_offset 3, -8
+ 578              		.cfi_offset 14, -4
+ 310:HARDWARE/USART/Usart.c **** 	Serial_SendArray(Seria1_TxPacket, Packet_Len);
+ 579              		.loc 1 310 2 view .LVU135
+ 580 0002 0821     		movs	r1, #8
+ 581 0004 0148     		ldr	r0, .L37
+ 582 0006 FFF7FEFF 		bl	Serial_SendArray
+ 583              	.LVL46:
+ 311:HARDWARE/USART/Usart.c **** }
+ 584              		.loc 1 311 1 is_stmt 0 view .LVU136
+ 585 000a 08BD     		pop	{r3, pc}
+ 586              	.L38:
+ 587              		.align	2
+ 588              	.L37:
+ 589 000c 00000000 		.word	Seria1_TxPacket
+ 590              		.cfi_endproc
+ 591              	.LFE41:
+ 593              		.section	.text.Serial_GetRxFlag,"ax",%progbits
+ 594              		.align	1
+ 595              		.global	Serial_GetRxFlag
+ 596              		.syntax unified
+ 597              		.thumb
+ 598              		.thumb_func
+ 600              	Serial_GetRxFlag:
+ 601              	.LFB42:
+ 312:HARDWARE/USART/Usart.c **** 
+ 313:HARDWARE/USART/Usart.c **** /**
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 17
+
+
+ 314:HARDWARE/USART/Usart.c ****  * @brief 获取接收标志位
+ 315:HARDWARE/USART/Usart.c ****  * @param 无
+ 316:HARDWARE/USART/Usart.c ****  * @return 接收标志位状态
+ 317:HARDWARE/USART/Usart.c ****  */
+ 318:HARDWARE/USART/Usart.c **** uint8_t Serial_GetRxFlag(void)
+ 319:HARDWARE/USART/Usart.c **** {
+ 602              		.loc 1 319 1 is_stmt 1 view -0
+ 603              		.cfi_startproc
+ 604              		@ args = 0, pretend = 0, frame = 0
+ 605              		@ frame_needed = 0, uses_anonymous_args = 0
+ 606              		@ link register save eliminated.
+ 320:HARDWARE/USART/Usart.c **** 	if (Serial_RxFlag == 1)
+ 607              		.loc 1 320 2 view .LVU138
+ 608              		.loc 1 320 20 is_stmt 0 view .LVU139
+ 609 0000 044B     		ldr	r3, .L43
+ 610 0002 1878     		ldrb	r0, [r3]	@ zero_extendqisi2
+ 611              		.loc 1 320 5 view .LVU140
+ 612 0004 0128     		cmp	r0, #1
+ 613 0006 01D0     		beq	.L42
+ 321:HARDWARE/USART/Usart.c **** 	{
+ 322:HARDWARE/USART/Usart.c **** 		Serial_RxFlag = 0;
+ 323:HARDWARE/USART/Usart.c **** 		return 1;
+ 324:HARDWARE/USART/Usart.c **** 	}
+ 325:HARDWARE/USART/Usart.c **** 	return 0;
+ 614              		.loc 1 325 9 view .LVU141
+ 615 0008 0020     		movs	r0, #0
+ 326:HARDWARE/USART/Usart.c **** }
+ 616              		.loc 1 326 1 view .LVU142
+ 617 000a 7047     		bx	lr
+ 618              	.L42:
+ 322:HARDWARE/USART/Usart.c **** 		return 1;
+ 619              		.loc 1 322 3 is_stmt 1 view .LVU143
+ 322:HARDWARE/USART/Usart.c **** 		return 1;
+ 620              		.loc 1 322 17 is_stmt 0 view .LVU144
+ 621 000c 0022     		movs	r2, #0
+ 622 000e 1A70     		strb	r2, [r3]
+ 323:HARDWARE/USART/Usart.c **** 	}
+ 623              		.loc 1 323 3 is_stmt 1 view .LVU145
+ 323:HARDWARE/USART/Usart.c **** 	}
+ 624              		.loc 1 323 10 is_stmt 0 view .LVU146
+ 625 0010 7047     		bx	lr
+ 626              	.L44:
+ 627 0012 00BF     		.align	2
+ 628              	.L43:
+ 629 0014 00000000 		.word	Serial_RxFlag
+ 630              		.cfi_endproc
+ 631              	.LFE42:
+ 633              		.section	.text.USART1_IRQHandler,"ax",%progbits
+ 634              		.align	1
+ 635              		.global	USART1_IRQHandler
+ 636              		.syntax unified
+ 637              		.thumb
+ 638              		.thumb_func
+ 640              	USART1_IRQHandler:
+ 641              	.LFB43:
+ 327:HARDWARE/USART/Usart.c **** 
+ 328:HARDWARE/USART/Usart.c **** /**
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 18
+
+
+ 329:HARDWARE/USART/Usart.c ****  * @brief 在线计数器
+ 330:HARDWARE/USART/Usart.c ****  */
+ 331:HARDWARE/USART/Usart.c **** extern u16 online_count;
+ 332:HARDWARE/USART/Usart.c **** 
+ 333:HARDWARE/USART/Usart.c **** /**
+ 334:HARDWARE/USART/Usart.c ****  * @brief USART1中断处理函数
+ 335:HARDWARE/USART/Usart.c ****  * @param 无
+ 336:HARDWARE/USART/Usart.c ****  * @return 无
+ 337:HARDWARE/USART/Usart.c ****  * @note 处理USART1接收中断，实现数据包的接收
+ 338:HARDWARE/USART/Usart.c ****  */
+ 339:HARDWARE/USART/Usart.c **** #if  USART1_ENABLE
+ 340:HARDWARE/USART/Usart.c **** void USART1_IRQHandler(void)
+ 341:HARDWARE/USART/Usart.c **** {
+ 642              		.loc 1 341 1 is_stmt 1 view -0
+ 643              		.cfi_startproc
+ 644              		@ args = 0, pretend = 0, frame = 0
+ 645              		@ frame_needed = 0, uses_anonymous_args = 0
+ 646 0000 08B5     		push	{r3, lr}
+ 647              	.LCFI14:
+ 648              		.cfi_def_cfa_offset 8
+ 649              		.cfi_offset 3, -8
+ 650              		.cfi_offset 14, -4
+ 342:HARDWARE/USART/Usart.c **** 	static uint8_t RxState = 0;  // 接收状态
+ 651              		.loc 1 342 2 view .LVU148
+ 343:HARDWARE/USART/Usart.c **** 	static uint8_t pRxPacket = 0; // 接收数据包指针
+ 652              		.loc 1 343 2 view .LVU149
+ 344:HARDWARE/USART/Usart.c **** 	if (USART_GetITStatus(USART1, USART_IT_RXNE) == SET)
+ 653              		.loc 1 344 2 view .LVU150
+ 654              		.loc 1 344 6 is_stmt 0 view .LVU151
+ 655 0002 40F22551 		movw	r1, #1317
+ 656 0006 1F48     		ldr	r0, .L56
+ 657 0008 FFF7FEFF 		bl	USART_GetITStatus
+ 658              	.LVL47:
+ 659              		.loc 1 344 5 discriminator 1 view .LVU152
+ 660 000c 0128     		cmp	r0, #1
+ 661 000e 00D0     		beq	.L52
+ 662              	.L45:
+ 345:HARDWARE/USART/Usart.c **** 	{
+ 346:HARDWARE/USART/Usart.c **** 		uint8_t RxData = USART_ReceiveData(USART1); // 读取接收数据
+ 347:HARDWARE/USART/Usart.c **** 		
+ 348:HARDWARE/USART/Usart.c **** 		if (RxState == 0) // 等待起始符
+ 349:HARDWARE/USART/Usart.c **** 		{
+ 350:HARDWARE/USART/Usart.c **** 			if (RxData == '@' && Serial_RxFlag == 0)
+ 351:HARDWARE/USART/Usart.c **** 			{
+ 352:HARDWARE/USART/Usart.c **** 				RxState = 1; // 进入接收数据状态
+ 353:HARDWARE/USART/Usart.c **** 				pRxPacket = 0; // 重置数据包指针
+ 354:HARDWARE/USART/Usart.c **** 			}
+ 355:HARDWARE/USART/Usart.c **** 		}
+ 356:HARDWARE/USART/Usart.c **** 		else if (RxState == 1) // 接收数据
+ 357:HARDWARE/USART/Usart.c **** 		{
+ 358:HARDWARE/USART/Usart.c **** 			if (RxData == '\r') // 收到回车符
+ 359:HARDWARE/USART/Usart.c **** 			{
+ 360:HARDWARE/USART/Usart.c **** 				RxState = 2; // 进入等待换行符状态
+ 361:HARDWARE/USART/Usart.c **** 			}
+ 362:HARDWARE/USART/Usart.c **** 			else
+ 363:HARDWARE/USART/Usart.c **** 			{
+ 364:HARDWARE/USART/Usart.c **** 				Serial_RxPacket[pRxPacket] = RxData; // 存储数据
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 19
+
+
+ 365:HARDWARE/USART/Usart.c **** 				pRxPacket ++;
+ 366:HARDWARE/USART/Usart.c **** 			}
+ 367:HARDWARE/USART/Usart.c **** 		}
+ 368:HARDWARE/USART/Usart.c **** 		else if (RxState == 2) // 等待换行符
+ 369:HARDWARE/USART/Usart.c **** 		{
+ 370:HARDWARE/USART/Usart.c **** 			if (RxData == '\n') // 收到换行符
+ 371:HARDWARE/USART/Usart.c **** 			{
+ 372:HARDWARE/USART/Usart.c **** 				RxState = 0; // 重置状态
+ 373:HARDWARE/USART/Usart.c **** 				Serial_RxPacket[pRxPacket] = '\0'; // 添加字符串结束符
+ 374:HARDWARE/USART/Usart.c **** 				Serial_RxFlag = 1; // 设置接收标志位
+ 375:HARDWARE/USART/Usart.c **** 			}
+ 376:HARDWARE/USART/Usart.c **** 		}
+ 377:HARDWARE/USART/Usart.c **** 		
+ 378:HARDWARE/USART/Usart.c **** 		USART_ClearITPendingBit(USART1, USART_IT_RXNE); // 清除中断标志位
+ 379:HARDWARE/USART/Usart.c **** 	}
+ 380:HARDWARE/USART/Usart.c **** }
+ 663              		.loc 1 380 1 view .LVU153
+ 664 0010 08BD     		pop	{r3, pc}
+ 665              	.L52:
+ 666              	.LBB2:
+ 346:HARDWARE/USART/Usart.c **** 		
+ 667              		.loc 1 346 3 is_stmt 1 view .LVU154
+ 346:HARDWARE/USART/Usart.c **** 		
+ 668              		.loc 1 346 20 is_stmt 0 view .LVU155
+ 669 0012 1C48     		ldr	r0, .L56
+ 670 0014 FFF7FEFF 		bl	USART_ReceiveData
+ 671              	.LVL48:
+ 346:HARDWARE/USART/Usart.c **** 		
+ 672              		.loc 1 346 11 discriminator 1 view .LVU156
+ 673 0018 C0B2     		uxtb	r0, r0
+ 674              	.LVL49:
+ 348:HARDWARE/USART/Usart.c **** 		{
+ 675              		.loc 1 348 3 is_stmt 1 view .LVU157
+ 348:HARDWARE/USART/Usart.c **** 		{
+ 676              		.loc 1 348 15 is_stmt 0 view .LVU158
+ 677 001a 1B4B     		ldr	r3, .L56+4
+ 678 001c 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 348:HARDWARE/USART/Usart.c **** 		{
+ 679              		.loc 1 348 6 view .LVU159
+ 680 001e 93B9     		cbnz	r3, .L47
+ 350:HARDWARE/USART/Usart.c **** 			{
+ 681              		.loc 1 350 4 is_stmt 1 view .LVU160
+ 350:HARDWARE/USART/Usart.c **** 			{
+ 682              		.loc 1 350 7 is_stmt 0 view .LVU161
+ 683 0020 4028     		cmp	r0, #64
+ 684 0022 05D0     		beq	.L53
+ 685              	.L48:
+ 378:HARDWARE/USART/Usart.c **** 	}
+ 686              		.loc 1 378 3 is_stmt 1 view .LVU162
+ 687 0024 40F22551 		movw	r1, #1317
+ 688 0028 1648     		ldr	r0, .L56
+ 689              	.LVL50:
+ 378:HARDWARE/USART/Usart.c **** 	}
+ 690              		.loc 1 378 3 is_stmt 0 view .LVU163
+ 691 002a FFF7FEFF 		bl	USART_ClearITPendingBit
+ 692              	.LVL51:
+ 693              	.LBE2:
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 20
+
+
+ 694              		.loc 1 380 1 view .LVU164
+ 695 002e EFE7     		b	.L45
+ 696              	.LVL52:
+ 697              	.L53:
+ 698              	.LBB3:
+ 350:HARDWARE/USART/Usart.c **** 			{
+ 699              		.loc 1 350 39 discriminator 1 view .LVU165
+ 700 0030 164B     		ldr	r3, .L56+8
+ 701 0032 1B78     		ldrb	r3, [r3]	@ zero_extendqisi2
+ 350:HARDWARE/USART/Usart.c **** 			{
+ 702              		.loc 1 350 22 discriminator 1 view .LVU166
+ 703 0034 002B     		cmp	r3, #0
+ 704 0036 F5D1     		bne	.L48
+ 352:HARDWARE/USART/Usart.c **** 				pRxPacket = 0; // 重置数据包指针
+ 705              		.loc 1 352 5 is_stmt 1 view .LVU167
+ 352:HARDWARE/USART/Usart.c **** 				pRxPacket = 0; // 重置数据包指针
+ 706              		.loc 1 352 13 is_stmt 0 view .LVU168
+ 707 0038 134B     		ldr	r3, .L56+4
+ 708 003a 0122     		movs	r2, #1
+ 709 003c 1A70     		strb	r2, [r3]
+ 353:HARDWARE/USART/Usart.c **** 			}
+ 710              		.loc 1 353 5 is_stmt 1 view .LVU169
+ 353:HARDWARE/USART/Usart.c **** 			}
+ 711              		.loc 1 353 15 is_stmt 0 view .LVU170
+ 712 003e 144B     		ldr	r3, .L56+12
+ 713 0040 0022     		movs	r2, #0
+ 714 0042 1A70     		strb	r2, [r3]
+ 715 0044 EEE7     		b	.L48
+ 716              	.L47:
+ 356:HARDWARE/USART/Usart.c **** 		{
+ 717              		.loc 1 356 8 is_stmt 1 view .LVU171
+ 356:HARDWARE/USART/Usart.c **** 		{
+ 718              		.loc 1 356 11 is_stmt 0 view .LVU172
+ 719 0046 012B     		cmp	r3, #1
+ 720 0048 0ED0     		beq	.L54
+ 368:HARDWARE/USART/Usart.c **** 		{
+ 721              		.loc 1 368 8 is_stmt 1 view .LVU173
+ 368:HARDWARE/USART/Usart.c **** 		{
+ 722              		.loc 1 368 11 is_stmt 0 view .LVU174
+ 723 004a 022B     		cmp	r3, #2
+ 724 004c EAD1     		bne	.L48
+ 370:HARDWARE/USART/Usart.c **** 			{
+ 725              		.loc 1 370 4 is_stmt 1 view .LVU175
+ 370:HARDWARE/USART/Usart.c **** 			{
+ 726              		.loc 1 370 7 is_stmt 0 view .LVU176
+ 727 004e 0A28     		cmp	r0, #10
+ 728 0050 E8D1     		bne	.L48
+ 372:HARDWARE/USART/Usart.c **** 				Serial_RxPacket[pRxPacket] = '\0'; // 添加字符串结束符
+ 729              		.loc 1 372 5 is_stmt 1 view .LVU177
+ 372:HARDWARE/USART/Usart.c **** 				Serial_RxPacket[pRxPacket] = '\0'; // 添加字符串结束符
+ 730              		.loc 1 372 13 is_stmt 0 view .LVU178
+ 731 0052 0023     		movs	r3, #0
+ 732 0054 0C4A     		ldr	r2, .L56+4
+ 733 0056 1370     		strb	r3, [r2]
+ 373:HARDWARE/USART/Usart.c **** 				Serial_RxFlag = 1; // 设置接收标志位
+ 734              		.loc 1 373 5 is_stmt 1 view .LVU179
+ 373:HARDWARE/USART/Usart.c **** 				Serial_RxFlag = 1; // 设置接收标志位
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 21
+
+
+ 735              		.loc 1 373 20 is_stmt 0 view .LVU180
+ 736 0058 0D4A     		ldr	r2, .L56+12
+ 737 005a 1278     		ldrb	r2, [r2]	@ zero_extendqisi2
+ 373:HARDWARE/USART/Usart.c **** 				Serial_RxFlag = 1; // 设置接收标志位
+ 738              		.loc 1 373 32 view .LVU181
+ 739 005c 0D49     		ldr	r1, .L56+16
+ 740 005e 8B54     		strb	r3, [r1, r2]
+ 374:HARDWARE/USART/Usart.c **** 			}
+ 741              		.loc 1 374 5 is_stmt 1 view .LVU182
+ 374:HARDWARE/USART/Usart.c **** 			}
+ 742              		.loc 1 374 19 is_stmt 0 view .LVU183
+ 743 0060 0A4B     		ldr	r3, .L56+8
+ 744 0062 0122     		movs	r2, #1
+ 745 0064 1A70     		strb	r2, [r3]
+ 746 0066 DDE7     		b	.L48
+ 747              	.L54:
+ 358:HARDWARE/USART/Usart.c **** 			{
+ 748              		.loc 1 358 4 is_stmt 1 view .LVU184
+ 358:HARDWARE/USART/Usart.c **** 			{
+ 749              		.loc 1 358 7 is_stmt 0 view .LVU185
+ 750 0068 0D28     		cmp	r0, #13
+ 751 006a 06D0     		beq	.L55
+ 364:HARDWARE/USART/Usart.c **** 				pRxPacket ++;
+ 752              		.loc 1 364 5 is_stmt 1 view .LVU186
+ 364:HARDWARE/USART/Usart.c **** 				pRxPacket ++;
+ 753              		.loc 1 364 20 is_stmt 0 view .LVU187
+ 754 006c 084A     		ldr	r2, .L56+12
+ 755 006e 1378     		ldrb	r3, [r2]	@ zero_extendqisi2
+ 364:HARDWARE/USART/Usart.c **** 				pRxPacket ++;
+ 756              		.loc 1 364 32 view .LVU188
+ 757 0070 0849     		ldr	r1, .L56+16
+ 758 0072 C854     		strb	r0, [r1, r3]
+ 365:HARDWARE/USART/Usart.c **** 			}
+ 759              		.loc 1 365 5 is_stmt 1 view .LVU189
+ 365:HARDWARE/USART/Usart.c **** 			}
+ 760              		.loc 1 365 15 is_stmt 0 view .LVU190
+ 761 0074 0133     		adds	r3, r3, #1
+ 762 0076 1370     		strb	r3, [r2]
+ 763 0078 D4E7     		b	.L48
+ 764              	.L55:
+ 360:HARDWARE/USART/Usart.c **** 			}
+ 765              		.loc 1 360 5 is_stmt 1 view .LVU191
+ 360:HARDWARE/USART/Usart.c **** 			}
+ 766              		.loc 1 360 13 is_stmt 0 view .LVU192
+ 767 007a 034B     		ldr	r3, .L56+4
+ 768 007c 0222     		movs	r2, #2
+ 769 007e 1A70     		strb	r2, [r3]
+ 770 0080 D0E7     		b	.L48
+ 771              	.L57:
+ 772 0082 00BF     		.align	2
+ 773              	.L56:
+ 774 0084 00380140 		.word	1073821696
+ 775 0088 00000000 		.word	RxState.1
+ 776 008c 00000000 		.word	Serial_RxFlag
+ 777 0090 00000000 		.word	pRxPacket.0
+ 778 0094 00000000 		.word	Serial_RxPacket
+ 779              	.LBE3:
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 22
+
+
+ 780              		.cfi_endproc
+ 781              	.LFE43:
+ 783              		.section	.bss.pRxPacket.0,"aw",%nobits
+ 786              	pRxPacket.0:
+ 787 0000 00       		.space	1
+ 788              		.section	.bss.RxState.1,"aw",%nobits
+ 791              	RxState.1:
+ 792 0000 00       		.space	1
+ 793              		.global	__stdout
+ 794              		.section	.bss.__stdout,"aw",%nobits
+ 795              		.align	2
+ 798              	__stdout:
+ 799 0000 00000000 		.space	104
+ 799      00000000 
+ 799      00000000 
+ 799      00000000 
+ 799      00000000 
+ 800              		.global	Serial_RxFlag
+ 801              		.section	.bss.Serial_RxFlag,"aw",%nobits
+ 804              	Serial_RxFlag:
+ 805 0000 00       		.space	1
+ 806              		.global	Serial_RxPacket
+ 807              		.section	.bss.Serial_RxPacket,"aw",%nobits
+ 808              		.align	2
+ 811              	Serial_RxPacket:
+ 812 0000 00000000 		.space	50
+ 812      00000000 
+ 812      00000000 
+ 812      00000000 
+ 812      00000000 
+ 813              		.global	Seria1_TxPacket
+ 814              		.section	.data.Seria1_TxPacket,"aw"
+ 815              		.align	2
+ 818              	Seria1_TxPacket:
+ 819 0000 FF010000 		.ascii	"\377\001\000\000\000\000\000\357"
+ 819      000000EF 
+ 820              		.global	data_cnt
+ 821              		.section	.bss.data_cnt,"aw",%nobits
+ 822              		.align	1
+ 825              	data_cnt:
+ 826 0000 0000     		.space	2
+ 827              		.text
+ 828              	.Letext0:
+ 829              		.file 2 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 830              		.file 3 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 831              		.file 4 "USER/stm32f10x.h"
+ 832              		.file 5 "STM32F10x_FWLib/inc/stm32f10x_gpio.h"
+ 833              		.file 6 "STM32F10x_FWLib/inc/stm32f10x_usart.h"
+ 834              		.file 7 "STM32F10x_FWLib/inc/misc.h"
+ 835              		.file 8 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 836              		.file 9 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../li
+ 837              		.file 10 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../l
+ 838              		.file 11 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../l
+ 839              		.file 12 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../l
+ 840              		.file 13 "D:\\Study\\EmbeddedSystem\\STM32Cube\\STM32CubeCLT_1.20.0\\GNU-tools-for-STM32\\bin/../l
+ 841              		.file 14 "HARDWARE/USART/Usart.h"
+ 842              		.file 15 "STM32F10x_FWLib/inc/stm32f10x_rcc.h"
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 23
+
+
+ 843              		.file 16 "<built-in>"
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 24
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 Usart.c
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:19     .text._sys_exit:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:25     .text._sys_exit:00000000 _sys_exit
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:40     .text.fputc:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:46     .text.fputc:00000000 fputc
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:78     .text.fputc:00000014 $d
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:83     .text.Serial_Iint:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:89     .text.Serial_Iint:00000000 Serial_Iint
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:215    .text.Serial_Iint:0000009c $d
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:221    .text.Serial_SendByte:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:227    .text.Serial_SendByte:00000000 Serial_SendByte
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:263    .text.Serial_SendByte:00000018 $d
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:268    .text.Serial_SendArray:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:274    .text.Serial_SendArray:00000000 Serial_SendArray
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:321    .text.Serial_SendString:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:327    .text.Serial_SendString:00000000 Serial_SendString
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:375    .text.Serial_Pow:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:381    .text.Serial_Pow:00000000 Serial_Pow
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:423    .text.Serial_SendNumber:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:429    .text.Serial_SendNumber:00000000 Serial_SendNumber
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:493    .text.Serial_SendNumber:0000003c $d
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:498    .text.Serial_Printf:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:504    .text.Serial_Printf:00000000 Serial_Printf
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:562    .text.Serial_SendPacket:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:568    .text.Serial_SendPacket:00000000 Serial_SendPacket
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:589    .text.Serial_SendPacket:0000000c $d
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:818    .data.Seria1_TxPacket:00000000 Seria1_TxPacket
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:594    .text.Serial_GetRxFlag:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:600    .text.Serial_GetRxFlag:00000000 Serial_GetRxFlag
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:629    .text.Serial_GetRxFlag:00000014 $d
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:804    .bss.Serial_RxFlag:00000000 Serial_RxFlag
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:634    .text.USART1_IRQHandler:00000000 $t
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:640    .text.USART1_IRQHandler:00000000 USART1_IRQHandler
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:774    .text.USART1_IRQHandler:00000084 $d
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:791    .bss.RxState.1:00000000 RxState.1
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:786    .bss.pRxPacket.0:00000000 pRxPacket.0
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:811    .bss.Serial_RxPacket:00000000 Serial_RxPacket
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:787    .bss.pRxPacket.0:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:792    .bss.RxState.1:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:798    .bss.__stdout:00000000 __stdout
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:795    .bss.__stdout:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:805    .bss.Serial_RxFlag:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:808    .bss.Serial_RxPacket:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:815    .data.Seria1_TxPacket:00000000 $d
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:825    .bss.data_cnt:00000000 data_cnt
+C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s:822    .bss.data_cnt:00000000 $d
+
+UNDEFINED SYMBOLS
+RCC_APB2PeriphClockCmd
+GPIO_Init
+NVIC_Init
+USART_Init
+USART_ITConfig
+USART_Cmd
+USART_SendData
+USART_GetFlagStatus
+ARM GAS  C:\Users\31687\AppData\Local\Temp\ccb2flQ0.s 			page 25
+
+
+vsprintf
+USART_GetITStatus
+USART_ReceiveData
+USART_ClearITPendingBit
