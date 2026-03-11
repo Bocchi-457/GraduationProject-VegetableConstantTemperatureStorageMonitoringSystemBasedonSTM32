@@ -65,14 +65,14 @@ void Timer_Init(void)
  *       函数名为预留的指定名称，可以从启动文件复制
  *       请确保函数名正确，不能有任何差异，否则中断函数将不能进入
  */
-void TIM2_IRQHandler(void)
-{
-	if (TIM_GetITStatus(TIM2, TIM_IT_Update) == SET)
-	{
-		// 在这里添加中断处理代码
+// void TIM2_IRQHandler(void)
+// {
+// 	if (TIM_GetITStatus(TIM2, TIM_IT_Update) == SET)
+// 	{
+// 		// 在这里添加中断处理代码
 		
-		TIM_ClearITPendingBit(TIM2, TIM_IT_Update); // 清除中断标志位
-	}
-}
+// 		TIM_ClearITPendingBit(TIM2, TIM_IT_Update); // 清除中断标志位
+// 	}
+// }
 
 /***************************** 结束 *****************************/

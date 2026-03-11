@@ -23,11 +23,11 @@
 /**
  * 串口选择定义
  */
-#define Bamfa_USART1		        0  // 使用USART1
-#define Bamfa_USART2		        1  // 使用USART2
-#define Bamfa_USART3		        0  // 使用USART3
+#define Bemfa_USART1		        0  // 使用USART1
+#define Bemfa_USART2		        1  // 使用USART2
+#define Bemfa_USART3		        0  // 使用USART3
 
-#define Bamfa_USART		            USART2  // 当前使用的串口
+#define Bemfa_USART		            USART2  // 当前使用的串口
 
 /**
  * ESP-01S复位引脚定义
@@ -41,7 +41,7 @@
  * WiFi连接配置
  * 注意：根据实际WiFi网络修改这些定义
  */
-#define ESP8266_WIFI_INFO		"AT+CWJAP=\"The world\",\"2020625663\"\r\n"  // WiFi名称和密码
+#define ESP8266_WIFI_INFO		"AT+CWJAP=\"bocchi457\",\"2020625663\"\r\n"  // WiFi名称和密码
 
 /**
  * 巴法云平台连接配置
@@ -88,7 +88,7 @@ _Bool ESP8266_SendCmd(char *cmd, char *res);  // 发送AT指令并等待响应
 
 void Usart_SendString(USART_TypeDef *USARTx, unsigned char *str, unsigned short len);  // 串口发送字符串
 
-void ESP8266_SendData(unsigned char *data);  // 发送数据到巴法云
+uint8_t ESP8266_SendData(unsigned char *data);  // 发送数据到巴法云
 
 void ESP8266_Init(unsigned int bound);  // ESP8266初始化
 

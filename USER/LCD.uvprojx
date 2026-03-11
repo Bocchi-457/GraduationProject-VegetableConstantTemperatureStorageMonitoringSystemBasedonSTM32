@@ -450,16 +450,6 @@
               <FilePath>..\HARDWARE\DS1302\DS1302.c</FilePath>
             </File>
             <File>
-              <FileName>ESP8266.lib</FileName>
-              <FileType>4</FileType>
-              <FilePath>..\HARDWARE\ESP8266\ESP8266.lib</FilePath>
-            </File>
-            <File>
-              <FileName>AD.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\HARDWARE\AD\AD.h</FilePath>
-            </File>
-            <File>
               <FileName>control.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\HARDWARE\control\control.h</FilePath>
@@ -500,11 +490,6 @@
               <FilePath>..\HARDWARE\Light\Light.h</FilePath>
             </File>
             <File>
-              <FileName>mq135.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\HARDWARE\MQ-135\mq135.h</FilePath>
-            </File>
-            <File>
               <FileName>bmp.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\HARDWARE\OLED\bmp.h</FilePath>
@@ -518,11 +503,6 @@
               <FileName>oledfont.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\HARDWARE\OLED\oledfont.h</FilePath>
-            </File>
-            <File>
-              <FileName>PWM.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\HARDWARE\PWM\PWM.h</FilePath>
             </File>
             <File>
               <FileName>MyRTC.h</FileName>
@@ -540,11 +520,6 @@
               <FilePath>..\HARDWARE\STMFLASH\stmflash.h</FilePath>
             </File>
             <File>
-              <FileName>TIM.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\HARDWARE\TIM\TIM.h</FilePath>
-            </File>
-            <File>
               <FileName>Timer.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\HARDWARE\Timer\Timer.h</FilePath>
@@ -553,6 +528,16 @@
               <FileName>Usart.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\HARDWARE\Usart\Usart.h</FilePath>
+            </File>
+            <File>
+              <FileName>esp8266.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\ESP8266\esp8266.c</FilePath>
+            </File>
+            <File>
+              <FileName>AD.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\AD\AD.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -720,5 +705,14 @@
     <components/>
     <files/>
   </RTE>
+
+  <LayerInfo>
+    <Layers>
+      <Layer>
+        <LayName>LCD</LayName>
+        <LayPrjMark>1</LayPrjMark>
+      </Layer>
+    </Layers>
+  </LayerInfo>
 
 </Project>

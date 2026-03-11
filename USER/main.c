@@ -76,14 +76,16 @@ DHT11_Data_TypeDef DHT11_Data;
  */
 char TIMER_IT = 0;     //定时器中断标志
 char WiFiInit_time;    //WiFi初始化时间
-char Flagout = 1;      //输出标志
+char Flagout = 0;      //输出标志（0：禁止，1：允许）
+uint32_t heart_beat_count = 0; //心跳包计数器
+uint32_t reconnect_count = 0;   //重连计数器
 
 /**
  * OLED显示相关变量
  */
 u8 oled_Fill_flag = 1; //OLED填充标志
 char oled_str[100];     //OLED显示字符串
-char date[200];         //ESP8266发送缓冲区
+char data[200];         //ESP8266发送缓冲区
 u8 buff[30];            //缓冲区，用于显示数据
 
 int NUM = 0; //通用计数器 //通用计数器
@@ -111,19 +113,19 @@ int main(void)
     do
     {
         //显示欢迎信息
-        OLED_ShowCHinese(0, 0, 52); //菜
-        OLED_ShowCHinese(18, 0, 53); //篮
-        OLED_ShowCHinese(36, 0, 54); //恒
-        OLED_ShowCHinese(52, 0, 55); //温
-        OLED_ShowCHinese(68, 0, 56); //库
-        OLED_ShowCHinese(84, 0, 57); //监
-        OLED_ShowCHinese(100, 0, 58); //控 
+        OLED_ShowCHinese(0, 0, 52); //是
+        OLED_ShowCHinese(18, 0, 53); //否
+        OLED_ShowCHinese(36, 0, 54); //需
+        OLED_ShowCHinese(52, 0, 55); //要
+        OLED_ShowCHinese(68, 0, 56); //联
+        OLED_ShowCHinese(84, 0, 57); //网
+        OLED_ShowCHinese(100, 0, 58); //？ 
         
         //显示菜单选项
         OLED_ShowString(8, 4, "1.", 16);  
-        OLED_ShowCHinese(24, 4, 52); //菜
+        OLED_ShowCHinese(24, 4, 52); //是
         OLED_ShowString(62, 4, "2.", 16);  
-        OLED_ShowCHinese(78, 4, 53); //篮
+        OLED_ShowCHinese(78, 4, 53); //否
         
         key_num = KEY_Scan(0); //按键扫描
         
@@ -131,18 +133,19 @@ int main(void)
         {
             OLED_Clear(0);
             //显示初始化信息
-            OLED_ShowCHinese(0, 3, 21); //初
-            OLED_ShowCHinese(18, 3, 22); //始
-            OLED_ShowCHinese(36, 3, 23); //化
-            OLED_ShowCHinese(54, 3, 24); //中
+            OLED_ShowCHinese(0, 3, 21); //正
+            OLED_ShowCHinese(18, 3, 22); //在
+            OLED_ShowCHinese(36, 3, 23); //连
+            OLED_ShowCHinese(54, 3, 24); //接
             OLED_ShowString(72, 3, "WIFI", 16);
             OLED_ShowString(108, 3, "..", 16);
-            OLED_ShowCHinese(0, 6, 4); //请
-            OLED_ShowCHinese(18, 6, 5); //稍
-            OLED_ShowCHinese(36, 6, 13); //等
+            OLED_ShowCHinese(0, 6, 4); //进
+            OLED_ShowCHinese(18, 6, 5); //度
+            OLED_ShowCHinese(36, 6, 13); //：
             
             ESP8266_Init(115200); //初始化ESP8266模块，波特率115200
             Timer_Init();          //初始化定时器
+            Flagout = 1;           //允许数据输出
             break;
         }
     } while(key_num != 2);  
@@ -157,17 +160,60 @@ int main(void)
         Read_DHT11(&DHT11_Data); //读取DHT11传感器数据
         
         /*******************上传数据到平台***************************************/
-        if(TIMER_IT && Flagout == 0)
+        if(TIMER_IT && Flagout == 1)
         {
             TIMER_IT = 0; //清除定时器标志
-            //构建数据上传格式
-            sprintf(date, "cmd=2&uid=%s&topic=data&msg=#%d#%d.%d#%d.%d#\r\n", \
+            
+            // 构建数据上传格式
+            sprintf(data, "cmd=2&uid=%s&topic=data&msg=Mode:%d temp:%d.%d humi:%d.%d\r\n", \
             BEMFA_ID, //设备ID
             mode,     //当前模式
             DHT11_Data.temp_int, DHT11_Data.temp_deci, //温度整数和小数部分
             DHT11_Data.humi_int, DHT11_Data.humi_deci); //湿度整数和小数部分
             
-            ESP8266_SendData((unsigned char *)date); //通过ESP8266发送数据
+            // 发送数据
+            if(ESP8266_SendData((unsigned char *)data) == 0)
+            {
+                // 发送成功，显示上传状态
+                // sprintf(oled_str, "Upload: OK");
+                // OLED_ShowString(90, 0, oled_str, 12);
+                heart_beat_count = 0; // 重置心跳计数器
+                reconnect_count = 0;   // 重置重连计数器
+                // delay_ms(2000); // 上传成功后延时2秒显示上传状态
+                // OLED_Clear(0); // 上传成功后清屏
+            }
+            else
+            {
+                // 发送失败，尝试重连
+                reconnect_count++;
+                if(reconnect_count >= 3)
+                {
+                    // 重连ESP8266
+                    ESP8266_Init(115200);
+                    reconnect_count = 0;
+                }
+                // 显示上传失败状态
+                sprintf(oled_str, "Upload: FAIL");
+                OLED_ShowString(90, 0, oled_str, 12);
+                delay_ms(2000); // 显示失败状态2秒
+                OLED_Clear(0); // 显示失败状态后清屏
+            }
+            
+            // 定期发送心跳包
+            heart_beat_count++;
+            if(heart_beat_count >= 30) // 每30个周期（60秒）发送一次心跳包
+            {
+                sprintf(data, "cmd=2&uid=%s&topic=data&msg=Mode:%d temp:%d.%d humi:%d.%d\r\n", \
+                BEMFA_ID, //设备ID
+                mode,     //当前模式
+                DHT11_Data.temp_int, DHT11_Data.temp_deci, //温度整数和小数部分
+                DHT11_Data.humi_int, DHT11_Data.humi_deci); //湿度整数和小数部分
+                ESP8266_SendData((unsigned char *)data);
+                heart_beat_count = 0;
+            }
+            
+            // 清空接收缓冲区
+            ESP8266_Clear();
         } 	
 
         /*********************************面板控制区**************************************************/      
@@ -485,7 +531,7 @@ int main(void)
         //手动模式逻辑
         if(mode == 2)
         {
-            if(Flagout == 0)
+            if(Flagout == 1)
             {
                 //远程控制加热
                 if(strstr((const char *)esp8266_buf, "KJR") != 0) //开启加热
@@ -527,14 +573,14 @@ int main(void)
  * TIM2定时器中断处理函数
  * 功能：定时触发数据上传
  */
-/* void TIM2_IRQHandler(void)
+void TIM2_IRQHandler(void)
 {
     if (TIM_GetITStatus(TIM2, TIM_IT_Update) == SET)
     {
         TIMER_IT = 1; //设置定时器标志
         TIM_ClearITPendingBit(TIM2, TIM_IT_Update); //清除中断标志
     }
-} */
+}
 
 /**
  * 计算星期几的函数
@@ -588,8 +634,7 @@ u8 WeekYearday(int years, int months, int days)
 void show_wendu(void)
 {
     //格式化温湿度字符串
-    //注：此处温度小数部分固定为0，实际可以使用DHT11_Data.temp_deci获取小数部分
-    sprintf(oled_str, "T:%d.%dC  H:%d%% ", DHT11_Data.temp_int, 0, DHT11_Data.humi_int);
+    sprintf(oled_str, "T:%d.%dC  H:%d%% ", DHT11_Data.temp_int, DHT11_Data.temp_deci, DHT11_Data.humi_int);
     OLED_ShowString(0, 6, (u8 *)oled_str, 16);  
 }
 

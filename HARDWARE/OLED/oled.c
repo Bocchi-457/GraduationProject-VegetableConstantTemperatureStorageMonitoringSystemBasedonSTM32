@@ -1,39 +1,28 @@
 /**
- * oled.c
- * OLED显示模块驱动实现
- * 功能：实现OLED显示模块的初始化、IIC通信、显示控制等功能
- * 版本：V1.0
- * 测试硬件：单片机STM32F103RCT6,晶振72M  单片机工作电压3.3V或5V
- * 作者：xiao冯@ShenZhen QDtech co.,LTD
- * 公司网站:www.qdtech.net
- * 淘宝网站：http://qdtech.taobao.com
- * 邮箱:QDtech2008@gmail.com 
- * Skype:QDtech2008
- * 技术交流QQ群:324828016
- * 创建日期:2018/6/6
+ * @file OLED.c
+ * @brief OLED显示模块驱动实现
+ * @author xiao冯@ShenZhen QDtech co.,LTD
+ * @version V1.0
+ * @date 2018/6/6
+ * @copyright Copyright(C) 深圳市全动电子技术有限公司 2009-2019
+ * @note 测试硬件：单片机STM32F103RCT6,晶振72M  单片机工作电压3.3V或5V
  * 项目：蔬菜恒温库监控系统
  *
- * 版权所有，盗版必究。
- * Copyright(C) 深圳市全动电子技术有限公司 2009-2019
- * All rights reserved
- */
-
-/****************************************************************************************************
  * 电源接线：
  *      5V  接DC 5V电源
  *     GND  接地
  * 
  * OLED屏数据线接线：
  * 本模块数据总线类型为IIC
- *     SCL  接PB13    // IIC时钟信号
- *     SDA  接PB14    // IIC数据信号
+ *     SCL  接PB8    // IIC时钟信号
+ *     SDA  接PB9    // IIC数据信号
  * 
  * OLED屏控制线接线：
  * 本模块数据总线类型为IIC，不需要接控制信号线    
  * 
  * 触摸屏接线：
  * 本模块本身不带触摸，不需要接触摸屏线
- **************************************************************************************************/
+ */
 
 /****************************************************************************************************
  * @attention
@@ -52,8 +41,8 @@
 #include "delay.h"
 
 /**
- * OLED的显存
- * 存放格式如下：
+ * @brief OLED的显存
+ * @details 存放格式如下：
  * [0]0 1 2 3 ... 127
  * [1]0 1 2 3 ... 127
  * [2]0 1 2 3 ... 127
@@ -87,10 +76,10 @@ void IIC_Stop1()
 
 /**
  * @brief IIC等待应答
+ * @note 简化版的等待应答，实际项目中可能需要更完善的实现
  */
 void IIC_Wait_Ack1()
 {
-	// 简化版的等待应答，实际项目中可能需要更完善的实现
 	OLED_SCLK_Set();
 	OLED_SCLK_Clr();
 }
@@ -124,9 +113,11 @@ void Write_IIC_Byte(unsigned char IIC_Byte)
 		OLED_SCLK_Clr();
 	}
 }
-/**********************************************
-// IIC Write Command
-**********************************************/
+
+/**
+ * @brief 写入IIC命令
+ * @param IIC_Command: 要写入的命令
+ */
 void Write_IIC_Command(unsigned char IIC_Command)
 {
    IIC_Start1();
@@ -138,9 +129,11 @@ void Write_IIC_Command(unsigned char IIC_Command)
 	IIC_Wait_Ack1();	
    IIC_Stop1();
 }
-/**********************************************
-// IIC Write Data
-**********************************************/
+
+/**
+ * @brief 写入IIC数据
+ * @param IIC_Data: 要写入的数据
+ */
 void Write_IIC_Data(unsigned char IIC_Data)
 {
    IIC_Start1();
@@ -152,20 +145,21 @@ void Write_IIC_Data(unsigned char IIC_Data)
 	IIC_Wait_Ack1();	
    IIC_Stop1();
 }
-void OLED_WR_Byte(unsigned dat,unsigned cmd)
+
+/**
+ * @brief 向OLED写入一个字节
+ * @param dat: 要写入的数据
+ * @param cmd: 写入类型，OLED_CMD表示命令，OLED_DATA表示数据
+ */
+void OLED_WR_Byte(unsigned dat, unsigned cmd)
 {
 	if(cmd)
-			{
-
-   Write_IIC_Data(dat);
-   
-		}
-	else {
-   Write_IIC_Command(dat);
-		
+	{
+		Write_IIC_Data(dat);
 	}
-
-
+	else {
+		Write_IIC_Command(dat);
+	}
 }
 
 
@@ -335,9 +329,16 @@ void OLED_ShowString(u8 x,u8 y,u8 *chr,u8 Char_Size)
 				adder+=1;
       }					
 }
-/***********功能描述：显示显示BMP图片128×64起始点坐标(x,y),x的范围0～127，y为页的范围0～7*****************/
+/**
+ * @brief 显示BMP图片
+ * @param x0: 起始X坐标，范围0～127
+ * @param y0: 起始Y坐标，范围0～7（页地址）
+ * @param x1: 结束X坐标
+ * @param y1: 结束Y坐标
+ * @param BMP: 图片数据
+ */
 void OLED_DrawBMP(unsigned char x0, unsigned char y0,unsigned char x1, unsigned char y1,unsigned char BMP[])
-{ 	
+{  	
  unsigned int j=0;
  unsigned char x,y;
   
@@ -348,28 +349,31 @@ void OLED_DrawBMP(unsigned char x0, unsigned char y0,unsigned char x1, unsigned 
 		OLED_Set_Pos(x0,y);
     for(x=x0;x<x1;x++)
 	    {      
-	    	OLED_WR_Byte(BMP[j++],OLED_DATA);	    	
+	    	OLED_WR_Byte(BMP[j++],OLED_DATA);			
 	    }
 	}
 } 
 
-//初始化SSD1306					    
+/**
+ * @brief 初始化SSD1306 OLED显示模块
+ */
 void OLED_Init(void)
-{ 	
+{  	
  
  	 
- 	GPIO_InitTypeDef  GPIO_InitStructure;
- 	
- 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);	 //使能B端口时钟
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8|GPIO_Pin_9;	 
- 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP; 		 //推挽输出
+  	GPIO_InitTypeDef  GPIO_InitStructure;
+  	
+  	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);	 //使能B端口时钟
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8|GPIO_Pin_9; 	 
+  	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP; 		 //推挽输出
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;//速度50MHz
- 	GPIO_Init(GPIOB, &GPIO_InitStructure);	  //初始化GPIOB3,4
- 	GPIO_SetBits(GPIOB,GPIO_Pin_8|GPIO_Pin_9);	
+  	GPIO_Init(GPIOB, &GPIO_InitStructure);	  //初始化GPIOB8,9
+  	GPIO_SetBits(GPIOB,GPIO_Pin_8|GPIO_Pin_9);	
 	
-delay_ms(200);
+	delay_ms(200);
 
-OLED_WR_Byte(0xAE,OLED_CMD);//--display off
+	// 初始化SSD1306
+	OLED_WR_Byte(0xAE,OLED_CMD);//--display off
 	OLED_WR_Byte(0x00,OLED_CMD);//---set low column address
 	OLED_WR_Byte(0x10,OLED_CMD);//---set high column address
 	OLED_WR_Byte(0x40,OLED_CMD);//--set start line address  
@@ -403,33 +407,4 @@ OLED_WR_Byte(0xAE,OLED_CMD);//--display off
 	OLED_WR_Byte(0x14,OLED_CMD);//
 	
 	OLED_WR_Byte(0xAF,OLED_CMD);//--turn on oled panel
-}  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+}

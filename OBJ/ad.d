@@ -1,7 +1,7 @@
 ..\obj\ad.o: ..\HARDWARE\AD\AD.c
 ..\obj\ad.o: ..\USER\stm32f10x.h
 ..\obj\ad.o: ..\CORE\core_cm3.h
-..\obj\ad.o: D:\KEIL5\ARM\ARMCC\Bin\..\include\stdint.h
+..\obj\ad.o: D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\Bin\..\include\stdint.h
 ..\obj\ad.o: ..\USER\system_stm32f10x.h
 ..\obj\ad.o: ..\USER\stm32f10x_conf.h
 ..\obj\ad.o: ..\STM32F10x_FWLib\inc\stm32f10x_adc.h
