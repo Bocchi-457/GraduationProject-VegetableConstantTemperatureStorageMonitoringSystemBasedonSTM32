@@ -45,41 +45,22 @@ int page2_index = 1;  //页面2的索引，用于选择不同的控制项
 int page3_index = 1;  //页面3的索引，用于选择不同的设置项
 int set_wendu_high = 15; //温度上限设置
 int set_wendu_lou = 10;  //温度下限设置
-int set_shidu = 80;      //湿度设置
+int set_shidu = 80;      //湿度上限设置
 
 /**
- * 设置数据结构体
+ * DHT22相关变量
  */
-struct Set_data
-{
-  u16 temp_h;       //温度上限
-  u16 temp_l;       //温度下限
-  u16 humi_l;       //湿度下限
-  u16 soil_humi_l;  //土壤湿度下限
-};
-
-struct Set_data Out_data = {15, 10, 80, 80}; //初始设置值
+DHT22_Data_TypeDef DHT22_Data;       // 当前温湿度数据
+DHT22_Data_TypeDef last_valid_data = {0, 0, 0, 0, 0};   // 上次有效的温湿度数据
+u8 data_valid = 0;                     // 温湿度数据有效标志
+volatile uint32_t sys_tick_ms = 0;    // 全局毫秒计数器
+uint32_t last_dht22_read_time = 0;
+#define DHT22_READ_INTERVAL 2000       // 最小2s读取间隔
 
 /**
  * 按键相关变量
  */
 u8 key_num = 0;      //按键返回值
-u8 led_temp_mode = 0; //温度模式LED标志
-
-/**
- * DHT22温湿度传感器数据结构
- */
-DHT22_Data_TypeDef DHT22_Data;
-
-/**
- * 保存上次有效的温湿度数据
- */
-DHT22_Data_TypeDef last_valid_data = {0, 0, 0, 0, 0};
-
-/**
- * 温湿度数据有效标志
- */
-u8 data_valid = 0;
 
 /**
  * WiFi相关变量
@@ -97,33 +78,6 @@ u8 oled_Fill_flag = 1; //OLED填充标志
 char oled_str[100];     //OLED显示字符串
 char data[200];         //ESP8266发送缓冲区
 u8 buff[30];            //缓冲区，用于显示数据
-
-/**
- * DHT22采集相关变量
- */
-uint32_t last_dht22_read_time = 0;
-#define DHT22_READ_INTERVAL 2000 // 2秒读取一次
-
-/**
- * 获取系统当前时间（毫秒）
- * @return 当前系统时间，单位毫秒
- */
-uint32_t GetSysTimeMs(void)
-{
-    static uint32_t tick_ms = 0;
-    static uint32_t last_tick = 0;
-    uint32_t current_tick = SysTick->VAL;
-    
-    // SysTick每1ms递减一次
-    if (current_tick < last_tick)
-    {
-        tick_ms++;
-    }
-    last_tick = current_tick;
-    
-    return tick_ms;
-}
-
 /**
  * 温湿度显示相关变量
  */
@@ -133,7 +87,24 @@ int last_humi_int = -1;
 int last_humi_deci = -1;
 u8 wendu_display_force_update = 1; // 强制更新温湿度显示标志
 
-int NUM = 0; //通用计数器 //通用计数器
+/**
+ * 获取系统当前时间（毫秒）
+ * @return 当前系统时间，单位毫秒
+ */
+uint32_t GetSysTimeMs(void)
+{
+    return sys_tick_ms;
+}
+
+/**
+ * 读取DHT22数据并验证校验和
+ * @return 0: 成功, 1: 失败
+ */
+uint8_t ReadAndValidateDHT22(DHT22_Data_TypeDef *data)
+{
+    // Read_DHT22已经进行了正确的校验和检查，不需要再调用DHT22_CheckSum
+    return Read_DHT22(data);
+}
 
 /**
  * 主函数
@@ -148,12 +119,48 @@ int main(void)
     Key_Init();        //按键初始化
     OLED_Init();       //OLED显示初始化
     OLED_Clear(0);     //清屏
+    Serial_Iint(115200);     //串口初始化，用于调试
+    Serial_Printf("系统初始化中...\n\r");
     Ds1302_Init();     //DS1302实时时钟初始化
     warm_init();       //加热模块初始化
     zhileng_init();    //制冷模块初始化
     chushi_init();     //除湿模块初始化
-    // DHT22初始化将根据是否联网在后面处理
-		
+    Timer_Init();          //初始化定时器
+
+    // 全局上电延时，确保DHT22 2s稳定期
+    OLED_ShowCHinese(0, 3, 19); // 系
+    OLED_ShowCHinese(18, 3, 20); // 统
+    OLED_ShowCHinese(36, 3, 21); // 正
+    OLED_ShowCHinese(54, 3, 22); // 在
+    OLED_ShowCHinese(72, 3, 0); // 初
+    OLED_ShowCHinese(90, 3, 1); // 始
+    OLED_ShowCHinese(108, 3, 2); // 化 
+    delay_ms(2000); // 等待DHT22稳定
+	
+    // 初始化DHT22
+    Serial_Printf("初始化DHT22...\n\r");
+    if (DHT22_Init() == 0)
+    {
+        Serial_Printf("DHT22初始化成功\n\r");
+        Serial_Printf("系统初始化完成\n\r");
+        // 第一次读取的是上一次数据，连续读两次获取实时值
+        Read_DHT22(&DHT22_Data); // 丢弃第一次
+        delay_ms(2000);
+        if (Read_DHT22(&DHT22_Data) == SUCCESS)
+        {
+            last_valid_data = DHT22_Data;
+            data_valid = 1;
+            Serial_Printf("初始数据读取成功: T=%d.%d, H=%d.%d\n",
+                   DHT22_Data.temp_int, DHT22_Data.temp_deci,
+                   DHT22_Data.humi_int, DHT22_Data.humi_deci);
+        }
+    }
+    else
+    {
+        Serial_Printf("DHT22初始化失败，请检查接线\n\r");
+    }
+    OLED_Clear(0);
+
     //开机界面
     do
     {
@@ -177,36 +184,29 @@ int main(void)
         if(key_num == 1) //选择菜单
         {
             OLED_Clear(0);
-            //显示初始化信息
-            OLED_ShowCHinese(0, 3, 21); //正
-            OLED_ShowCHinese(18, 3, 22); //在
-            OLED_ShowCHinese(36, 3, 23); //连
-            OLED_ShowCHinese(54, 3, 24); //接
-            OLED_ShowString(72, 3, "WIFI", 16);
-            OLED_ShowString(108, 3, "..", 16);
-            OLED_ShowCHinese(0, 6, 4); //进
-            OLED_ShowCHinese(18, 6, 5); //度
-            OLED_ShowCHinese(36, 6, 13); //：
+            // //显示初始化信息
+            // OLED_ShowCHinese(0, 3, 21); //正
+            // OLED_ShowCHinese(18, 3, 22); //在
+            // OLED_ShowCHinese(36, 3, 23); //连
+            // OLED_ShowCHinese(54, 3, 24); //接
+            // OLED_ShowString(72, 3, "WIFI", 16);
+            // OLED_ShowString(108, 3, "..", 16);
+            // OLED_ShowCHinese(0, 6, 4); //进
+            // OLED_ShowCHinese(18, 6, 5); //度
+            // OLED_ShowCHinese(36, 6, 13); //：
             
+            Serial_Printf("初始化ESP8266模块...\n\r");
             ESP8266_Init(115200); //初始化ESP8266模块，波特率115200
-            Timer_Init();          //初始化定时器
             Flagout = 1;           //允许数据输出
-            
-            // 联网过程已经超过2秒，直接初始化DHT22
-            DHT22_Init();      //DHT22温湿度传感器初始化
             break;
         }
     } while(key_num != 2);  
 	
     OLED_Clear(0); //清屏
     
-    // 如果没有联网，需要等待2秒再初始化DHT22
-    if (Flagout == 0)
-    {
-        // DHT22上电后需要等待2秒以越过不稳定状态
-        delay_ms(2000);
-        DHT22_Init();      //DHT22温湿度传感器初始化
-    }
+    
+    last_dht22_read_time = GetSysTimeMs();
+    OLED_Clear(0);
 
     //主循环
 	while(1)
@@ -216,12 +216,15 @@ int main(void)
         // 控制DHT22采集频率，每2秒读取一次
         if (GetSysTimeMs() - last_dht22_read_time >= DHT22_READ_INTERVAL)
         {
-            if (Read_DHT22(&DHT22_Data) == SUCCESS)
+            if (ReadAndValidateDHT22(&DHT22_Data) == SUCCESS)
             {
                 // 读取成功，保存有效数据
                 last_valid_data = DHT22_Data;
                 data_valid = 1;
                 wendu_display_force_update = 1; // 数据更新，强制显示
+                Serial_Printf("读取成功: 温度=%d.%d℃, 湿度=%d.%d%%\n\r",  
+                       DHT22_Data.temp_int, DHT22_Data.temp_deci, 
+                       DHT22_Data.humi_int, DHT22_Data.humi_deci);
             }
             else
             {
@@ -229,8 +232,14 @@ int main(void)
                 if (data_valid)
                 {
                     DHT22_Data = last_valid_data;
+                    Serial_Printf("读取失败，使用上次有效数据: 温度=%d.%d℃, 湿度=%d.%d%%\n\r",  
+                           DHT22_Data.temp_int, DHT22_Data.temp_deci, 
+                           DHT22_Data.humi_int, DHT22_Data.humi_deci);
                 }
-                // 否则保持当前值（可能为0）
+                else
+                {
+                    Serial_Printf("读取失败，无有效数据\n\r");
+                }
             }
             last_dht22_read_time = GetSysTimeMs();
         }
@@ -241,7 +250,7 @@ int main(void)
             TIMER_IT = 0; //清除定时器标志
             
             // 构建数据上传格式
-            sprintf(data, "cmd=2&uid=%s&topic=data&msg=Mode:%d temp:%d.%d humi:%d.%d\r\n", \
+            sprintf(data, "cmd=2&uid=%s&topic=data&msg=Mode:%d temp:%d.%d humi:%d.%d\r\n", 
             BEMFA_ID, //设备ID
             mode,     //当前模式
             DHT22_Data.temp_int, DHT22_Data.temp_deci, //温度整数和小数部分
@@ -590,23 +599,16 @@ int main(void)
         //自动模式逻辑
         if(mode == 1)
         {
+            float current_temp = DHT22_Data.temp_int + DHT22_Data.temp_deci * 0.1f;
+            float current_humi = DHT22_Data.humi_int + DHT22_Data.humi_deci * 0.1f;
             //温度高于上限，开启制冷
-            if(DHT22_Data.temp_int > set_wendu_high)
-                zhileng = 1;
-            else
-                zhileng = 0;
+            zhileng = (current_temp > set_wendu_high) ? 1 : 0;
             
             //温度低于下限，开启加热
-            if(DHT22_Data.temp_int < set_wendu_lou)
-                jiare = 1;
-            else
-                jiare = 0;
+            jiare   = (current_temp < set_wendu_lou)  ? 1 : 0;
             
             //湿度高于设置值，开启除湿
-            if(DHT22_Data.humi_int > set_shidu)
-                chushi = 1;
-            else
-                chushi = 0;
+            chushi  = (current_humi > set_shidu) ? 1 : 0;
         }
         
         //手动模式逻辑
@@ -652,13 +654,24 @@ int main(void)
 
 /**
  * TIM2定时器中断处理函数
- * 功能：定时触发数据上传
+ * 功能：定时触发数据上传，同时更新系统时间
  */
 void TIM2_IRQHandler(void)
 {
+    static uint16_t upload_counter = 0;
+    
     if (TIM_GetITStatus(TIM2, TIM_IT_Update) == SET)
     {
-        TIMER_IT = 1; //设置定时器标志
+        sys_tick_ms++; // 毫秒计数器累加，每1ms递增一次
+        
+        // 每2秒设置一次TIMER_IT标志，用于数据上传
+        upload_counter++;
+        if (upload_counter >= 2000) // 2000ms = 2s
+        {
+            upload_counter = 0;
+            TIMER_IT = 1; //设置定时器标志，用于数据上传
+        }
+        
         TIM_ClearITPendingBit(TIM2, TIM_IT_Update); //清除中断标志
     }
 }
@@ -730,7 +743,9 @@ void show_wendu(void)
         wendu_display_force_update = 0; // 清除强制更新标志
         
         //格式化温湿度字符串
-        sprintf(oled_str, "T:%d.%dC  H:%d.%d%%", DHT22_Data.temp_int, DHT22_Data.temp_deci, DHT22_Data.humi_int, DHT22_Data.humi_deci);
+        sprintf(oled_str, "T:%d.%dC  H:%d.%d%%", 
+            DHT22_Data.temp_int, DHT22_Data.temp_deci,
+            DHT22_Data.humi_int, DHT22_Data.humi_deci);
         OLED_ShowString(0, 6, (u8 *)oled_str, 16);  
     }
 }

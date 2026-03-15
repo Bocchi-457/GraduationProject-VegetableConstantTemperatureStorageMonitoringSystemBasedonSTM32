@@ -16,8 +16,8 @@
  * @brief 初始化定时器
  * @param 无
  * @return 无
- * @note 初始化TIM2定时器，配置为2秒中断一次
- *       时钟频率：72MHz / 7200 / 20000 = 0.5Hz
+ * @note 初始化TIM2定时器，配置为1毫秒中断一次
+ *       时钟频率：72MHz / 72 / 1000 = 1kHz
  */
 void Timer_Init(void)
 {
@@ -33,8 +33,8 @@ void Timer_Init(void)
 	// 配置时基单元
 	TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;         // 时钟分频，选择不分频
 	TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up;     // 计数器模式，选择向上计数
-	TIM_TimeBaseInitStructure.TIM_Period = 20000 - 1;                   // 计数周期，即ARR的值，定时2秒
-	TIM_TimeBaseInitStructure.TIM_Prescaler = 7200 - 1;                 // 预分频器，即PSC的值
+	TIM_TimeBaseInitStructure.TIM_Period = 1000 - 1;                    // 计数周期，即ARR的值，定时1ms
+	TIM_TimeBaseInitStructure.TIM_Prescaler = 72 - 1;                   // 预分频器，即PSC的值
 	TIM_TimeBaseInitStructure.TIM_RepetitionCounter = 0;                // 重复计数器，高级定时器才会用到
 	TIM_TimeBaseInit(TIM2, &TIM_TimeBaseInitStructure);                 // 配置TIM2的时基单元
 	

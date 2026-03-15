@@ -9,193 +9,203 @@
  */
 
 #include "dht22.h"
+#include "delay.h"
 
 /**
- * 复位DHT22传感器
- * 功能：发送复位信号，使DHT22进入起始状态
- * @param 无
- * @retval 无
+ * 发送复位/起始信号
+ * 遵循手册7.3节时序：拉低≥800us，典型值1ms
  */
 void DHT22_Rst(void)
 {
-    DHT22_IO_OUT();  	    // 设置为输出模式
-    DHT22_DQ_OUT = 0;  	    // 拉低DQ引脚
-    delay_ms(3);         	// 拉低3ms，确保DHT22正确响应
-    DHT22_DQ_OUT = 1;  	    // 拉高DQ引脚
-    delay_us(30);          	// 主机拉高20~40us
+    DHT22_IO_OUT();   // 配置为开漏输出
+    DHT22_DQ_OUT = 0; // 拉低总线
+    delay_ms(1);      // 严格拉低1ms
+    DHT22_DQ_OUT = 1; // 释放总线
+    delay_us(30);     // 等待25~45us
+    DHT22_IO_IN();    // 切换为输入模式，彻底释放总线
 }
 
 /**
- * 等待DHT22的回应
- * 功能：检测DHT22是否存在并响应
- * @param 无
- * @retval 1: 未检测到DHT22的存在
- * @retval 0: DHT22存在
+ * 检测DHT22响应信号
+ * 遵循手册7.3节时序：80us低电平 + 80us高电平
+ * @retval 0=响应成功，1=响应失败
  */
-u8 DHT22_Check(void)
+static u8 DHT22_Check(void)
 {
     u8 retry = 0;
-    DHT22_IO_IN();  // 设置为输入模式
+    DHT22_IO_IN(); // 确保为输入模式
     
-    // 等待DHT22拉低（80us左右）
+    // 1. 等待响应低电平 (Trel=75~85us)
+    // 当DQ为高电平时等待，直到DQ变为低电平
     while (DHT22_DQ_IN && retry < 200)
     {
         retry++;
         delay_us(1);
     }
+    if (retry >= 200) return 1; // 超时
     
-    if (retry >= 200) return 1;  // 超时，未检测到DHT22
-    else retry = 0;
-    
-    // 等待DHT22拉高（80us左右）
-    while (!DHT22_DQ_IN && retry < 200)
-    {
-        retry++;
-        delay_us(1);
-    }
-    
-    if (retry >= 200) return 1;  // 超时，未检测到DHT22
-    return 0;  // DHT22存在
-}
-
-/**
- * 从DHT22读取一个位
- * 功能：读取DHT22发送的单个位数据（区分0/1时序）
- * @param 无
- * @retval 1: 读取到逻辑1
- * @retval 0: 读取到逻辑0
- */
-u8 DHT22_Read_Bit(void)
-{
-    u8 retry = 0;
-    
-    // 等待变为低电平（DHT22拉低50us）
-    while (DHT22_DQ_IN && retry < 200)
-    {
-        retry++;
-        delay_us(1);
-    }
     retry = 0;
-    
-    // 等待变高电平
+    // 2. 等待响应高电平 (Treh=75~85us)
+    // 当DQ为低电平时等待，直到DQ变为高电平
     while (!DHT22_DQ_IN && retry < 200)
     {
         retry++;
         delay_us(1);
     }
+    if (retry >= 200) return 1; // 超时
     
-    delay_us(40);  // 等待40us后判断：0码高电平≤30us，1码≥60us
-    if (DHT22_DQ_IN) return 1;  // 高电平为1
-    else return 0;               // 低电平为0
+    return 0; // 响应成功
 }
 
 /**
- * 从DHT22读取一个字节
- * 功能：读取DHT22发送的8位数据
- * @param 无
- * @retval u8 读到的数据
+ * 读取单个位数据
+ * 遵循手册7.3节位时序：
+ * - 位0：50us低 + 22~30us高
+ * - 位1：50us低 + 68~75us高
+ * @retval 0/1=数据位，0xFF=读取失败
  */
-u8 DHT22_Read_Byte(void)
+static u8 DHT22_Read_Bit(void)
 {
-    u8 i, dat;
-    dat = 0;
+    u8 retry = 0;
     
-    // 读取8位数据，高位先传
+    // 1. 等待位起始的低电平 (TLOW=48~55us)
+    // 当DQ为高电平时等待，直到DQ变为低电平
+    while (DHT22_DQ_IN && retry < 100)
+    {
+        retry++;
+        delay_us(1);
+    }
+    if (retry >= 100) return 0xFF; // 失败
+    
+    retry = 0;
+    // 2. 等待低电平结束
+    // 当DQ为低电平时等待，直到DQ变为高电平
+    while (!DHT22_DQ_IN && retry < 100)
+    {
+        retry++;
+        delay_us(1);
+    }
+    if (retry >= 100) return 0xFF; // 失败
+    
+    // 3. 时序判断点：延时35us
+    // 此时位0的高电平已结束，位1的高电平仍在持续
+    delay_us(35);
+    return DHT22_DQ_IN ? 1 : 0;
+    
+}
+
+/**
+ * 读取单个字节数据
+ * @retval 读取到的字节，0xFF=读取失败
+ */
+static u8 DHT22_Read_Byte(void)
+{
+    u8 i, dat = 0;
+    u8 bit;
+    
     for (i = 0; i < 8; i++)
     {
-        dat <<= 1;  // 左移一位
-        dat |= DHT22_Read_Bit();  // 读取一位并或运算
+        dat <<= 1; // 高位先出
+        bit = DHT22_Read_Bit();
+        if (bit == 0xFF) return 0xFF; // 位读取失败
+        dat |= bit;
     }
-    
     return dat;
 }
 
 /**
- * 初始化DHT22的IO口并检测DHT22的存在
- * 功能：配置GPIO并检测DHT22是否存在
- * @param 无
- * @retval 1: DHT22不存在
- * @retval 0: DHT22存在
+ * DHT22初始化
+ * 遵循手册7.4节：上电后必须等待2s越过不稳定期
+ * @retval 0=初始化成功，1=失败
  */
 u8 DHT22_Init(void)
 {
     GPIO_InitTypeDef GPIO_InitStructure;
     
-    // 使能GPIOB端口时钟
+    // 1. 使能GPIOB时钟
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
     
-    // 配置PB12端口
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_12;                // PB12
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;          // 推挽输出
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;         // GPIO速度50MHz
-    GPIO_Init(GPIOB, &GPIO_InitStructure);                    // 初始化IO口
-    GPIO_SetBits(GPIOB, GPIO_Pin_12);                         // PB12输出高
+    // 2. 配置PB12为开漏输出
+    GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_12;
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_OD; // 开漏输出
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
+    GPIO_SetBits(GPIOB, GPIO_Pin_12); // 初始拉高
     
-    DHT22_Rst();  // 复位DHT22
-    return DHT22_Check();  // 等待DHT22的回应
+    // 3. 手册强制要求：上电等待2s不稳定期
+    // delay_ms(2000);
+    
+    // 4. 发送复位信号并检测响应
+    DHT22_Rst();
+    return DHT22_Check();
 }
 
 /**
  * 读取DHT22温湿度数据
- * 功能：从DHT22读取温湿度数据并存储到结构体中，增加重试机制
- * @param DHT22_Data 温湿度数据结构体指针
- * @retval SUCCESS: 读取成功
- * @retval ERROR: 读取失败
+ * 遵循手册7.2节数据格式：
+ * 40位 = 湿度高8位 + 湿度低8位 + 温度高8位 + 温度低8位 + 校验和
+ * @param data 数据结构体指针
+ * @retval SUCCESS=成功，ERROR=失败
  */
-uint8_t Read_DHT22(DHT22_Data_TypeDef *DHT22_Data)
+uint8_t Read_DHT22(DHT22_Data_TypeDef *data)
 {
-    u8 retry = 3; // 最多重试3次
+    u8 buf[5] = {0};
+    u8 i;
+    u16 humi_raw, temp_raw;
     
-    while (retry--)
+    // 1. 发送起始信号并检测响应
+    DHT22_Rst();
+    if (DHT22_Check() != 0) return ERROR;
+    
+    // 2. 连续读取40位数据
+    for (i = 0; i < 5; i++)
     {
-        u8 buf[5] = {0};  // 初始化buf数组，避免未定义行为
-        u8 i;
-        u16 humi, temp;
-        
-        DHT22_Rst();  // 复位DHT22
-        
-        if (DHT22_Check() == 0)  // DHT22响应
-        {
-            for (i = 0; i < 5; i++)  // 读取40位数据
-            {
-                buf[i] = DHT22_Read_Byte();
-            }
-            
-            // 检查校验和（湿度高+湿度低+温度高+温度低 = 校验和）
-            if ((buf[0] + buf[1] + buf[2] + buf[3]) == buf[4])
-            {
-                // 计算湿度：(buf[0]<<8 | buf[1]) / 10 → 整数+小数
-                humi = (buf[0] << 8) | buf[1];
-                DHT22_Data->humi_int = humi / 10;
-                DHT22_Data->humi_deci = humi % 10;
-                
-                // 计算温度：处理符号位（最高位为1表示负温度）
-                temp = (buf[2] << 8) | buf[3];
-                if(temp & 0x8000) // 负温度
-                {
-                    temp = ~temp + 1; // 补码转原码
-                    DHT22_Data->temp_int = -(temp / 10);
-                }
-                else // 正温度
-                {
-                    DHT22_Data->temp_int = temp / 10;
-                }
-                DHT22_Data->temp_deci = temp % 10;
-                
-                DHT22_Data->check_sum = buf[4];    // 校验和
-                
-                // 数据范围检查，确保数据在合理范围内
-                if (DHT22_Data->humi_int >= 100)  // 湿度范围0-100%
-                    continue; // 数据异常，重试
-                if (DHT22_Data->temp_int < -40 || DHT22_Data->temp_int > 80)  // 温度范围-40~80℃
-                    continue; // 数据异常，重试
-                
-                return SUCCESS;  // 读取成功
-            }
-        }
-        
-        delay_ms(100); // 重试间隔
+        buf[i] = DHT22_Read_Byte();
+        if (buf[i] == 0xFF) return ERROR; // 读取失败
     }
     
-    return ERROR;  // 读取失败
+    // 3. 校验和检查
+    if ((buf[0] + buf[1] + buf[2] + buf[3]) != buf[4])
+    {
+        return ERROR;
+    }
+    
+    // 4. 湿度计算 (量程：0~99.9%RH)
+    humi_raw = (buf[0] << 8) | buf[1];
+    if (humi_raw > 999) return ERROR; // 量程校验
+    data->humi_int  = humi_raw / 10;
+    data->humi_deci = humi_raw % 10;
+    
+    // 5. 温度计算 (严格遵循手册7.2节)
+    // 最高位(Bit15)=1表示负温度，低15位为绝对值的10倍
+    temp_raw = (buf[2] << 8) | buf[3];
+    
+    // 正温度量程校验 (0~80.0℃)
+    if ((temp_raw & 0x7FFF) > 800) return ERROR;
+    
+    if (temp_raw & 0x8000) // 负温度
+    {
+        // 负温度量程校验 (-40.0~0℃)
+        if ((temp_raw & 0x7FFF) > 400) return ERROR;
+        data->temp_int = -((temp_raw & 0x7FFF) / 10);
+    }
+    else // 正温度
+    {
+        data->temp_int = (temp_raw & 0x7FFF) / 10;
+    }
+    data->temp_deci = (temp_raw & 0x7FFF) % 10;
+    data->check_sum = buf[4];
+    
+    return SUCCESS;
+}
+
+/**
+ * 校验和验证
+ * @param data DHT22数据结构体
+ * @return 0: 校验成功, 1: 校验失败
+ */
+uint8_t DHT22_CheckSum(DHT22_Data_TypeDef *data)
+{
+    uint8_t sum = data->humi_int + data->humi_deci + data->temp_int + data->temp_deci;
+    return (sum == data->check_sum) ? SUCCESS : ERROR;
 }

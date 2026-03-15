@@ -103,6 +103,17 @@ static void ESP8266_USART_Init(unsigned int bound)
  */
 void ESP8266_Init(unsigned int bound)
 {
+    //显示初始化信息
+    OLED_ShowCHinese(0, 3, 21); //正
+    OLED_ShowCHinese(18, 3, 22); //在
+    OLED_ShowCHinese(36, 3, 23); //连
+    OLED_ShowCHinese(54, 3, 24); //接
+    OLED_ShowString(72, 3, "WIFI", 16);
+    OLED_ShowString(108, 3, "..", 16);
+    OLED_ShowCHinese(0, 6, 4); //进
+    OLED_ShowCHinese(18, 6, 5); //度
+    OLED_ShowCHinese(36, 6, 13); //：
+    
     // 初始化复位引脚
     GPIO_InitTypeDef GPIO_InitStructure;
     RCC_APB2PeriphClockCmd(ESP01S_RST_RCC_CLK, ENABLE);
@@ -124,6 +135,7 @@ void ESP8266_Init(unsigned int bound)
     memset(ESP8266_RecvBuf, 0, buf_len);
     ESP8266_RecvLen = 0;
     ESP8266_Clear();
+            
 
     // 3. 发送AT指令检测ESP8266是否在线
     int at_retry = 3;
@@ -149,10 +161,10 @@ void ESP8266_Init(unsigned int bound)
                     {
                         int i = 0;
                         // 显示WiFi连接进度
-                        for (; i <= 30; i += 10)
+                        for (; i <= 30; i += 1)
                         {
                             OLED_ShowWiFiProgress(i);
-                            delay_ms(300);
+                            delay_ms(20);
                         }
                         
                         if(ESP8266_SendATCmd(ESP8266_WIFI_INFO, "WIFI CONNECTED", 10000) == 0)
@@ -161,10 +173,10 @@ void ESP8266_Init(unsigned int bound)
                             ESP8266_SendATCmd("AT+CIFSR\r\n", "STAIP", 2000);
                             
                             // 等待WiFi连接
-                            for (; i <= 40; i += 10)
+                            for (; i <= 40; i += 1)
                             {
                                 OLED_ShowWiFiProgress(i);
-                                delay_ms(300);
+                                delay_ms(30);
                             }
                             
                             // delay_ms(500); // 额外等待
@@ -173,27 +185,27 @@ void ESP8266_Init(unsigned int bound)
                             while (bemfa_retry > 0)
                             {
                                 // 显示巴法云连接进度
-                                for (; i <= 60; i += 10)
+                                for (; i <= 60; i += 1)
                                 {
                                     OLED_ShowWiFiProgress(i);
-                                    delay_ms(300);
+                                    delay_ms(20);
                                 }
                                 if(ESP8266_SendATCmd(ESP8266_ONENET_INFO, "CONNECT", 5000) == 0)
                                 {
                                     // delay_ms(500);
                                     // 订阅主题
                                     // 显示订阅主题进度
-                                    for (; i <= 70; i += 10)
+                                    for (; i <= 70; i += 1)
                                     {
                                         OLED_ShowWiFiProgress(i);
-                                        delay_ms(300);
+                                        delay_ms(20);
                                     }
                                     ESP8266_SendData((unsigned char *)ESP8266_TOPIC);
                                     
-                                    for (; i <= 100; i += 10)
+                                    for (; i <= 100; i += 1)
                                     {
                                         OLED_ShowWiFiProgress(i);
-                                        delay_ms(200);
+                                        delay_ms(15);
                                     }
                                     // delay_ms(500);
                                     // 显示连接成功提示
@@ -533,6 +545,20 @@ void OLED_ShowFailureWithCountdown(u8 *message, int time)
         OLED_ShowString(90, 6, (u8 *)countdown_str, 16);
         delay_ms(1000);
     }
+
+    OLED_Clear(0);
+
+    //显示初始化信息
+    OLED_ShowCHinese(0, 3, 21); //正
+    OLED_ShowCHinese(18, 3, 22); //在
+    OLED_ShowCHinese(36, 3, 23); //连
+    OLED_ShowCHinese(54, 3, 24); //接
+    OLED_ShowString(72, 3, "WIFI", 16);
+    OLED_ShowString(108, 3, "..", 16);
+    OLED_ShowCHinese(0, 6, 4); //进
+    OLED_ShowCHinese(18, 6, 5); //度
+    OLED_ShowCHinese(36, 6, 13); //：
+            
 }
 
 /**
