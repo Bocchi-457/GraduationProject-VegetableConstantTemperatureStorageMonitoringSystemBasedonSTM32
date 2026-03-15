@@ -205,7 +205,7 @@ void ESP8266_Init(unsigned int bound)
                                     OLED_ShowCHinese(72, 0, 39); // 功
                                     OLED_ShowString(0, 3, (u8 *)"WiFi connected", 16);
                                     OLED_ShowString(0, 6, (u8 *)"Bemfa connected", 16);
-                                    delay_ms(2000);
+                                    delay_ms(1500);
                                     return;
                                 }
                                 else

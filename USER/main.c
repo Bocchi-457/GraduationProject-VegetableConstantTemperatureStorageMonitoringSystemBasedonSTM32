@@ -7,7 +7,7 @@
 #include "delay.h"
 #include "sys.h"
 #include "OLED.h"
-#include "dht11.h"
+#include "dht22.h"
 #include "esp8266.h"
 #include "Timer.h"
 #include "AD.h"
@@ -67,9 +67,19 @@ u8 key_num = 0;      //按键返回值
 u8 led_temp_mode = 0; //温度模式LED标志
 
 /**
- * DHT11温湿度传感器数据结构
+ * DHT22温湿度传感器数据结构
  */
-DHT11_Data_TypeDef DHT11_Data;
+DHT22_Data_TypeDef DHT22_Data;
+
+/**
+ * 保存上次有效的温湿度数据
+ */
+DHT22_Data_TypeDef last_valid_data = {0, 0, 0, 0, 0};
+
+/**
+ * 温湿度数据有效标志
+ */
+u8 data_valid = 0;
 
 /**
  * WiFi相关变量
@@ -88,6 +98,41 @@ char oled_str[100];     //OLED显示字符串
 char data[200];         //ESP8266发送缓冲区
 u8 buff[30];            //缓冲区，用于显示数据
 
+/**
+ * DHT22采集相关变量
+ */
+uint32_t last_dht22_read_time = 0;
+#define DHT22_READ_INTERVAL 2000 // 2秒读取一次
+
+/**
+ * 获取系统当前时间（毫秒）
+ * @return 当前系统时间，单位毫秒
+ */
+uint32_t GetSysTimeMs(void)
+{
+    static uint32_t tick_ms = 0;
+    static uint32_t last_tick = 0;
+    uint32_t current_tick = SysTick->VAL;
+    
+    // SysTick每1ms递减一次
+    if (current_tick < last_tick)
+    {
+        tick_ms++;
+    }
+    last_tick = current_tick;
+    
+    return tick_ms;
+}
+
+/**
+ * 温湿度显示相关变量
+ */
+int last_temp_int = -1;
+int last_temp_deci = -1;
+int last_humi_int = -1;
+int last_humi_deci = -1;
+u8 wendu_display_force_update = 1; // 强制更新温湿度显示标志
+
 int NUM = 0; //通用计数器 //通用计数器
 
 /**
@@ -104,10 +149,10 @@ int main(void)
     OLED_Init();       //OLED显示初始化
     OLED_Clear(0);     //清屏
     Ds1302_Init();     //DS1302实时时钟初始化
-    DHT11_Init();      //DHT11温湿度传感器初始化
     warm_init();       //加热模块初始化
     zhileng_init();    //制冷模块初始化
     chushi_init();     //除湿模块初始化
+    // DHT22初始化将根据是否联网在后面处理
 		
     //开机界面
     do
@@ -146,18 +191,49 @@ int main(void)
             ESP8266_Init(115200); //初始化ESP8266模块，波特率115200
             Timer_Init();          //初始化定时器
             Flagout = 1;           //允许数据输出
+            
+            // 联网过程已经超过2秒，直接初始化DHT22
+            DHT22_Init();      //DHT22温湿度传感器初始化
             break;
         }
     } while(key_num != 2);  
 	
     OLED_Clear(0); //清屏
+    
+    // 如果没有联网，需要等待2秒再初始化DHT22
+    if (Flagout == 0)
+    {
+        // DHT22上电后需要等待2秒以越过不稳定状态
+        delay_ms(2000);
+        DHT22_Init();      //DHT22温湿度传感器初始化
+    }
 
     //主循环
 	while(1)
 	{
         /*********************************数据采集区**************************************************/ 
         /*******************读取温湿度数据***************************************/
-        Read_DHT11(&DHT11_Data); //读取DHT11传感器数据
+        // 控制DHT22采集频率，每2秒读取一次
+        if (GetSysTimeMs() - last_dht22_read_time >= DHT22_READ_INTERVAL)
+        {
+            if (Read_DHT22(&DHT22_Data) == SUCCESS)
+            {
+                // 读取成功，保存有效数据
+                last_valid_data = DHT22_Data;
+                data_valid = 1;
+                wendu_display_force_update = 1; // 数据更新，强制显示
+            }
+            else
+            {
+                // 读取失败，使用上次有效数据
+                if (data_valid)
+                {
+                    DHT22_Data = last_valid_data;
+                }
+                // 否则保持当前值（可能为0）
+            }
+            last_dht22_read_time = GetSysTimeMs();
+        }
         
         /*******************上传数据到平台***************************************/
         if(TIMER_IT && Flagout == 1)
@@ -168,8 +244,8 @@ int main(void)
             sprintf(data, "cmd=2&uid=%s&topic=data&msg=Mode:%d temp:%d.%d humi:%d.%d\r\n", \
             BEMFA_ID, //设备ID
             mode,     //当前模式
-            DHT11_Data.temp_int, DHT11_Data.temp_deci, //温度整数和小数部分
-            DHT11_Data.humi_int, DHT11_Data.humi_deci); //湿度整数和小数部分
+            DHT22_Data.temp_int, DHT22_Data.temp_deci, //温度整数和小数部分
+            DHT22_Data.humi_int, DHT22_Data.humi_deci); //湿度整数和小数部分
             
             // 发送数据
             if(ESP8266_SendData((unsigned char *)data) == 0)
@@ -192,9 +268,9 @@ int main(void)
                     ESP8266_Init(115200);
                     reconnect_count = 0;
                 }
-                // 显示上传失败状态
-                sprintf(oled_str, "Upload: FAIL");
-                OLED_ShowString(90, 0, oled_str, 12);
+                // // 显示上传失败状态
+                // sprintf(oled_str, "Upload: FAIL");
+                // OLED_ShowString(90, 0, oled_str, 12);
                 delay_ms(2000); // 显示失败状态2秒
                 OLED_Clear(0); // 显示失败状态后清屏
             }
@@ -206,8 +282,8 @@ int main(void)
                 sprintf(data, "cmd=2&uid=%s&topic=data&msg=Mode:%d temp:%d.%d humi:%d.%d\r\n", \
                 BEMFA_ID, //设备ID
                 mode,     //当前模式
-                DHT11_Data.temp_int, DHT11_Data.temp_deci, //温度整数和小数部分
-                DHT11_Data.humi_int, DHT11_Data.humi_deci); //湿度整数和小数部分
+                DHT22_Data.temp_int, DHT22_Data.temp_deci, //温度整数和小数部分
+                DHT22_Data.humi_int, DHT22_Data.humi_deci); //湿度整数和小数部分
                 ESP8266_SendData((unsigned char *)data);
                 heart_beat_count = 0;
             }
@@ -234,6 +310,7 @@ int main(void)
             {
                 page_clear = 1;
                 OLED_Clear(0);
+                wendu_display_force_update = 1; // 页面切换，强制更新温湿度显示
             }
             show_mode();    //显示当前模式
             TIME();         //显示时间
@@ -245,6 +322,8 @@ int main(void)
                 jiare = 0;    //关闭加热
                 zhileng = 0;  //关闭制冷
                 chushi = 0;   //关闭除湿
+                // 模式变化，重新显示
+                show_mode();
             }
             if(key_num == 3) //切换到自动模式
             {
@@ -252,6 +331,8 @@ int main(void)
                 jiare = 0;    //关闭加热
                 zhileng = 0;  //关闭制冷
                 chushi = 0;   //关闭除湿
+                // 模式变化，重新显示
+                show_mode();
             }
         }
 
@@ -510,19 +591,19 @@ int main(void)
         if(mode == 1)
         {
             //温度高于上限，开启制冷
-            if(DHT11_Data.temp_int > set_wendu_high)
+            if(DHT22_Data.temp_int > set_wendu_high)
                 zhileng = 1;
             else
                 zhileng = 0;
             
             //温度低于下限，开启加热
-            if(DHT11_Data.temp_int < set_wendu_lou)
+            if(DHT22_Data.temp_int < set_wendu_lou)
                 jiare = 1;
             else
                 jiare = 0;
             
             //湿度高于设置值，开启除湿
-            if(DHT11_Data.humi_int > set_shidu)
+            if(DHT22_Data.humi_int > set_shidu)
                 chushi = 1;
             else
                 chushi = 0;
@@ -631,11 +712,27 @@ u8 WeekYearday(int years, int months, int days)
  * 显示温湿度函数
  * 功能：在OLED上显示当前温度和湿度
  */
+
 void show_wendu(void)
 {
-    //格式化温湿度字符串
-    sprintf(oled_str, "T:%d.%dC  H:%d%% ", DHT11_Data.temp_int, DHT11_Data.temp_deci, DHT11_Data.humi_int);
-    OLED_ShowString(0, 6, (u8 *)oled_str, 16);  
+    // 只有当温湿度数据变化或需要强制更新时才更新显示
+    if(wendu_display_force_update || 
+       last_temp_int != DHT22_Data.temp_int || 
+       last_temp_deci != DHT22_Data.temp_deci || 
+       last_humi_int != DHT22_Data.humi_int ||
+       last_humi_deci != DHT22_Data.humi_deci)
+    {
+        // 保存当前值
+        last_temp_int = DHT22_Data.temp_int;
+        last_temp_deci = DHT22_Data.temp_deci;
+        last_humi_int = DHT22_Data.humi_int;
+        last_humi_deci = DHT22_Data.humi_deci;
+        wendu_display_force_update = 0; // 清除强制更新标志
+        
+        //格式化温湿度字符串
+        sprintf(oled_str, "T:%d.%dC  H:%d.%d%%", DHT22_Data.temp_int, DHT22_Data.temp_deci, DHT22_Data.humi_int, DHT22_Data.humi_deci);
+        OLED_ShowString(0, 6, (u8 *)oled_str, 16);  
+    }
 }
 
 

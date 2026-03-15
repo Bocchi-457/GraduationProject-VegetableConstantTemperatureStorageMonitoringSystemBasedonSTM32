@@ -231,8 +231,9 @@ void Ds1302_Init(void)
     CE = 0;                                    		//RST脚置低
     SCLK = 0;                                  		//SCK脚置低
     Ds1302_Write_Byte(WRITE_SECOND,0x00);      		//开始  
-//    RTC_Set(2025,1,10,22,17,40) ;  //将注释取消，更改成功之后重新注销
-	      //年月日时分秒
+    // 设置当前时间为2026年3月12日 10:00:00
+    // 取消注释以下行来设置时间，设置完成后重新注释
+    // RTC_Set(2026, 3, 13, 0, 7, 0);  // 年月日时分秒
 }
 
 //*******************以下UTC时间计算部分函数*****************
@@ -265,33 +266,57 @@ u8 Is_Leap_Year(u16 year)
 	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP; 		 												//推挽输出	
 	GPIO_Init(GPIOC, &GPIO_InitStructure);																							
 }
+// void TIME(void)
+// {
+//   RTC_Get();	//获取时间
+// 	if(rtctime!=calendar.sec)						//一分钟打印一次
+// 	{		
+// 		rtctime=calendar.sec;
+// 		if((calendar.hour<=24)&&(calendar.min<=60)&&(calendar.week<=7)&&(calendar.w_date<=31)&&(calendar.w_month<=12))//检测成功
+// 	  {
+// 				sprintf(time_str,"%04d-%02d-%02d ",calendar.w_year,calendar.w_month,calendar.w_date);
+// 				OLED_ShowString(0,2,(u8 *)time_str,16);
+			 
+// 				sprintf(time_str,"%02d:%02d:%02d",calendar.hour,calendar.min,calendar.sec);
+// 				OLED_ShowString(0,4,(u8 *)time_str,16);   
+// 				switch(calendar.week)
+// 			 {	
+// 					case 0:  OLED_ShowCHinese(48+32, 4,102),OLED_ShowCHinese(48+16+32, 4,94),OLED_ShowCHinese(96+16, 4,101); break;//周日
+// 					case 1:  OLED_ShowCHinese(48+32, 4,102),OLED_ShowCHinese(48+16+32, 4,94),OLED_ShowCHinese(96+16, 4,95); break;//周一
+// 					case 2:  OLED_ShowCHinese(48+32, 4,102),OLED_ShowCHinese(48+16+32, 4,94),OLED_ShowCHinese(96+16, 4,96); break;//周二
+// 					case 3:  OLED_ShowCHinese(48+32, 4,102),OLED_ShowCHinese(48+16+32, 4,94),OLED_ShowCHinese(96+16, 4,97); break;//周三
+// 					case 4:  OLED_ShowCHinese(48+32, 4,102),OLED_ShowCHinese(48+16+32, 4,94),OLED_ShowCHinese(96+16, 4,98); break;//周四
+// 					case 5:  OLED_ShowCHinese(48+32, 4,102),OLED_ShowCHinese(48+16+32, 4,94),OLED_ShowCHinese(96+16, 4,99); break;//周五
+// 					case 6:  OLED_ShowCHinese(48+32, 4,102),OLED_ShowCHinese(48+16+32, 4,94),OLED_ShowCHinese(96+16, 4,100); break;//周六                         
+// 			 }
+// 		}
+//         else OLED_ShowString(0,6,(u8 *)"shibai",16);
+
+// 	 }
+// }
+
 void TIME(void)
 {
   RTC_Get();	//获取时间
-	if(rtctime!=calendar.sec)						//一分钟打印一次
-	{		
-		rtctime=calendar.sec;
-		if((calendar.hour<=24)&&(calendar.min<=60)&&(calendar.week<=7)&&(calendar.w_date<=31)&&(calendar.w_month<=12))//检测成功
-	  {
-				sprintf(time_str,"%04d-%02d-%02d ",calendar.w_year,calendar.w_month,calendar.w_date);
-				OLED_ShowString(0,2,(u8 *)time_str,16);
-			 
-				sprintf(time_str,"%02d:%02d:%02d",calendar.hour,calendar.min,calendar.sec);
-				OLED_ShowString(0,4,(u8 *)time_str,16);   
-				switch(calendar.week)
-			 {	
-					case 0:  OLED_ShowCHinese(48+32, 4,102),OLED_ShowCHinese(48+16+32, 4,94),OLED_ShowCHinese(96+16, 4,101); break;//周日
-					case 1:  OLED_ShowCHinese(48+32, 4,102),OLED_ShowCHinese(48+16+32, 4,94),OLED_ShowCHinese(96+16, 4,95); break;//周一
-					case 2:  OLED_ShowCHinese(48+32, 4,102),OLED_ShowCHinese(48+16+32, 4,94),OLED_ShowCHinese(96+16, 4,96); break;//周二
-					case 3:  OLED_ShowCHinese(48+32, 4,102),OLED_ShowCHinese(48+16+32, 4,94),OLED_ShowCHinese(96+16, 4,97); break;//周三
-					case 4:  OLED_ShowCHinese(48+32, 4,102),OLED_ShowCHinese(48+16+32, 4,94),OLED_ShowCHinese(96+16, 4,98); break;//周四
-					case 5:  OLED_ShowCHinese(48+32, 4,102),OLED_ShowCHinese(48+16+32, 4,94),OLED_ShowCHinese(96+16, 4,99); break;//周五
-					case 6:  OLED_ShowCHinese(48+32, 4,102),OLED_ShowCHinese(48+16+32, 4,94),OLED_ShowCHinese(96+16, 4,100); break;//周六                         
-			 }
+	// 每次都更新时间显示，不使用条件判断
+	// 确保时间数据有效
+	if((calendar.hour<=24)&&(calendar.min<=60)&&(calendar.week<=7)&&(calendar.w_date<=31)&&(calendar.w_month<=12))//检测成功
+	{
+		sprintf(time_str,"%04d-%02d-%02d",calendar.w_year,calendar.w_month,calendar.w_date);
+		OLED_ShowString(0,3,(u8 *)time_str,12); //使用F6x8字体显示日期
+		
+		sprintf(time_str,"%02d:%02d:%02d",calendar.hour,calendar.min,calendar.sec);
+		OLED_ShowString(0,4,(u8 *)time_str,12); //使用F6x8字体显示时间  
+		switch(calendar.week)
+		{
+		case 0:  OLED_ShowCHinese(80, 3,102),OLED_ShowCHinese(96, 3,94),OLED_ShowCHinese(112, 3,101); break;//周日
+		case 1:  OLED_ShowCHinese(80, 3,102),OLED_ShowCHinese(96, 3,94),OLED_ShowCHinese(112, 3,95); break;//周一
+		case 2:  OLED_ShowCHinese(80, 3,102),OLED_ShowCHinese(96, 3,94),OLED_ShowCHinese(112, 3,96); break;//周二
+		case 3:  OLED_ShowCHinese(80, 3,102),OLED_ShowCHinese(96, 3,94),OLED_ShowCHinese(112, 3,97); break;//周三
+		case 4:  OLED_ShowCHinese(80, 3,102),OLED_ShowCHinese(96, 3,94),OLED_ShowCHinese(112, 3,98); break;//周四
+		case 5:  OLED_ShowCHinese(80, 3,102),OLED_ShowCHinese(96, 3,94),OLED_ShowCHinese(112, 3,99); break;//周五
+		case 6:  OLED_ShowCHinese(80, 3,102),OLED_ShowCHinese(96, 3,94),OLED_ShowCHinese(112, 3,100); break;//周六                          
 		}
-        else OLED_ShowString(0,6,(u8 *)"shibai",16);
-
-	 }
+	}
+	else OLED_ShowString(0,6,(u8 *)"shibai",16);
 }
-
-

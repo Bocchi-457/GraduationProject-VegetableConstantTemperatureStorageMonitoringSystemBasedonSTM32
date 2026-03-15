@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>USE_STDPERIPH_DRIVER</Define>
               <Undefine></Undefine>
-              <IncludePath>..\CORE;..\STM32F10x_FWLib\inc;..\USER;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\HARDWARE\LCD;..\HARDWARE\AD;..\HARDWARE\DHT11;..\HARDWARE\Timer;..\HARDWARE\SIM800L;..\HARDWARE\OLED;..\HARDWARE\KEY;..\HARDWARE\SGP30;..\HARDWARE\EXIT;..\HARDWARE\STMFLASH;..\HARDWARE\Light;..\HARDWARE\Usart;..\SYSTEM\adc;..\HARDWARE\control;..\HARDWARE\DS1302;..\HARDWARE\ESP8266</IncludePath>
+              <IncludePath>..\CORE;..\STM32F10x_FWLib\inc;..\USER;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\HARDWARE\LCD;..\HARDWARE\AD;..\HARDWARE\DHT11;..\HARDWARE\Timer;..\HARDWARE\SIM800L;..\HARDWARE\OLED;..\HARDWARE\KEY;..\HARDWARE\SGP30;..\HARDWARE\EXIT;..\HARDWARE\STMFLASH;..\HARDWARE\Light;..\HARDWARE\Usart;..\SYSTEM\adc;..\HARDWARE\control;..\HARDWARE\DS1302;..\HARDWARE\ESP8266;..\HARDWARE\DHT22</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -538,6 +538,16 @@
               <FileName>AD.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\HARDWARE\AD\AD.c</FilePath>
+            </File>
+            <File>
+              <FileName>dht22.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\DHT22\dht22.c</FilePath>
+            </File>
+            <File>
+              <FileName>dht22.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\HARDWARE\DHT22\dht22.h</FilePath>
             </File>
           </Files>
         </Group>

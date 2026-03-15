@@ -32,7 +32,7 @@
 ..\obj\main.o: ..\STM32F10x_FWLib\inc\misc.h
 ..\obj\main.o: ..\HARDWARE\OLED\OLED.h
 ..\obj\main.o: D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\Bin\..\include\stdlib.h
-..\obj\main.o: ..\HARDWARE\DHT11\dht11.h
+..\obj\main.o: ..\HARDWARE\DHT22\dht22.h
 ..\obj\main.o: ..\HARDWARE\ESP8266\esp8266.h
 ..\obj\main.o: ..\HARDWARE\Timer\Timer.h
 ..\obj\main.o: ..\HARDWARE\AD\AD.h
