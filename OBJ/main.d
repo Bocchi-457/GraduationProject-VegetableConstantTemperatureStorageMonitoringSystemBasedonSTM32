@@ -35,12 +35,9 @@
 ..\obj\main.o: ..\HARDWARE\DHT22\dht22.h
 ..\obj\main.o: ..\HARDWARE\ESP8266\esp8266.h
 ..\obj\main.o: ..\HARDWARE\Timer\Timer.h
-..\obj\main.o: ..\HARDWARE\AD\AD.h
 ..\obj\main.o: ..\HARDWARE\KEY\Key.h
-..\obj\main.o: ..\HARDWARE\STMFLASH\stmflash.h
 ..\obj\main.o: ..\HARDWARE\Usart\Usart.h
 ..\obj\main.o: D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\Bin\..\include\stdio.h
 ..\obj\main.o: ..\HARDWARE\DS1302\DS1302.h
 ..\obj\main.o: ..\HARDWARE\control\control.h
 ..\obj\main.o: D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\Bin\..\include\string.h
-..\obj\main.o: D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\Bin\..\include\math.h

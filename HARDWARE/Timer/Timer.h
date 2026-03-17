@@ -4,8 +4,6 @@
  * 功能：提供定时器初始化函数
  * 版本：V1.0
  * 测试硬件：STM32F103RCT6
- * 作者：蔬菜恒温库监控系统开发团队
- * 创建日期：2026-03-08
  * 项目：蔬菜恒温库监控系统
  */
 
@@ -15,6 +13,8 @@
 #include "stm32f10x_tim.h"
 #include "stm32f10x_rcc.h"
 
+extern char TIMER_IT;     //定时器中断标志
+
 /**
  * @brief 初始化定时器
  * @param 无
@@ -22,6 +22,7 @@
  * @note 初始化TIM2定时器，配置为2秒中断一次
  */
 void Timer_Init(void);
+void TIM2_IRQHandler(void);
 
 #endif
 

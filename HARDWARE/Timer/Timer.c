@@ -4,13 +4,13 @@
  * 功能：实现定时器初始化和中断处理函数
  * 版本：V1.0
  * 测试硬件：STM32F103RCT6
- * 作者：蔬菜恒温库监控系统开发团队
- * 创建日期：2026-03-08
  * 项目：蔬菜恒温库监控系统
  */
 
 #include "stm32f10x.h"                  // Device header
 #include "timer.h"                  // Device header
+
+char TIMER_IT = 0;     //定时器中断标志
 
 /**
  * @brief 初始化定时器
@@ -33,8 +33,14 @@ void Timer_Init(void)
 	// 配置时基单元
 	TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;         // 时钟分频，选择不分频
 	TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up;     // 计数器模式，选择向上计数
-	TIM_TimeBaseInitStructure.TIM_Period = 1000 - 1;                    // 计数周期，即ARR的值，定时1ms
-	TIM_TimeBaseInitStructure.TIM_Prescaler = 72 - 1;                   // 预分频器，即PSC的值
+	// TIM_TimeBaseInitStructure.TIM_Period = 1000 - 1;                    // 计数周期，即ARR的值，定时1ms
+	// TIM_TimeBaseInitStructure.TIM_Prescaler = 72 - 1;                   // 预分频器，即PSC的值
+	// 时钟频率 72MHz。预分频设为 7200-1，则定时器频率为 10kHz (0.1ms)
+
+    // 计数周期设为 20000-1，则 20000 * 0.1ms = 2000ms = 2秒
+    TIM_TimeBaseInitStructure.TIM_Period = 20000 - 1;       // ARR
+    TIM_TimeBaseInitStructure.TIM_Prescaler = 7200 - 1;     // PSC
+
 	TIM_TimeBaseInitStructure.TIM_RepetitionCounter = 0;                // 重复计数器，高级定时器才会用到
 	TIM_TimeBaseInit(TIM2, &TIM_TimeBaseInitStructure);                 // 配置TIM2的时基单元
 	
@@ -55,6 +61,17 @@ void Timer_Init(void)
 	
 	// 使能TIM2，定时器开始运行
 	TIM_Cmd(TIM2, ENABLE);
+}
+
+// TIM2 中断服务函数
+
+void TIM2_IRQHandler(void)
+{
+    if (TIM_GetITStatus(TIM2, TIM_IT_Update) == SET)
+    {
+        TIMER_IT = 1; // 只需要这一个标志位，每2秒置1一次
+        TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
+    }
 }
 
 /**

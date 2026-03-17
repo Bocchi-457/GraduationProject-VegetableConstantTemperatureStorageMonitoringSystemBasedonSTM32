@@ -10,9 +10,8 @@
 #include "dht22.h"
 #include "esp8266.h"
 #include "Timer.h"
-#include "AD.h"
 #include "Key.h"
-#include "stmflash.h"
+// #include "stmflash.h"
 #include "Usart.h" 
 #include "DS1302.h"
 #include "control.h"
@@ -20,7 +19,6 @@
 //C标准库
 #include <string.h>
 #include "stdio.h"
-#include "math.h"
 
 /**
  * 函数声明
@@ -51,7 +49,6 @@ int set_shidu = 80;      //湿度上限设置
  * DHT22相关变量
  */
 DHT22_Data_TypeDef DHT22_Data;       // 当前温湿度数据
-DHT22_Data_TypeDef last_valid_data = {0, 0, 0, 0, 0};   // 上次有效的温湿度数据
 u8 data_valid = 0;                     // 温湿度数据有效标志
 volatile uint32_t sys_tick_ms = 0;    // 全局毫秒计数器
 uint32_t last_dht22_read_time = 0;
@@ -65,7 +62,7 @@ u8 key_num = 0;      //按键返回值
 /**
  * WiFi相关变量
  */
-char TIMER_IT = 0;     //定时器中断标志
+// char TIMER_IT = 0;     //定时器中断标志
 char WiFiInit_time;    //WiFi初始化时间
 char Flagout = 0;      //输出标志（0：禁止，1：允许）
 uint32_t heart_beat_count = 0; //心跳包计数器
@@ -78,23 +75,8 @@ u8 oled_Fill_flag = 1; //OLED填充标志
 char oled_str[100];     //OLED显示字符串
 char data[200];         //ESP8266发送缓冲区
 u8 buff[30];            //缓冲区，用于显示数据
-/**
- * 温湿度显示相关变量
- */
-int last_temp_int = -1;
-int last_temp_deci = -1;
-int last_humi_int = -1;
-int last_humi_deci = -1;
 u8 wendu_display_force_update = 1; // 强制更新温湿度显示标志
 
-/**
- * 获取系统当前时间（毫秒）
- * @return 当前系统时间，单位毫秒
- */
-uint32_t GetSysTimeMs(void)
-{
-    return sys_tick_ms;
-}
 
 /**
  * 读取DHT22数据并验证校验和
@@ -102,7 +84,6 @@ uint32_t GetSysTimeMs(void)
  */
 uint8_t ReadAndValidateDHT22(DHT22_Data_TypeDef *data)
 {
-    // Read_DHT22已经进行了正确的校验和检查，不需要再调用DHT22_CheckSum
     return Read_DHT22(data);
 }
 
@@ -148,11 +129,7 @@ int main(void)
         delay_ms(2000);
         if (Read_DHT22(&DHT22_Data) == SUCCESS)
         {
-            last_valid_data = DHT22_Data;
             data_valid = 1;
-            Serial_Printf("初始数据读取成功: T=%d.%d, H=%d.%d\n",
-                   DHT22_Data.temp_int, DHT22_Data.temp_deci,
-                   DHT22_Data.humi_int, DHT22_Data.humi_deci);
         }
     }
     else
@@ -184,16 +161,6 @@ int main(void)
         if(key_num == 1) //选择菜单
         {
             OLED_Clear(0);
-            // //显示初始化信息
-            // OLED_ShowCHinese(0, 3, 21); //正
-            // OLED_ShowCHinese(18, 3, 22); //在
-            // OLED_ShowCHinese(36, 3, 23); //连
-            // OLED_ShowCHinese(54, 3, 24); //接
-            // OLED_ShowString(72, 3, "WIFI", 16);
-            // OLED_ShowString(108, 3, "..", 16);
-            // OLED_ShowCHinese(0, 6, 4); //进
-            // OLED_ShowCHinese(18, 6, 5); //度
-            // OLED_ShowCHinese(36, 6, 13); //：
             
             Serial_Printf("初始化ESP8266模块...\n\r");
             ESP8266_Init(115200); //初始化ESP8266模块，波特率115200
@@ -203,103 +170,79 @@ int main(void)
     } while(key_num != 2);  
 	
     OLED_Clear(0); //清屏
-    
-    
-    last_dht22_read_time = GetSysTimeMs();
-    OLED_Clear(0);
 
     //主循环
 	while(1)
 	{
-        /*********************************数据采集区**************************************************/ 
-        /*******************读取温湿度数据***************************************/
-        // 控制DHT22采集频率，每2秒读取一次
-        if (GetSysTimeMs() - last_dht22_read_time >= DHT22_READ_INTERVAL)
+         /*****************************************数据采集与上传区*****************************************/ 
+        // 捕捉 2 秒一次的节拍 
+        if(TIMER_IT == 1)
         {
-            if (ReadAndValidateDHT22(&DHT22_Data) == SUCCESS)
+            TIMER_IT = 0; // 及时清零标志位
+        
+            /***************************** 第一步：读取温湿度 *****************************/
+            if (Read_DHT22(&DHT22_Data) == SUCCESS)
             {
-                // 读取成功，保存有效数据
-                last_valid_data = DHT22_Data;
-                data_valid = 1;
-                wendu_display_force_update = 1; // 数据更新，强制显示
-                Serial_Printf("读取成功: 温度=%d.%d℃, 湿度=%d.%d%%\n\r",  
-                       DHT22_Data.temp_int, DHT22_Data.temp_deci, 
-                       DHT22_Data.humi_int, DHT22_Data.humi_deci);
+                wendu_display_force_update = 1; // 刷新屏幕标志
             }
             else
             {
-                // 读取失败，使用上次有效数据
-                if (data_valid)
+                Serial_Printf("DHT22 Read Error\r\n");
+                // 读取失败会保持上一次读取的数据
+            }
+
+            /***************************** 第二步：上传云平台 *****************************/
+            if(Flagout == 1)
+            {
+                int abs_temp = (DHT22_Data.temperature < 0) ? -DHT22_Data.temperature : DHT22_Data.temperature;
+                char sign_str[2] = "";
+                if (DHT22_Data.temperature < 0) strcpy(sign_str, "-"); // 处理上传字符串的负号
+
+                // 构建数据上传格式 
+                sprintf(data, "cmd=2&uid=%s&topic=data&msg=Mode:%d temp:%s%d.%d humi:%d.%d\r\n", 
+                BEMFA_ID, 
+                mode,     
+                sign_str, abs_temp / 10, abs_temp % 10, 
+                DHT22_Data.humidity / 10, DHT22_Data.humidity % 10);
+            
+
+
+                // 发送数据
+                if(ESP8266_SendData((unsigned char *)data) == 0)
                 {
-                    DHT22_Data = last_valid_data;
-                    Serial_Printf("读取失败，使用上次有效数据: 温度=%d.%d℃, 湿度=%d.%d%%\n\r",  
-                           DHT22_Data.temp_int, DHT22_Data.temp_deci, 
-                           DHT22_Data.humi_int, DHT22_Data.humi_deci);
+                    heart_beat_count = 0; // 重置心跳计数器
+                    reconnect_count = 0;   // 重置重连计数器
                 }
                 else
                 {
-                    Serial_Printf("读取失败，无有效数据\n\r");
+                    // 发送失败，尝试重连
+                    reconnect_count++;
+                    if(reconnect_count >= 3)
+                    {
+                        // 重连ESP8266
+                        ESP8266_Init(115200);
+                        reconnect_count = 0;
+                    }
+                    // // 显示上传失败状态
+                    // sprintf(oled_str, "Upload: FAIL");
+                    // OLED_ShowString(90, 0, oled_str, 12);
+                    // delay_ms(2000); // 显示失败状态2秒
+                    // OLED_Clear(0); // 显示失败状态后清屏
                 }
-            }
-            last_dht22_read_time = GetSysTimeMs();
-        }
-        
-        /*******************上传数据到平台***************************************/
-        if(TIMER_IT && Flagout == 1)
-        {
-            TIMER_IT = 0; //清除定时器标志
-            
-            // 构建数据上传格式
-            sprintf(data, "cmd=2&uid=%s&topic=data&msg=Mode:%d temp:%d.%d humi:%d.%d\r\n", 
-            BEMFA_ID, //设备ID
-            mode,     //当前模式
-            DHT22_Data.temp_int, DHT22_Data.temp_deci, //温度整数和小数部分
-            DHT22_Data.humi_int, DHT22_Data.humi_deci); //湿度整数和小数部分
-            
-            // 发送数据
-            if(ESP8266_SendData((unsigned char *)data) == 0)
-            {
-                // 发送成功，显示上传状态
-                // sprintf(oled_str, "Upload: OK");
-                // OLED_ShowString(90, 0, oled_str, 12);
-                heart_beat_count = 0; // 重置心跳计数器
-                reconnect_count = 0;   // 重置重连计数器
-                // delay_ms(2000); // 上传成功后延时2秒显示上传状态
-                // OLED_Clear(0); // 上传成功后清屏
-            }
-            else
-            {
-                // 发送失败，尝试重连
-                reconnect_count++;
-                if(reconnect_count >= 3)
+
+                // 定期发送心跳包
+                heart_beat_count++;
+                if(heart_beat_count >= 30) // 每30个周期（60秒）发送一次心跳包
                 {
-                    // 重连ESP8266
-                    ESP8266_Init(115200);
-                    reconnect_count = 0;
+                    sprintf(data, "cmd=2&uid=%s&topic=online&msg=Keep online\r\n", BEMFA_ID );
+                    ESP8266_SendData((unsigned char *)data);
+                    heart_beat_count = 0;
                 }
-                // // 显示上传失败状态
-                // sprintf(oled_str, "Upload: FAIL");
-                // OLED_ShowString(90, 0, oled_str, 12);
-                delay_ms(2000); // 显示失败状态2秒
-                OLED_Clear(0); // 显示失败状态后清屏
-            }
-            
-            // 定期发送心跳包
-            heart_beat_count++;
-            if(heart_beat_count >= 30) // 每30个周期（60秒）发送一次心跳包
-            {
-                sprintf(data, "cmd=2&uid=%s&topic=data&msg=Mode:%d temp:%d.%d humi:%d.%d\r\n", \
-                BEMFA_ID, //设备ID
-                mode,     //当前模式
-                DHT22_Data.temp_int, DHT22_Data.temp_deci, //温度整数和小数部分
-                DHT22_Data.humi_int, DHT22_Data.humi_deci); //湿度整数和小数部分
-                ESP8266_SendData((unsigned char *)data);
-                heart_beat_count = 0;
-            }
-            
-            // 清空接收缓冲区
-            ESP8266_Clear();
-        } 	
+
+                // 清空接收缓冲区
+                ESP8266_Clear();
+            } 	
+        }
 
         /*********************************面板控制区**************************************************/      
         key_num = KEY_Scan(0); //按键扫描
@@ -599,8 +542,11 @@ int main(void)
         //自动模式逻辑
         if(mode == 1)
         {
-            float current_temp = DHT22_Data.temp_int + DHT22_Data.temp_deci * 0.1f;
-            float current_humi = DHT22_Data.humi_int + DHT22_Data.humi_deci * 0.1f;
+            // float current_temp = DHT22_Data.temp_int + DHT22_Data.temp_deci * 0.1f;
+            // float current_humi = DHT22_Data.humi_int + DHT22_Data.humi_deci * 0.1f;
+
+            float current_temp = DHT22_Data.temperature / 10.0f;
+            float current_humi = DHT22_Data.humidity / 10.0f;
             //温度高于上限，开启制冷
             zhileng = (current_temp > set_wendu_high) ? 1 : 0;
             
@@ -648,32 +594,6 @@ int main(void)
             }
         }
 	}
-}
-
-
-
-/**
- * TIM2定时器中断处理函数
- * 功能：定时触发数据上传，同时更新系统时间
- */
-void TIM2_IRQHandler(void)
-{
-    static uint16_t upload_counter = 0;
-    
-    if (TIM_GetITStatus(TIM2, TIM_IT_Update) == SET)
-    {
-        sys_tick_ms++; // 毫秒计数器累加，每1ms递增一次
-        
-        // 每2秒设置一次TIMER_IT标志，用于数据上传
-        upload_counter++;
-        if (upload_counter >= 2000) // 2000ms = 2s
-        {
-            upload_counter = 0;
-            TIMER_IT = 1; //设置定时器标志，用于数据上传
-        }
-        
-        TIM_ClearITPendingBit(TIM2, TIM_IT_Update); //清除中断标志
-    }
 }
 
 /**
@@ -725,31 +645,19 @@ u8 WeekYearday(int years, int months, int days)
  * 显示温湿度函数
  * 功能：在OLED上显示当前温度和湿度
  */
-
 void show_wendu(void)
 {
-    // 只有当温湿度数据变化或需要强制更新时才更新显示
-    if(wendu_display_force_update || 
-       last_temp_int != DHT22_Data.temp_int || 
-       last_temp_deci != DHT22_Data.temp_deci || 
-       last_humi_int != DHT22_Data.humi_int ||
-       last_humi_deci != DHT22_Data.humi_deci)
-    {
-        // 保存当前值
-        last_temp_int = DHT22_Data.temp_int;
-        last_temp_deci = DHT22_Data.temp_deci;
-        last_humi_int = DHT22_Data.humi_int;
-        last_humi_deci = DHT22_Data.humi_deci;
-        wendu_display_force_update = 0; // 清除强制更新标志
-        
-        //格式化温湿度字符串
-        sprintf(oled_str, "T:%d.%dC  H:%d.%d%%", 
-            DHT22_Data.temp_int, DHT22_Data.temp_deci,
-            DHT22_Data.humi_int, DHT22_Data.humi_deci);
-        OLED_ShowString(0, 6, (u8 *)oled_str, 16);  
-    }
-}
+    // 提取绝对值用于求模计算
+    int abs_temp = (DHT22_Data.temperature < 0) ? -DHT22_Data.temperature : DHT22_Data.temperature;
+    char temp_sign = (DHT22_Data.temperature < 0) ? '-' : ' '; // 负数显示减号，正数补空格对齐
 
+    sprintf(oled_str, "T:%c%d.%dC H:%d.%d%%", 
+        temp_sign,
+        abs_temp / 10, abs_temp % 10,
+        DHT22_Data.humidity / 10, DHT22_Data.humidity % 10);
+        
+    OLED_ShowString(0, 6, (u8 *)oled_str, 16);  
+}
 
 /**
  * 显示模式函数

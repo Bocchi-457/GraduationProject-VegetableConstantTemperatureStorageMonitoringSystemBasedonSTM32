@@ -4,8 +4,6 @@
  * 功能：定义DHT22相关的宏、结构体和函数声明
  * 版本：V1.0
  * MCU：STM32F103C8T6
- * 作者：蔬菜恒温库监控系统
- * 日期：2026-03-07
  */
 
 #ifndef __DHT22_H
@@ -19,16 +17,11 @@
 #define SUCCESS 0
 #define ERROR   1
 
-/**
- * DHT22温湿度数据结构体
- */
-typedef struct
+typedef struct DHT22_Data_Struct
 {
-	uint8_t  humi_int; 	// 湿度整数部分 (0~99)
-	uint8_t  humi_deci; 	// 湿度小数部分 (0~9)
-	int8_t   temp_int; 	// 温度整数部分 (-40~80)
-	uint8_t  temp_deci; 	// 温度小数部分 (0~9)
-	uint8_t  check_sum; 	// 校验和
+    uint16_t humidity;    // 湿度值，放大10倍，例如 805 表示 80.5%
+    int16_t  temperature; // 温度值，放大10倍，例如 -5 表示 -0.5℃
+    uint8_t  check_sum;   // 校验和
 } DHT22_Data_TypeDef;
 
 /**
