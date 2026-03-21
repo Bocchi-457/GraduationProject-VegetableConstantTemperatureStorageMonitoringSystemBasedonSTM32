@@ -43,7 +43,8 @@ int page2_index = 1;  //页面2的索引，用于选择不同的控制项
 int page3_index = 1;  //页面3的索引，用于选择不同的设置项
 int set_wendu_high = 15; //温度上限设置
 int set_wendu_lou = 10;  //温度下限设置
-int set_shidu = 80;      //湿度上限设置
+int set_shidu_high = 80;      //湿度上限设置
+int set_shidu_low = 65;  //湿度下限设置
 
 /**
  * DHT22相关变量
@@ -103,9 +104,10 @@ int main(void)
     Serial_Iint(115200);     //串口初始化，用于调试
     Serial_Printf("系统初始化中...\n\r");
     Ds1302_Init();     //DS1302实时时钟初始化
-    warm_init();       //加热模块初始化
+    jiare_init();       //加热模块初始化
     zhileng_init();    //制冷模块初始化
     chushi_init();     //除湿模块初始化
+    jiashi_init(); //加湿器模块初始化
     Timer_Init();          //初始化定时器
 
     // 全局上电延时，确保DHT22 2s稳定期
@@ -219,6 +221,8 @@ int main(void)
                     reconnect_count++;
                     if(reconnect_count >= 3)
                     {
+                        // 清屏显示重连状态
+                        OLED_Clear(0);
                         // 重连ESP8266
                         ESP8266_Init(115200);
                         reconnect_count = 0;
@@ -298,11 +302,11 @@ int main(void)
             }
             
             if(key_num == 2) //切换控制项
-            {
-                page2_index++;
-                if(page2_index == 4)
-                    page2_index = 1;
-            }
+        {
+            page2_index++;
+            if(page2_index == 5)
+                page2_index = 1;
+        }
             
             //显示加热控制
             OLED_ShowCHinese(0, 0, 116); //加
@@ -319,18 +323,25 @@ int main(void)
             OLED_ShowCHinese(16, 4, 121); //湿
             OLED_ShowString(32, 4, (u8 *)":", 16);
             
+            //显示加湿控制
+            OLED_ShowCHinese(0, 6, 116); //加
+            OLED_ShowCHinese(16, 6, 121); //湿
+            OLED_ShowString(32, 6, (u8 *)":", 16);
+            
             //加热控制
             if(page2_index == 1)
             {
                 OLED_ShowString(60, 0, (u8 *)"<", 16);
                 OLED_ShowString(60, 2, (u8 *)" ", 16);   
                 OLED_ShowString(60, 4, (u8 *)" ", 16); 
+                OLED_ShowString(60, 6, (u8 *)" ", 16); 
                 
                 if(mode == 2) //手动模式下才能控制
                 {
                     if(key_num == 3) //开启加热
                     {
                         jiare = 1;
+                        zhileng = 0; // 开启加热时关闭制冷
                     }
                     else if(key_num == 4) //关闭加热
                     {
@@ -345,12 +356,14 @@ int main(void)
                 OLED_ShowString(60, 0, (u8 *)" ", 16);
                 OLED_ShowString(60, 2, (u8 *)"<", 16);   
                 OLED_ShowString(60, 4, (u8 *)" ", 16); 
+                OLED_ShowString(60, 6, (u8 *)" ", 16); 
                 
                 if(mode == 2) //手动模式下才能控制
                 {
                     if(key_num == 3) //开启制冷
                     {
                         zhileng = 1;
+                        jiare = 0; // 开启制冷时关闭加热
                     }
                     else if(key_num == 4) //关闭制冷
                     {
@@ -364,17 +377,41 @@ int main(void)
             {
                 OLED_ShowString(60, 0, (u8 *)" ", 16);
                 OLED_ShowString(60, 2, (u8 *)" ", 16);   
-                OLED_ShowString(60, 4, (u8 *)"<", 16); 
+                OLED_ShowString(60, 4, (u8 *)"<", 16);
+                OLED_ShowString(60, 6, (u8 *)" ", 16); 
                 
                 if(mode == 2) //手动模式下才能控制
                 {
                     if(key_num == 3) //开启除湿
                     {
                         chushi = 1;
+                        jiashi = 0; // 开启除湿时关闭加湿
                     }
                     else if(key_num == 4) //关闭除湿
                     {
                         chushi = 0;
+                    }
+                }
+            }
+            
+            //加湿控制
+            if(page2_index == 4)
+            {
+                OLED_ShowString(60, 0, (u8 *)" ", 16);
+                OLED_ShowString(60, 2, (u8 *)" ", 16);   
+                OLED_ShowString(60, 4, (u8 *)" ", 16);
+                OLED_ShowString(60, 6, (u8 *)"<", 16); 
+                
+                if(mode == 2) //手动模式下才能控制
+                {
+                    if(key_num == 3) //开启加湿
+                    {
+                        jiashi = 1;
+                        chushi = 0; // 开启加湿时关闭除湿
+                    }
+                    else if(key_num == 4) //关闭加湿
+                    {
+                        jiashi = 0;
                     }
                 }
             }
@@ -408,6 +445,16 @@ int main(void)
             {
                 OLED_ShowCHinese(40, 4, 123); //关
             }
+            
+            //显示加湿状态
+            if(jiashi == 1)
+            {
+                OLED_ShowCHinese(40, 6, 122); //开
+            }
+            else
+            {
+                OLED_ShowCHinese(40, 6, 123); //关
+            }
         }
 
         //页面3：设置页面
@@ -422,44 +469,53 @@ int main(void)
             if(key_num == 2) //切换设置项
             {
                 page3_index++;
-                if(page3_index == 4)
+                if(page3_index == 5)
                     page3_index = 1;
             }
             
-            //显示设置标题
-            OLED_ShowCHinese(16+15, 0, 26);
-            OLED_ShowCHinese(16+15+16, 0, 27);
-            OLED_ShowCHinese(16+15+32, 0, 28);
-            OLED_ShowCHinese(16+15+48, 0, 29);
+            // //显示设置标题
+            // OLED_ShowCHinese(16+15, 0, 26);
+            // OLED_ShowCHinese(16+15+16, 0, 27);
+            // OLED_ShowCHinese(16+15+32, 0, 28);
+            // OLED_ShowCHinese(16+15+48, 0, 29);
             
             //显示温度上限
-            OLED_ShowCHinese(0, 2, 10); //温
-            OLED_ShowCHinese(16, 2, 12); //度
-            OLED_ShowCHinese(32, 2, 124); //上
-            OLED_ShowCHinese(48, 2, 125); //限
-            OLED_ShowChar(64, 2, ':', 16);
-            OLED_ShowNum(72, 2, set_wendu_high, 2, 16);
+            OLED_ShowCHinese(0, 0, 10); //温
+            OLED_ShowCHinese(16, 0, 12); //度
+            OLED_ShowCHinese(32, 0, 124); //上
+            OLED_ShowCHinese(48, 0, 125); //限
+            OLED_ShowChar(64, 0, ':', 16);
+            OLED_ShowNum(72, 0, set_wendu_high, 2, 16);
             
             //显示温度下限
-            OLED_ShowCHinese(0, 4, 10); //温
-            OLED_ShowCHinese(16, 4, 12); //度
-            OLED_ShowCHinese(32, 4, 126); //下
-            OLED_ShowCHinese(48, 4, 127); //限
-            OLED_ShowChar(64, 4, ':', 16);
-            OLED_ShowNum(72, 4, set_wendu_lou, 2, 16);
+            OLED_ShowCHinese(0, 2, 10); //温
+            OLED_ShowCHinese(16, 2, 12); //度
+            OLED_ShowCHinese(32, 2, 126); //下
+            OLED_ShowCHinese(48, 2, 127); //限
+            OLED_ShowChar(64, 2, ':', 16);
+            OLED_ShowNum(72, 2, set_wendu_lou, 2, 16);
             
-            //显示湿度设置
+            //显示湿度上限
+            OLED_ShowCHinese(0, 4, 11); //湿
+            OLED_ShowCHinese(16, 4, 12); //度
+            OLED_ShowCHinese(32, 4, 124); //上
+            OLED_ShowCHinese(48, 4, 125); //限
+            OLED_ShowChar(64, 4, ':', 16);
+            OLED_ShowNum(72, 4, set_shidu_high, 2, 16);
+            
+            //显示湿度下限
             OLED_ShowCHinese(0, 6, 11); //湿
-            OLED_ShowCHinese(16, 6, 11); //度
-            OLED_ShowCHinese(32, 6, 124); //上
-            OLED_ShowCHinese(48, 6, 125); //限
+            OLED_ShowCHinese(16, 6, 12); //度
+            OLED_ShowCHinese(32, 6, 126); //下
+            OLED_ShowCHinese(48, 6, 127); //限
             OLED_ShowChar(64, 6, ':', 16);
-            OLED_ShowNum(72, 6, set_shidu, 2, 16);
+            OLED_ShowNum(72, 6, set_shidu_low, 2, 16);
             
             //设置温度上限
             if(page3_index == 1)
             {
-                OLED_ShowString(100, 2, (u8 *)"<", 16);
+                OLED_ShowString(100, 0, (u8 *)"<", 16);
+                OLED_ShowString(100, 2, (u8 *)" ", 16);
                 OLED_ShowString(100, 4, (u8 *)" ", 16);   
                 OLED_ShowString(100, 6, (u8 *)" ", 16); 
                 
@@ -476,8 +532,9 @@ int main(void)
             //设置温度下限
             if(page3_index == 2)
             {
-                OLED_ShowString(100, 2, (u8 *)" ", 16);
-                OLED_ShowString(100, 4, (u8 *)"<", 16);   
+                OLED_ShowString(100, 0, (u8 *)" ", 16);
+                OLED_ShowString(100, 2, (u8 *)"<", 16);
+                OLED_ShowString(100, 4, (u8 *)" ", 16);   
                 OLED_ShowString(100, 6, (u8 *)" ", 16); 
                 
                 if(key_num == 3) //增加温度下限
@@ -490,20 +547,39 @@ int main(void)
                 }
             }
             
-            //设置湿度
+            //设置湿度上限
             if(page3_index == 3)
             {
-                OLED_ShowString(100, 2, (u8 *)" ", 16);
-                OLED_ShowString(100, 4, (u8 *)" ", 16);   
+                OLED_ShowString(100, 0, (u8 *)" ", 16);
+                OLED_ShowString(100, 2, (u8 *)" ", 16);   
+                OLED_ShowString(100, 4, (u8 *)"<", 16);
+                OLED_ShowString(100, 6, (u8 *)" ", 16); 
+                
+                if(key_num == 3) //增加湿度上限
+                {
+                    set_shidu_high++;
+                }
+                if(key_num == 4) //减少湿度上限
+                {
+                    set_shidu_high--;
+                }
+            }
+            
+            //设置湿度下限
+            if(page3_index == 4)
+            {
+                OLED_ShowString(100, 0, (u8 *)" ", 16);
+                OLED_ShowString(100, 2, (u8 *)" ", 16);   
+                OLED_ShowString(100, 4, (u8 *)" ", 16);
                 OLED_ShowString(100, 6, (u8 *)"<", 16); 
                 
-                if(key_num == 3) //增加湿度
+                if(key_num == 3) //增加湿度下限
                 {
-                    set_shidu += 5;
+                    set_shidu_low++;
                 }
-                if(key_num == 4) //减少湿度
+                if(key_num == 4) //减少湿度下限
                 {
-                    set_shidu -= 5;
+                    set_shidu_low--;
                 }
             }
         }
@@ -517,7 +593,11 @@ int main(void)
         {
             ESP8266_Clear(); //清除缓冲区
         }
-        if (sscanf((strstr((char *)esp8266_buf, "shidu") + 5), "=%d", &set_shidu)) 
+        if (sscanf((strstr((char *)esp8266_buf, "shidu") + 5), "=%d", &set_shidu_high)) 
+        {
+            ESP8266_Clear(); //清除缓冲区
+        }
+        if (sscanf((strstr((char *)esp8266_buf, "shidu_low") + 9), "=%d", &set_shidu_low)) 
         {
             ESP8266_Clear(); //清除缓冲区
         }
@@ -530,6 +610,7 @@ int main(void)
             jiare = 0;    //关闭加热
             zhileng = 0;  //关闭制冷
             chushi = 0;   //关闭除湿
+            jiashi = 0; //关闭加湿
         }
         else if(strstr((const char *)esp8266_buf, "SD") != 0) //手动模式
         {
@@ -537,24 +618,48 @@ int main(void)
             jiare = 0;    //关闭加热
             zhileng = 0;  //关闭制冷
             chushi = 0;   //关闭除湿
+            jiashi = 0; //关闭加湿
         } 
 
         //自动模式逻辑
         if(mode == 1)
         {
-            // float current_temp = DHT22_Data.temp_int + DHT22_Data.temp_deci * 0.1f;
-            // float current_humi = DHT22_Data.humi_int + DHT22_Data.humi_deci * 0.1f;
-
             float current_temp = DHT22_Data.temperature / 10.0f;
             float current_humi = DHT22_Data.humidity / 10.0f;
-            //温度高于上限，开启制冷
-            zhileng = (current_temp > set_wendu_high) ? 1 : 0;
             
-            //温度低于下限，开启加热
-            jiare   = (current_temp < set_wendu_lou)  ? 1 : 0;
+            // 温度控制逻辑
+            if(current_temp > set_wendu_high)
+            {
+                zhileng = 1;
+                jiare = 0; // 制冷时关闭加热
+            }
+            else if(current_temp < set_wendu_lou)
+            {
+                jiare = 1;
+                zhileng = 0; // 加热时关闭制冷
+            }
+            else
+            {
+                jiare = 0;
+                zhileng = 0;
+            }
             
-            //湿度高于设置值，开启除湿
-            chushi  = (current_humi > set_shidu) ? 1 : 0;
+            // 湿度控制逻辑
+            if(current_humi > set_shidu_high)
+            {
+                chushi = 1;
+                jiashi = 0; // 除湿时关闭加湿
+            }
+            else if(current_humi < set_shidu_low)
+            {
+                jiashi = 1;
+                chushi = 0; // 加湿时关闭除湿
+            }
+            else
+            {
+                chushi = 0;
+                jiashi = 0;
+            }
         }
         
         //手动模式逻辑
@@ -566,6 +671,7 @@ int main(void)
                 if(strstr((const char *)esp8266_buf, "KJR") != 0) //开启加热
                 {
                     jiare = 1;
+                    zhileng = 0; // 开启加热时关闭制冷
                 }
                 if(strstr((const char *)esp8266_buf, "GJR") != 0) //关闭加热
                 {
@@ -576,6 +682,7 @@ int main(void)
                 if(strstr((const char *)esp8266_buf, "KZL") != 0) //开启制冷
                 {
                     zhileng = 1;
+                    jiare = 0; // 开启制冷时关闭加热
                 }
                 if(strstr((const char *)esp8266_buf, "GZL") != 0) //关闭制冷
                 {
@@ -583,13 +690,25 @@ int main(void)
                 }
                 
                 //远程控制除湿
-                if(strstr((const char *)esp8266_buf, "KJS") != 0) //开启除湿
+                if(strstr((const char *)esp8266_buf, "KCS") != 0) //开启除湿
                 {
                     chushi = 1;
+                    jiashi = 0; // 开启除湿时关闭加湿
                 }
-                if(strstr((const char *)esp8266_buf, "GJS") != 0) //关闭除湿
+                if(strstr((const char *)esp8266_buf, "GCS") != 0) //关闭除湿
                 {
                     chushi = 0;
+                }
+                
+                //远程控制加湿
+                if(strstr((const char *)esp8266_buf, "KJS") != 0) //开启加湿
+                {
+                    jiashi = 1;
+                    chushi = 0; // 开启加湿时关闭除湿
+                }
+                if(strstr((const char *)esp8266_buf, "GJS") != 0) //关闭加湿
+                {
+                    jiashi = 0;
                 }
             }
         }

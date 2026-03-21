@@ -34,13 +34,13 @@ void beep_init(void);
  * @return 无
  * @note 初始化加热模块控制引脚
  */
-void warm_init(void);
+void jiare_init(void);
 
 /**
  * @brief 加热模块控制宏定义
  * @note PB11引脚控制加热模块
  */
-#define jiare PBout(11)
+#define jiare PBout(11) // PB11
 
 /**
  * @brief 制冷模块初始化函数
@@ -54,7 +54,7 @@ void zhileng_init(void);
  * @brief 制冷模块控制宏定义
  * @note PB1引脚控制制冷模块
  */
-#define zhileng PBout(1)
+#define zhileng PBout(1) // PB1
 
 /**
  * @brief 除湿模块初始化函数
@@ -62,13 +62,26 @@ void zhileng_init(void);
  * @return 无
  * @note 初始化除湿模块控制引脚
  */
-void chushi_init(void);
+void chushi_init(void); 
 
 /**
  * @brief 除湿模块控制宏定义
  * @note PB10引脚控制除湿模块
  */
-#define chushi PBout(10)
+#define chushi PBout(10) // PB10
+
+/**
+ * @brief 加湿器初始化函数
+ * @param 无
+ * @return 无
+ * @note 初始化加湿器控制引脚
+ */
+void jiashi_init(void);
+/**
+ * @brief 加湿器控制宏定义
+ * @note PB0引脚控制加湿器
+ */
+#define jiashi PBout(0)
 
 #endif
 

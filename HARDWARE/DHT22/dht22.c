@@ -2,10 +2,8 @@
  * dht22.c
  * DHT22温湿度传感器驱动文件
  * 功能：实现DHT22传感器的初始化和温湿度数据读取
- * 版本：V1.0
+ * 版本：V1.1
  * MCU：STM32F103C8T6
- * 作者：蔬菜恒温库监控系统
- * 日期：2026-03-07
  */
 
 #include "dht22.h"
@@ -13,13 +11,13 @@
 
 /**
  * 发送复位/起始信号
- * 遵循手册7.3节时序：拉低≥800us，典型值1ms
+ * 时序：拉低≥800us，典型值1ms
  */
 void DHT22_Rst(void)
 {
     DHT22_IO_OUT();   // 配置为开漏输出
     DHT22_DQ_OUT = 0; // 拉低总线
-    delay_ms(1);      // 严格拉低1ms
+    delay_ms(1);      // 拉低1ms
     DHT22_DQ_OUT = 1; // 释放总线
     delay_us(30);     // 等待25~45us
     DHT22_IO_IN();    // 切换为输入模式，彻底释放总线
@@ -27,7 +25,7 @@ void DHT22_Rst(void)
 
 /**
  * 检测DHT22响应信号
- * 遵循手册7.3节时序：80us低电平 + 80us高电平
+ * 时序：80us低电平 + 80us高电平
  * @retval 0=响应成功，1=响应失败
  */
 static u8 DHT22_Check(void)
@@ -59,7 +57,7 @@ static u8 DHT22_Check(void)
 
 /**
  * 读取单个位数据
- * 遵循手册7.3节位时序：
+ * 位时序：
  * - 位0：50us低 + 22~30us高
  * - 位1：50us低 + 68~75us高
  * @retval 0/1=数据位，0xFF=读取失败
@@ -115,7 +113,7 @@ static u8 DHT22_Read_Byte(void)
 
 /**
  * DHT22初始化
- * 遵循手册7.4节：上电后必须等待2s越过不稳定期
+ * 上电后必须等待2s越过不稳定期
  * @retval 0=初始化成功，1=失败
  */
 u8 DHT22_Init(void)
@@ -132,7 +130,7 @@ u8 DHT22_Init(void)
     GPIO_Init(GPIOB, &GPIO_InitStructure);
     GPIO_SetBits(GPIOB, GPIO_Pin_12); // 初始拉高
     
-    // 3. 手册强制要求：上电等待2s不稳定期
+    // 3.上电等待2s不稳定期
     // delay_ms(2000);
     
     // 4. 发送复位信号并检测响应
@@ -149,7 +147,7 @@ uint8_t Read_DHT22(DHT22_Data_TypeDef *data)
     DHT22_Rst();
     if (DHT22_Check() != 0) return ERROR;
 
-    // --- 核心修改1：关中断，保护微秒级时序 ---
+    // 关中断，保护微秒级时序
     __disable_irq(); 
     
     for (i = 0; i < 5; i++)
@@ -165,7 +163,7 @@ uint8_t Read_DHT22(DHT22_Data_TypeDef *data)
     __enable_irq(); // 读取完毕，恢复中断
     // ----------------------------------------
 
-    // --- 核心修改2：强制转为8位，防止隐式整数提升导致校验失败 ---
+    // 强制转为8位，防止隐式整数提升导致校验失败
     if ((uint8_t)(buf[0] + buf[1] + buf[2] + buf[3]) != buf[4])
     {
         return ERROR;
@@ -174,7 +172,7 @@ uint8_t Read_DHT22(DHT22_Data_TypeDef *data)
     // 湿度计算
     data->humidity = (buf[0] << 8) | buf[1];
 
-    // --- 核心修改3：统一温度计算，完美保留负号 ---
+    // 温度计算，保留负号
     temp_raw = (buf[2] << 8) | buf[3];
     if (temp_raw & 0x8000) // 判断最高位，如果是1代表负温度
     {

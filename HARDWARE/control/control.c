@@ -38,7 +38,7 @@ void beep_init(void)
  * @retval 无
  * @note 加热器连接到PB11引脚
  */
-void warm_init(void)
+void jiare_init(void)
 {
     GPIO_InitTypeDef GPIO_InitStructure;
     
@@ -94,3 +94,23 @@ void chushi_init(void)
     GPIO_Init(GPIOB, &GPIO_InitStructure);
 }
 
+/**
+ * 加湿器初始化函数
+ * 功能：初始化加湿器控制引脚
+ * @param 无
+ * @retval 无
+ * @note 加湿器连接到PB0引脚
+ */
+void jiashi_init(void)
+{
+    GPIO_InitTypeDef GPIO_InitStructure;
+    
+    // 1. 开启GPIOB时钟
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+
+    // 2. 配置PB0引脚为推挽输出
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;        // 推挽输出模式
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;       // 高速模式
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
+}

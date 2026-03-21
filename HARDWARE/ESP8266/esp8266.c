@@ -113,6 +113,7 @@ void ESP8266_Init(unsigned int bound)
     OLED_ShowCHinese(0, 6, 4); //进
     OLED_ShowCHinese(18, 6, 5); //度
     OLED_ShowCHinese(36, 6, 13); //：
+    OLED_ShowString(60, 6, "0%", 16);
     
     // 初始化复位引脚
     GPIO_InitTypeDef GPIO_InitStructure;
@@ -210,14 +211,14 @@ void ESP8266_Init(unsigned int bound)
                                     // delay_ms(500);
                                     // 显示连接成功提示
                                     OLED_Clear(0);
-                                    OLED_ShowCHinese(0, 0, 0); // 初
-                                    OLED_ShowCHinese(18, 0, 1); // 始
-                                    OLED_ShowCHinese(36, 0, 2); // 化
-                                    OLED_ShowCHinese(54, 0, 38); // 成
-                                    OLED_ShowCHinese(72, 0, 39); // 功
+                                    OLED_ShowCHinese(0, 0, 57); // 联
+                                    OLED_ShowCHinese(18, 0, 58); // 网
+                                    OLED_ShowCHinese(36, 0, 8); // 成
+                                    OLED_ShowCHinese(54, 0, 39); // 功
                                     OLED_ShowString(0, 3, (u8 *)"WiFi connected", 16);
                                     OLED_ShowString(0, 6, (u8 *)"Bemfa connected", 16);
                                     delay_ms(1500);
+                                    OLED_Clear(0);
                                     return;
                                 }
                                 else
@@ -568,14 +569,6 @@ void OLED_ShowFailureWithCountdown(u8 *message, int time)
  */
 void OLED_ShowWiFiProgress(int progress)
 {
-    // OLED_Clear(0);
-    // OLED_ShowCHinese(0, 0, 0); // 初
-    // OLED_ShowCHinese(18, 0, 1); // 始
-    // OLED_ShowCHinese(36, 0, 2); // 化
-    // OLED_ShowCHinese(54, 0, 3); // 中
-    // OLED_ShowString(72, 0, (u8 *)"...", 16);
-    // OLED_ShowString(0, 3, (u8 *)"WiFi connecting", 16);
-    
     // 显示进度百分比
     char progress_str[10];
     sprintf(progress_str, "%d%%", progress);
