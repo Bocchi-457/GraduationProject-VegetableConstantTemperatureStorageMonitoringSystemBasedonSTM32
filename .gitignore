@@ -1,0 +1,45 @@
+# 编译输出目录
+OUTPUT/
+OBJ/
+
+# 二进制文件
+*.hex
+*.bin
+*.elf
+*.axf
+*.o
+*.d
+*.crf
+*.lst
+*.map
+
+# 临时文件
+*.tmp
+*.swp
+*.swo
+*~
+
+# IDE 配置目录
+.vscode/
+.idea/
+*.build_log.htm
+*.htm
+*.lnp
+*.sct
+*_Target *.dep
+*_sct.Bak
+
+# 系统文件
+Thumbs.db
+.DS_Store
+
+# 依赖文件
+*.d
+
+# Keil工程文件
+*.uvprojx
+*.uvproj
+*.uvguix.*
+
+# 日志文件
+*.scvd
