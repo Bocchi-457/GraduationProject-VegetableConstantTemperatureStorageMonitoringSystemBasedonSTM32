@@ -51,9 +51,8 @@ int set_shidu_low = 50;  //湿度下限设置
  */
 DHT22_Data_TypeDef DHT22_Data;       // 当前温湿度数据
 u8 data_valid = 0;                     // 温湿度数据有效标志
-volatile uint32_t sys_tick_ms = 0;    // 全局毫秒计数器
+// volatile uint32_t sys_tick_ms = 0;    // 全局毫秒计数器
 uint32_t last_dht22_read_time = 0;
-#define DHT22_READ_INTERVAL 2000       // 最小2s读取间隔
 
 /**
  * 按键相关变量
@@ -77,16 +76,6 @@ char oled_str[100];     //OLED显示字符串
 char data[200];         //ESP8266发送缓冲区
 u8 buff[30];            //缓冲区，用于显示数据
 u8 wendu_display_force_update = 1; // 强制更新温湿度显示标志
-
-
-/**
- * 读取DHT22数据并验证校验和
- * @return 0: 成功, 1: 失败
- */
-uint8_t ReadAndValidateDHT22(DHT22_Data_TypeDef *data)
-{
-    return Read_DHT22(data);
-}
 
 /**
  * 主函数
