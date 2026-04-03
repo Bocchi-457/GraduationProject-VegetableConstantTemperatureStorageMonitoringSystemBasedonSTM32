@@ -2,6 +2,8 @@
  * main.c
  * 蔬菜恒温库监控系统主文件
  * 功能：实现温湿度采集、显示、控制以及WiFi远程监控
+ * 版本：V1.0
+ * MCU：STM32F103C8T6
  */
 
 #include "delay.h"
@@ -11,7 +13,7 @@
 #include "esp8266.h"
 #include "Timer.h"
 #include "Key.h"
-// #include "stmflash.h"
+#include "stmflash.h"
 #include "Usart.h" 
 #include "DS1302.h"
 #include "control.h"
@@ -21,10 +23,61 @@
 #include "stdio.h"
 
 /**
+ * Flash配置参数结构体
+ * 用于存储需要持久化的系统参数
+ */
+typedef struct {
+    uint16_t temperature_high;    // 温度上限 (放大10倍)
+    uint16_t temperature_low;     // 温度下限 (放大10倍)
+    uint16_t humidity_high;       // 湿度上限 (放大10倍)
+    uint16_t humidity_low;        // 湿度下限 (放大10倍)
+    uint8_t  work_mode;           // 工作模式 (1:自动, 2:手动)
+    uint16_t checksum;            // 校验和，用于数据完整性验证
+} SystemConfig_t;
+
+/**
+ * Flash存储地址定义
+ * 使用STM32的最后一页Flash存储配置数据
+ */
+#define CONFIG_FLASH_ADDR    0x0800FC00  // 配置数据存储地址
+#define CONFIG_MAGIC_NUMBER  0xAA55      // 配置数据魔数，用于识别有效数据
+
+/**
+ * 默认配置参数
+ */
+#define DEFAULT_TEMP_HIGH    250         // 默认温度上限25.0℃
+#define DEFAULT_TEMP_LOW     200         // 默认温度下限20.0℃
+#define DEFAULT_HUMID_HIGH   650         // 默认湿度上限65.0%
+#define DEFAULT_HUMID_LOW    500         // 默认湿度下限50.0%
+#define DEFAULT_WORK_MODE    1           // 默认自动模式
+
+/**
+ * 配置保存延时（毫秒）
+ * 避免频繁写入Flash，延长Flash寿命
+ */
+#define CONFIG_SAVE_DELAY    5000        // 5秒延时保存
+
+/**
  * 函数声明
  */
 u8 WeekYearday(int years, int months, int days); //计算星期几的函数
 extern unsigned char esp8266_buf[buf_len]; //ESP8266接收缓冲区
+
+/**
+ * Flash配置管理函数声明
+ */
+void SystemConfig_Init(void);                    // 系统配置初始化
+void SystemConfig_Save(void);                    // 保存系统配置到Flash
+uint16_t CalculateChecksum(SystemConfig_t *config); // 计算配置校验和
+uint8_t ValidateConfig(SystemConfig_t *config);  // 验证配置数据有效性
+
+/**
+ * 时间同步相关变量
+ */
+uint8_t need_time_sync = 1;     // 开机联网后默认需要同步一次
+uint8_t time_sync_state = 0;    // 0: 准备发送请求, 1: 等待接收响应
+uint32_t time_sync_timer = 0;   // 超时计时器，用于无阻塞重试
+int last_sync_date = -1;        // 记录上次同步的日期，确保每天只同步一次
 
 /**
  * 自定义函数声明
@@ -42,16 +95,23 @@ int page_clear = 0;   //页面清屏标志
 int page2_index = 1;  //页面2的索引，用于选择不同的控制项
 int page3_index = 1;  //页面3的索引，用于选择不同的设置项
 int set_wendu_high = 25; //温度上限设置
-int set_wendu_lou = 20;  //温度下限设置
+int set_wendu_low = 20;  //温度下限设置
 int set_shidu_high = 65; //湿度上限设置
 int set_shidu_low = 50;  //湿度下限设置
+
+/**
+ * Flash配置管理变量
+ */
+SystemConfig_t system_config;     // 系统配置参数
+uint8_t config_changed = 0;       // 配置改变标志，用于触发保存
+uint32_t last_save_time = 0;       // 上次保存时间，用于延时保存
 
 /**
  * DHT22相关变量
  */
 DHT22_Data_TypeDef DHT22_Data;       // 当前温湿度数据
 u8 data_valid = 0;                     // 温湿度数据有效标志
-// volatile uint32_t sys_tick_ms = 0;    // 全局毫秒计数器
+volatile uint32_t sys_tick_ms = 0;    // 全局毫秒计数器，用于配置保存延时
 uint32_t last_dht22_read_time = 0;
 
 /**
@@ -86,7 +146,7 @@ int main(void)
     //设置中断优先级分组
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
                     
-    //初始化各模块
+    // 初始化各模块
     Key_Init();        //按键初始化
     OLED_Init();       //OLED显示初始化
     OLED_Clear(0);     //清屏
@@ -99,6 +159,10 @@ int main(void)
     chushi_init();     //除湿模块初始化
     jiashi_init(); //加湿器模块初始化
     Timer_Init();          //初始化定时器
+
+    // 初始化系统配置（从Flash读取或使用默认值）
+    SystemConfig_Init();
+    Serial_Printf("系统配置初始化完成\n\r");
 
     // 全局上电延时，确保DHT22 2s稳定期
     OLED_ShowCHinese(0, 3, 19); // 系
@@ -171,13 +235,67 @@ int main(void)
     //主循环
 	while(1)
 	{
+        /********************************* 时间同步：触发与解析区 *********************************/ 
+        RTC_Get(); // 保证 calendar 数据时刻最新
+        
+        // 1. 每天凌晨 3:00 触发一次时间同步 (避开午夜跨天的边缘情况)
+        if (calendar.hour == 3 && calendar.min == 0 && calendar.w_date != last_sync_date && Flagout == 1) {
+            need_time_sync = 1;
+            time_sync_state = 0;
+        }
+
+        // 2. 无阻塞解析巴法云时间数据
+        if (time_sync_state == 1 && esp8266_buf[0] != '\0') {
+            char *p = (char *)esp8266_buf;
+            char *time_str_ptr = NULL;
+            
+            // 滑动窗口扫描：寻找 "xxxx-xx-xx xx:xx:xx" 的排版特征
+            // 只要剩余字符串长度大于等于19，就继续扫描
+            while (*p && strlen(p) >= 19) {
+                // 校验连字符和冒号的固定位置
+                if (p[4] == '-' && p[7] == '-' && p[10] == ' ' && p[13] == ':' && p[16] == ':') {
+                    // 进一步验证首字符是否为数字，防止意外的符号干扰
+                    if (p[0] >= '0' && p[0] <= '9') {
+                        time_str_ptr = p; // 找到特征头部！
+                        break;
+                    }
+                }
+                p++;
+            }
+
+            // 如果成功抓取到时间字符串的起点
+            if (time_str_ptr != NULL) {
+                int r_year, r_month, r_day, r_hour, r_minute, r_second;
+                // 提取具体的整型数值
+                if (sscanf(time_str_ptr, "%d-%d-%d %d:%d:%d", &r_year, &r_month, &r_day, &r_hour, &r_minute, &r_second) == 6) {
+                    
+                    // 严谨的通用合法性校验（支持 2000~2099 年，严格限制时分秒范围）
+                    if (r_year >= 2000 && r_year <= 2099 && 
+                        r_month >= 1 && r_month <= 12 && 
+                        r_day >= 1 && r_day <= 31 && 
+                        r_hour >= 0 && r_hour < 24 && 
+                        r_minute >= 0 && r_minute < 60 && 
+                        r_second >= 0 && r_second < 60) {
+                        
+                        RTC_Set(r_year, r_month, r_day, r_hour, r_minute, r_second);
+                        Serial_Printf("时间同步成功: %04d-%02d-%02d %02d:%02d:%02d\r\n", r_year, r_month, r_day, r_hour, r_minute, r_second);
+                        
+                        need_time_sync = 0;      // 完成同步，关闭标志位
+                        time_sync_state = 0;     // 复位状态机
+                        last_sync_date = r_day;  // 更新最后同步日期
+                        ESP8266_Clear();         // 清理缓冲区，迎接后续传感器数据上传
+                    }
+                }
+            }
+        }
+
          /*****************************************数据采集与上传区*****************************************/ 
         // 捕捉 2 秒一次的节拍 
         if(TIMER_IT == 1)
         {
             TIMER_IT = 0; // 及时清零标志位
         
-            /***************************** 第一步：读取温湿度 *****************************/
+            /***************************** 读取温湿度 *****************************/
             if (Read_DHT22(&DHT22_Data) == SUCCESS)
             {
                 wendu_display_force_update = 1; // 刷新屏幕标志
@@ -188,60 +306,71 @@ int main(void)
                 // 读取失败会保持上一次读取的数据
             }
 
-            /***************************** 第二步：上传云平台 *****************************/
+            /***************************** 上传云平台 / 时间同步 *****************************/
             if(Flagout == 1)
             {
-                int abs_temp = (DHT22_Data.temperature < 0) ? -DHT22_Data.temperature : DHT22_Data.temperature;
-                char sign_str[2] = "";
-                if (DHT22_Data.temperature < 0) strcpy(sign_str, "-"); // 处理上传字符串的负号
-
-                // 构建数据上传格式 
-                sprintf(data, "cmd=2&uid=%s&topic=data&msg=Mode:%d temp:%s%d.%d humi:%d.%d\r\n", 
-                BEMFA_ID, 
-                mode,     
-                sign_str, abs_temp / 10, abs_temp % 10, 
-                DHT22_Data.humidity / 10, DHT22_Data.humidity % 10);
-            
-
-
-                // 发送数据
-                if(ESP8266_SendData((unsigned char *)data) == 0)
+                // 如果当前需要时间同步，则暂停发传感器数据，让出通道给时间同步指令
+                if (need_time_sync) 
                 {
-                    heart_beat_count = 0; // 重置心跳计数器
-                    reconnect_count = 0;   // 重置重连计数器
-                }
-                else
-                {
-                    
-                    reconnect_count++;
-                    // 连续5次发送失败，尝试重连
-                    if(reconnect_count >= 5)
-                    {
-                        // 清屏显示重连状态
-                        OLED_Clear(0);
-                        // 重连ESP8266
-                        ESP8266_Init(115200);
-                        reconnect_count = 0;
+                    // ====== 无阻塞时间同步状态机 ======
+                    if (time_sync_state == 0) {
+                        // 发送获取时间指令
+                        ESP8266_SendData((unsigned char *)Return_Time);
+                        time_sync_state = 1;           // 切换为等待响应状态
+                        time_sync_timer = sys_tick_ms; // 记录发送时刻
+                        Serial_Printf("正在请求服务器时间...\r\n");
+                    } 
+                    else if (time_sync_state == 1) {
+                        // 检查是否超时 (发送后过了 6 秒仍未解析成功，触发重发机制)
+                        if ((sys_tick_ms - time_sync_timer) > 6000) {
+                            time_sync_state = 0; // 重置为发送请求状态
+                            ESP8266_Clear();     // 清理可能导致拥堵的垃圾数据
+                            Serial_Printf("时间同步超时，进入重试机制\r\n");
+                        }
                     }
-                    // // 显示上传失败状态
-                    // OLED_Clear(0);
-                    // sprintf(oled_str, "Upload: FAIL");
-                    // OLED_ShowString(0, 4, oled_str, 12);
-                    // delay_ms(1000); // 显示失败状态1秒
-                    // OLED_Clear(0); // 显示失败状态后清屏
                 }
-
-                // 定期发送心跳包
-                heart_beat_count++;
-                if(heart_beat_count >= 30) // 每30个周期（60秒）发送一次心跳包
+                else 
                 {
-                    sprintf(data, "cmd=2&uid=%s&topic=online&msg=Keep online\r\n", BEMFA_ID );
-                    ESP8266_SendData((unsigned char *)data);
-                    heart_beat_count = 0;
-                }
+                    // ====== 温湿度数据上传 ======
+                    int abs_temp = (DHT22_Data.temperature < 0) ? -DHT22_Data.temperature : DHT22_Data.temperature;
+                    char sign_str[2] = "";
+                    if (DHT22_Data.temperature < 0) strcpy(sign_str, "-"); 
 
-                // 清空接收缓冲区
-                ESP8266_Clear();
+                    // 构建数据上传格式 
+                    sprintf(data, "cmd=2&uid=%s&topic=data&msg=Mode:%d temp:%s%d.%d humi:%d.%d\r\n", 
+                    BEMFA_ID, mode, sign_str, abs_temp / 10, abs_temp % 10, 
+                    DHT22_Data.humidity / 10, DHT22_Data.humidity % 10);
+                
+                    // 发送数据
+                    if(ESP8266_SendData((unsigned char *)data) == 0)
+                    {
+                        heart_beat_count = 0; // 重置心跳计数器
+                        reconnect_count = 0;  // 重置重连计数器
+                    }
+                    else
+                    {
+                        reconnect_count++;
+                        // 连续5次发送失败，尝试重连
+                        if(reconnect_count >= 5)
+                        {
+                            OLED_Clear(0);
+                            ESP8266_Init(115200);
+                            reconnect_count = 0;
+                        }
+                    }
+
+                    // 定期发送心跳包
+                    heart_beat_count++;
+                    if(heart_beat_count >= 30) // 每30个周期（60秒）发送一次心跳包
+                    {
+                        sprintf(data, "cmd=2&uid=%s&topic=online&msg=Keep online\r\n", BEMFA_ID );
+                        ESP8266_SendData((unsigned char *)data);
+                        heart_beat_count = 0;
+                    }
+
+                    // 常规上传完毕后，清空接收缓冲区
+                    ESP8266_Clear();
+                }
             }  
         }
         
@@ -257,8 +386,8 @@ int main(void)
         float temp_diff = 0;
         if(current_temp > set_wendu_high)
             temp_diff = current_temp - set_wendu_high;
-        else if(current_temp < set_wendu_lou)
-            temp_diff = set_wendu_lou - current_temp;
+        else if(current_temp < set_wendu_low)
+            temp_diff = set_wendu_low - current_temp;
         
         // 检查湿度是否超过范围5%
         float humi_diff = 0;
@@ -317,6 +446,8 @@ int main(void)
                 jiare = 0;    //关闭加热
                 zhileng = 0;  //关闭制冷
                 chushi = 0;   //关闭除湿
+                config_changed = 1; // 配置已改变
+                last_save_time = sys_tick_ms;
                 // 模式变化，重新显示
                 show_mode();
             }
@@ -326,6 +457,8 @@ int main(void)
                 jiare = 0;    //关闭加热
                 zhileng = 0;  //关闭制冷
                 chushi = 0;   //关闭除湿
+                config_changed = 1; // 配置已改变
+                last_save_time = sys_tick_ms;
                 // 模式变化，重新显示
                 show_mode();
             }
@@ -532,7 +665,7 @@ int main(void)
             OLED_ShowCHinese(32, 2, 126); //下
             OLED_ShowCHinese(48, 2, 127); //限
             OLED_ShowChar(64, 2, ':', 16);
-            OLED_ShowNum(72, 2, set_wendu_lou, 2, 16);
+            OLED_ShowNum(72, 2, set_wendu_low, 2, 16);
             
             //显示湿度上限
             OLED_ShowCHinese(0, 4, 11); //湿
@@ -562,19 +695,23 @@ int main(void)
                 {
                     set_wendu_high++;
                     // 确保上限大于下限
-                    if(set_wendu_high <= set_wendu_lou)
+                    if(set_wendu_high <= set_wendu_low)
                     {
-                        set_wendu_lou = set_wendu_high - 1;
+                        set_wendu_low = set_wendu_high - 1;
                     }
+                    config_changed = 1; // 配置已改变
+                    last_save_time = sys_tick_ms;
                 }
                 if(key_num == 4) //减少温度上限
                 {
                     set_wendu_high--;
                     // 确保上限大于下限
-                    if(set_wendu_high <= set_wendu_lou)
+                    if(set_wendu_high <= set_wendu_low)
                     {
-                        set_wendu_high = set_wendu_lou + 1;
+                        set_wendu_high = set_wendu_low + 1;
                     }
+                    config_changed = 1; // 配置已改变
+                    last_save_time = sys_tick_ms;
                 }
             }
             
@@ -588,16 +725,20 @@ int main(void)
                 
                 if(key_num == 3) //增加温度下限
                 {
-                    set_wendu_lou++;
+                    set_wendu_low++;
                     // 确保下限小于上限
-                    if(set_wendu_lou >= set_wendu_high)
+                    if(set_wendu_low >= set_wendu_high)
                     {
-                        set_wendu_high = set_wendu_lou + 1;
+                        set_wendu_high = set_wendu_low + 1;
                     }
+                    config_changed = 1; // 配置已改变
+                    last_save_time = sys_tick_ms;
                 }
                 if(key_num == 4) //减少温度下限
                 {
-                    set_wendu_lou--;
+                    set_wendu_low--;
+                    config_changed = 1; // 配置已改变
+                    last_save_time = sys_tick_ms;
                 }
             }
             
@@ -617,6 +758,8 @@ int main(void)
                     {
                         set_shidu_low = set_shidu_high - 1;
                     }
+                    config_changed = 1; // 配置已改变
+                    last_save_time = sys_tick_ms;
                 }
                 if(key_num == 4) //减少湿度上限
                 {
@@ -626,6 +769,8 @@ int main(void)
                     {
                         set_shidu_high = set_shidu_low + 1;
                     }
+                    config_changed = 1; // 配置已改变
+                    last_save_time = sys_tick_ms;
                 }
             }
             
@@ -645,31 +790,17 @@ int main(void)
                     {
                         set_shidu_high = set_shidu_low + 1;
                     }
+                    config_changed = 1; // 配置已改变
+                    last_save_time = sys_tick_ms;
                 }
                 if(key_num == 4) //减少湿度下限
                 {
                     set_shidu_low--;
+                    config_changed = 1; // 配置已改变
+                    last_save_time = sys_tick_ms;
                 }
             }
         }
-        
-        // // 从ESP8266接收的数据中解析设置值
-        // if (sscanf((strstr((char *)esp8266_buf, "wendu_high") + 10), "=%d", &set_wendu_high)) 
-        // {
-        //     ESP8266_Clear(); //清除缓冲区
-        // }
-        // if (sscanf((strstr((char *)esp8266_buf, "wendu_lou") + 9), "=%d", &set_wendu_lou)) 
-        // {
-        //     ESP8266_Clear(); //清除缓冲区
-        // }
-        // if (sscanf((strstr((char *)esp8266_buf, "shidu_high") + 10), "=%d", &set_shidu_high)) 
-        // {
-        //     ESP8266_Clear(); //清除缓冲区
-        // }
-        // if (sscanf((strstr((char *)esp8266_buf, "shidu_low") + 9), "=%d", &set_shidu_low)) 
-        // {
-        //     ESP8266_Clear(); //清除缓冲区
-        // }
         
         // 从ESP8266接收的数据中解析设置值
         int parse_count = 0;
@@ -678,7 +809,7 @@ int main(void)
             parse_count++;
         }
         if (strstr((char *)esp8266_buf, "wendu_lou")) {
-            sscanf((strstr((char *)esp8266_buf, "wendu_lou") + 9), "=%d", &set_wendu_lou);
+            sscanf((strstr((char *)esp8266_buf, "wendu_lou") + 9), "=%d", &set_wendu_low);
             parse_count++;
         }
         if (strstr((char *)esp8266_buf, "shidu_high")) {
@@ -689,17 +820,31 @@ int main(void)
             sscanf((strstr((char *)esp8266_buf, "shidu_low") + 9), "=%d", &set_shidu_low);
             parse_count++;
         }
+        if (parse_count > 0) {
+            config_changed = 1; // 配置已改变
+            last_save_time = sys_tick_ms;
+        }
         // 验证并调整上下限关系
         if (parse_count > 0) {
             // 温度上下限验证
-            if (set_wendu_lou >= set_wendu_high) {
-                set_wendu_high = set_wendu_lou + 1;
+            if (set_wendu_low >= set_wendu_high) {
+                set_wendu_high = set_wendu_low + 1;
             }
             // 湿度上下限验证
             if (set_shidu_low >= set_shidu_high) {
                 set_shidu_high = set_shidu_low + 1;
             }
             ESP8266_Clear(); // 所有解析完成后再清除缓冲区
+        }
+
+        /*********************************配置保存逻辑区************************************/
+        // 检查配置是否发生变化，延时保存避免频繁写入Flash
+        if(config_changed && (sys_tick_ms - last_save_time > CONFIG_SAVE_DELAY))
+        {
+            SystemConfig_Save();
+            config_changed = 0;
+            last_save_time = sys_tick_ms;
+            Serial_Printf("配置已保存到Flash\n\r");
         }
 
         /*********************************模式控制区**************************************************/
@@ -711,6 +856,8 @@ int main(void)
             zhileng = 0;  //关闭制冷
             chushi = 0;   //关闭除湿
             jiashi = 0; //关闭加湿
+            config_changed = 1; // 配置已改变
+            last_save_time = sys_tick_ms;
         }
         else if(strstr((const char *)esp8266_buf, "SD") != 0) //手动模式
         {
@@ -719,6 +866,8 @@ int main(void)
             zhileng = 0;  //关闭制冷
             chushi = 0;   //关闭除湿
             jiashi = 0; //关闭加湿
+            config_changed = 1; // 配置已改变
+            last_save_time = sys_tick_ms;
         } 
 
         //自动模式逻辑
@@ -733,7 +882,7 @@ int main(void)
                 zhileng = 1;
                 jiare = 0; // 制冷时关闭加热
             }
-            else if(current_temp < set_wendu_lou)
+            else if(current_temp < set_wendu_low)
             {
                 jiare = 1;
                 zhileng = 0; // 加热时关闭制冷
@@ -907,4 +1056,117 @@ void show_mode(void)
 void show_on_off(void)
 {
     //预留函数，可根据需要实现
+}
+
+/**
+ * 计算配置校验和
+ * @param config 配置结构体指针
+ * @return 校验和值
+ */
+uint16_t CalculateChecksum(SystemConfig_t *config)
+{
+    uint16_t sum = 0;
+    uint8_t *data = (uint8_t*)config;
+    
+    // 计算除checksum字段外的所有字节的和
+    for(uint16_t i = 0; i < sizeof(SystemConfig_t) - sizeof(uint16_t); i++)
+    {
+        sum += data[i];
+    }
+    
+    return sum;
+}
+
+/**
+ * 验证配置数据有效性
+ * @param config 配置结构体指针
+ * @return 1:有效, 0:无效
+ */
+uint8_t ValidateConfig(SystemConfig_t *config)
+{
+    // 检查温度上下限关系
+    if(config->temperature_low >= config->temperature_high)
+        return 0;
+    
+    // 检查湿度上下限关系
+    if(config->humidity_low >= config->humidity_high)
+        return 0;
+    
+    // 检查工作模式有效性
+    if(config->work_mode != 1 && config->work_mode != 2)
+        return 0;
+    
+    // 检查校验和
+    if(config->checksum != CalculateChecksum(config))
+        return 0;
+    
+    return 1;
+}
+
+/**
+ * 系统配置初始化
+ * 功能：从Flash读取配置或使用默认配置
+ */
+void SystemConfig_Init(void)
+{
+    SystemConfig_t flash_config;
+    
+    // 从Flash读取配置数据
+    STMFLASH_Read(CONFIG_FLASH_ADDR, (uint16_t*)&flash_config, sizeof(SystemConfig_t)/2);
+    
+    // 验证Flash中的数据有效性
+    if(ValidateConfig(&flash_config))
+    {
+        // 使用Flash中的配置
+        system_config = flash_config;
+        
+        // 更新全局变量
+        set_wendu_high = system_config.temperature_high / 10;
+        set_wendu_low = system_config.temperature_low / 10;
+        set_shidu_high = system_config.humidity_high / 10;
+        set_shidu_low = system_config.humidity_low / 10;
+        mode = system_config.work_mode;
+        
+        Serial_Printf("从Flash读取配置成功\n\r");
+    }
+    else
+    {
+        // 使用默认配置
+        system_config.temperature_high = DEFAULT_TEMP_HIGH;
+        system_config.temperature_low = DEFAULT_TEMP_LOW;
+        system_config.humidity_high = DEFAULT_HUMID_HIGH;
+        system_config.humidity_low = DEFAULT_HUMID_LOW;
+        system_config.work_mode = DEFAULT_WORK_MODE;
+        system_config.checksum = CalculateChecksum(&system_config);
+        
+        // 更新全局变量
+        set_wendu_high = system_config.temperature_high / 10;
+        set_wendu_low = system_config.temperature_low / 10;
+        set_shidu_high = system_config.humidity_high / 10;
+        set_shidu_low = system_config.humidity_low / 10;
+        mode = system_config.work_mode;
+        
+        Serial_Printf("使用默认配置\n\r");
+    }
+}
+
+/**
+ * 保存系统配置到Flash
+ * 功能：将当前配置保存到Flash存储器
+ */
+void SystemConfig_Save(void)
+{
+    // 更新配置结构体
+    system_config.temperature_high = set_wendu_high * 10;
+    system_config.temperature_low = set_wendu_low * 10;
+    system_config.humidity_high = set_shidu_high * 10;
+    system_config.humidity_low = set_shidu_low * 10;
+    system_config.work_mode = mode;
+    system_config.checksum = CalculateChecksum(&system_config);
+    
+    // 擦除Flash页
+    STMFLASH_ErasePage(CONFIG_FLASH_ADDR);
+    
+    // 写入配置数据
+    STMFLASH_Write(CONFIG_FLASH_ADDR, (uint16_t*)&system_config, sizeof(SystemConfig_t)/2);
 }

@@ -68,7 +68,8 @@ void TIM2_IRQHandler(void)
 {
     if (TIM_GetITStatus(TIM2, TIM_IT_Update) == SET)
     {
-        TIMER_IT = 1; // 只需要这一个标志位，每2秒置1一次
+        TIMER_IT = 1; // 标志位，每2秒置1一次
+		sys_tick_ms += 2000; // 每2秒增加2000毫秒
         TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
     }
 }

@@ -13,6 +13,7 @@
 #include "stm32f10x_rcc.h"
 
 extern char TIMER_IT;     //定时器中断标志
+extern volatile uint32_t sys_tick_ms;    // 全局毫秒计数器
 
 /**
  * @brief 初始化定时器

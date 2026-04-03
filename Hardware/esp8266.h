@@ -67,7 +67,6 @@
                          
 /**
  * 返回时间指令
- * 注意：需要修改为实际的巴法云用户秘钥
  */
 #define Return_Time	"cmd=7&uid=ae6e47ba373f46e79db0e8ce6e50ea3d&type=1\r\n"  // 返回时间指令
 
