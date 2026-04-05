@@ -20,6 +20,22 @@
 #define buf_len    256  // 串口接收缓冲区总长度
 
 /**
+ * 指令队列配置
+ */
+#define CMD_QUEUE_SIZE    5     // 指令队列最大容量（最多缓存5条指令）
+#define CMD_MAX_LEN       128   // 单条指令最大长度
+
+/**
+ * 指令队列结构体
+ */
+typedef struct {
+    char commands[CMD_QUEUE_SIZE][CMD_MAX_LEN];  // 指令存储数组
+    uint8_t head;                                 // 队头索引（读取位置）
+    uint8_t tail;                                 // 队尾索引（写入位置）
+    uint8_t count;                                // 当前队列中的指令数量
+} CmdQueue_t;
+
+/**
  * 串口选择定义
  */
 #define Bemfa_USART1		        0  // 使用USART1
@@ -83,6 +99,9 @@ extern unsigned char esp8266_recive_flag;        // 应用层接收完成标志
 extern uint8_t ESP8266_RecvBuf[buf_len];         // 驱动层接收缓冲区：专用于处理AT指令的同步响应
 extern uint16_t ESP8266_RecvLen;                 // 驱动层缓冲区数据长度
 
+// 【新增】指令队列声明
+extern CmdQueue_t cmd_queue;                     // 云平台指令队列
+
 /**
  * ESP8266函数声明
  */
@@ -101,6 +120,15 @@ void ESP8266_Init(unsigned int bound);  // ESP8266初始化
 void USART2_IRQHandler(void);  // USART2中断处理函数
 
 void mode_choice(void);  // 模式选择函数
+
+/**
+ * 【新增】指令队列管理函数声明
+ */
+void CmdQueue_Init(CmdQueue_t *queue);                          // 初始化指令队列
+uint8_t CmdQueue_Push(CmdQueue_t *queue, const char *cmd);     // 指令入队
+uint8_t CmdQueue_Pop(CmdQueue_t *queue, char *cmd_buf);        // 指令出队
+uint8_t CmdQueue_IsEmpty(CmdQueue_t *queue);                   // 判断队列是否为空
+uint8_t CmdQueue_GetCount(CmdQueue_t *queue);                  // 获取队列中指令数量
 
 /**
  * 工具函数声明

@@ -14,6 +14,9 @@ unsigned char esp8266_recive_flag = REV_WAIT; // 接收标志
 uint8_t ESP8266_RecvBuf[buf_len] = {0}; // 接收缓冲区
 uint16_t ESP8266_RecvLen = 0;                        // 接收数据长度
 
+// 【新增】指令队列定义
+CmdQueue_t cmd_queue;  // 云平台指令队列
+
 // 函数声明
 uint8_t ESP8266_SendATCmd(char *cmd, char *ack, uint32_t timeout);
 void OLED_ShowFailureWithCountdown(u8 *message, int time);
@@ -140,8 +143,10 @@ void ESP8266_Init(unsigned int bound)
     memset(ESP8266_RecvBuf, 0, buf_len);
     ESP8266_RecvLen = 0;
     ESP8266_Clear();
+    
+    // 【新增】初始化指令队列
+    CmdQueue_Init(&cmd_queue);
             
-
     // 3. 发送AT指令检测ESP8266是否在线
     int at_retry = 3;
     while (at_retry > 0)
@@ -594,5 +599,111 @@ void OLED_ShowWiFiProgress(int progress)
     // 显示进度百分比
     char progress_str[10];
     sprintf(progress_str, "%d%%", progress);
-    OLED_ShowString(60, 6, (u8 *)progress_str, 16);
+    OLED_ShowString(54, 6, (u8 *)progress_str, 16);
+}
+
+/**
+ * ============================================================================
+ * 【新增】指令队列管理函数实现
+ * ============================================================================
+ */
+
+/**
+ * @brief 初始化指令队列
+ * @param queue 指令队列指针
+ * @return 无
+ */
+void CmdQueue_Init(CmdQueue_t *queue)
+{
+    if(queue == NULL)
+        return;
+    
+    memset(queue->commands, 0, sizeof(queue->commands));
+    queue->head = 0;
+    queue->tail = 0;
+    queue->count = 0;
+}
+
+/**
+ * @brief 指令入队
+ * @param queue 指令队列指针
+ * @param cmd 要入队的指令字符串
+ * @return 1表示成功，0表示队列已满
+ */
+uint8_t CmdQueue_Push(CmdQueue_t *queue, const char *cmd)
+{
+    if(queue == NULL || cmd == NULL)
+        return 0;
+    
+    // 检查队列是否已满
+    if(queue->count >= CMD_QUEUE_SIZE)
+    {
+        Serial_Printf("警告：指令队列已满，丢弃新指令\r\n");
+        return 0;  // 队列已满
+    }
+    
+    // 复制指令到队列
+    strncpy(queue->commands[queue->tail], cmd, CMD_MAX_LEN - 1);
+    queue->commands[queue->tail][CMD_MAX_LEN - 1] = '\0';  // 确保字符串结束
+    
+    // 更新队尾指针（环形）
+    queue->tail = (queue->tail + 1) % CMD_QUEUE_SIZE;
+    queue->count++;
+    
+    return 1;  // 入队成功
+}
+
+/**
+ * @brief 指令出队
+ * @param queue 指令队列指针
+ * @param cmd_buf 用于存储出队指令的缓冲区
+ * @return 1表示成功，0表示队列为空
+ */
+uint8_t CmdQueue_Pop(CmdQueue_t *queue, char *cmd_buf)
+{
+    if(queue == NULL || cmd_buf == NULL)
+        return 0;
+    
+    // 检查队列是否为空
+    if(queue->count == 0)
+        return 0;  // 队列为空
+    
+    // 复制指令到输出缓冲区
+    strncpy(cmd_buf, queue->commands[queue->head], CMD_MAX_LEN - 1);
+    cmd_buf[CMD_MAX_LEN - 1] = '\0';  // 确保字符串结束
+    
+    // 清空已出队的指令
+    memset(queue->commands[queue->head], 0, CMD_MAX_LEN);
+    
+    // 更新队头指针（环形）
+    queue->head = (queue->head + 1) % CMD_QUEUE_SIZE;
+    queue->count--;
+    
+    return 1;  // 出队成功
+}
+
+/**
+ * @brief 判断队列是否为空
+ * @param queue 指令队列指针
+ * @return 1表示为空，0表示非空
+ */
+uint8_t CmdQueue_IsEmpty(CmdQueue_t *queue)
+{
+    if(queue == NULL)
+        return 1;
+    
+    return (queue->count == 0) ? 1 : 0;
+}
+
+/**
+ * @brief 获取队列中指令数量
+ * @param queue 指令队列指针
+ * @return 队列中的指令数量
+ */
+uint8_t CmdQueue_GetCount(CmdQueue_t *queue)
+{
+    if(queue == NULL)
+        return 0;
+    
+    return queue->count;
 }
