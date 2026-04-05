@@ -64,6 +64,12 @@ u8 WeekYearday(int years, int months, int days); //计算星期几的函数
 extern unsigned char esp8266_buf[buf_len]; //ESP8266接收缓冲区
 
 /**
+ * 协议解析辅助函数声明
+ */
+uint8_t Is_AT_Response(const char *buf);      // 判断是否为AT指令响应
+uint8_t Is_Bemfa_Data(const char *buf);       // 判断是否为巴法云业务数据
+
+/**
  * Flash配置管理函数声明
  */
 void SystemConfig_Init(void);                    // 系统配置初始化
@@ -122,7 +128,6 @@ u8 key_num = 0;      //按键返回值
 /**
  * WiFi相关变量
  */
-// char TIMER_IT = 0;     //定时器中断标志
 char WiFiInit_time;    //WiFi初始化时间
 char Flagout = 0;      //输出标志（0：禁止，1：允许）
 uint32_t heart_beat_count = 0; //心跳包计数器
@@ -136,6 +141,76 @@ char oled_str[100];     //OLED显示字符串
 char data[200];         //ESP8266发送缓冲区
 u8 buff[30];            //缓冲区，用于显示数据
 u8 wendu_display_force_update = 1; // 强制更新温湿度显示标志
+
+/**
+ * 协议解析辅助函数定义
+ */
+
+/**
+ * @brief 判断是否为AT指令响应
+ * @param buf 缓冲区指针
+ * @return 1表示是AT响应（应忽略），0表示可能是业务数据
+ */
+uint8_t Is_AT_Response(const char *buf)
+{
+    if(buf == NULL || buf[0] == '\0')
+        return 1;
+    
+    // 常见AT响应关键词
+    if(strstr(buf, "OK") != NULL && strlen(buf) < 20)  // 短字符串且包含OK
+        return 1;
+    if(strstr(buf, "SEND OK") != NULL)
+        return 1;
+    if(strstr(buf, "ERROR") != NULL)
+        return 1;
+    if(strstr(buf, "FAIL") != NULL)
+        return 1;
+    if(strstr(buf, "busy") != NULL)
+        return 1;
+    if(strstr(buf, "connected") != NULL || strstr(buf, "CONNECT") != NULL)
+        return 1;
+    if(strstr(buf, "WIFI CONNECTED") != NULL || strstr(buf, "WIFI GOT IP") != NULL)
+        return 1;
+    if(strstr(buf, "STAIP") != NULL || strstr(buf, "+CIFSR") != NULL)
+        return 1;
+    
+    return 0;  // 不是AT响应，可能是业务数据
+}
+
+/**
+ * @brief 判断是否为巴法云业务数据
+ * @param buf 缓冲区指针
+ * @return 1表示是巴法云业务数据，0表示不是
+ */
+uint8_t Is_Bemfa_Data(const char *buf)
+{
+    if(buf == NULL || buf[0] == '\0')
+        return 0;
+    
+    // 巴法云协议特征：包含cmd=参数
+    if(strstr(buf, "cmd=") != NULL)
+        return 1;
+    
+    // 或者直接包含控制指令（ZD/SD/KJR等）
+    // 但需要排除AT响应中的误匹配
+    if(!Is_AT_Response(buf))
+    {
+        if(strstr(buf, "ZD") != NULL || strstr(buf, "SD") != NULL)
+            return 1;
+        if(strstr(buf, "KJR") != NULL || strstr(buf, "GJR") != NULL)
+            return 1;
+        if(strstr(buf, "KZL") != NULL || strstr(buf, "GZL") != NULL)
+            return 1;
+        if(strstr(buf, "KCS") != NULL || strstr(buf, "GCS") != NULL)
+            return 1;
+        if(strstr(buf, "KJS") != NULL || strstr(buf, "GJS") != NULL)
+            return 1;
+        if(strstr(buf, "wendu_") != NULL || strstr(buf, "shidu_") != NULL)
+            return 1;
+    }
+    
+    return 0;
+}
 
 /**
  * 主函数
@@ -324,7 +399,10 @@ int main(void)
                         // 检查是否超时 (发送后过了 6 秒仍未解析成功，触发重发机制)
                         if ((sys_tick_ms - time_sync_timer) > 6000) {
                             time_sync_state = 0; // 重置为发送请求状态
-                            ESP8266_Clear();     // 清理可能导致拥堵的垃圾数据
+                            // 【优化】不清空应用层缓冲区，只清空驱动层
+                            // ESP8266_Clear();  // 原代码会误删云平台指令
+                            memset(ESP8266_RecvBuf, 0, buf_len);
+                            ESP8266_RecvLen = 0;
                             Serial_Printf("时间同步超时，进入重试机制\r\n");
                         }
                     }
@@ -381,8 +459,8 @@ int main(void)
                         heart_beat_count = 0;
                     }
 
-                    // 常规上传完毕后，清空接收缓冲区
-                    ESP8266_Clear();
+                    // 【已移除】禁止在固定周期无条件清空缓冲区，避免丢失云平台下发的指令
+                    // ESP8266_Clear();  // 原代码：常规上传完毕后清空接收缓冲区
                 }
             }  
         }
@@ -815,165 +893,227 @@ int main(void)
             }
         }
         
-        // 从ESP8266接收的数据中解析设置值
-        int parse_count = 0;
-        if (strstr((char *)esp8266_buf, "wendu_high")) {
-            sscanf((strstr((char *)esp8266_buf, "wendu_high") + 10), "=%d", &set_wendu_high);
-            parse_count++;
+        // 【优化】只处理有效的巴法云业务数据，过滤AT响应
+        uint8_t cmd_processed = 0;  // 标记是否有指令被处理
+        
+        if(!Is_Bemfa_Data((const char *)esp8266_buf))
+        {
+            // 不是有效的业务数据，跳过解析
+            // 但仍需要在主循环末尾检查是否需要清空缓冲区
         }
-        if (strstr((char *)esp8266_buf, "wendu_low")) {
-            sscanf((strstr((char *)esp8266_buf, "wendu_low") + 9), "=%d", &set_wendu_low);
-            parse_count++;
-        }
-        if (strstr((char *)esp8266_buf, "shidu_high")) {
-            sscanf((strstr((char *)esp8266_buf, "shidu_high") + 10), "=%d", &set_shidu_high);
-            parse_count++;
-        }
-        if (strstr((char *)esp8266_buf, "shidu_low")) {
-            sscanf((strstr((char *)esp8266_buf, "shidu_low") + 9), "=%d", &set_shidu_low);
-            parse_count++;
-        }
-        if (parse_count > 0) {
-            config_changed = 1; // 配置已改变
-            last_save_time = sys_tick_ms;
-        }
-        // 验证并调整上下限关系
-        if (parse_count > 0) {
-            // 温度上下限验证
-            if (set_wendu_low >= set_wendu_high) {
-                set_wendu_high = set_wendu_low + 1;
+        else
+        {
+            // 确认为巴法云业务数据，开始解析
+            Serial_Printf("检测到云平台指令\r\n");
+            
+            // 从ESP8266接收的数据中解析设置值
+            int parse_count = 0;
+            // uint8_t cmd_processed = 0;  // 【删除】已在外部定义
+            
+            if (strstr((char *)esp8266_buf, "wendu_high")) {
+                sscanf((strstr((char *)esp8266_buf, "wendu_high") + 10), "=%d", &set_wendu_high);
+                parse_count++;
+                cmd_processed = 1;
+                Serial_Printf("收到温度上限设置\r\n");
             }
-            // 湿度上下限验证
-            if (set_shidu_low >= set_shidu_high) {
-                set_shidu_high = set_shidu_low + 1;
+            if (strstr((char *)esp8266_buf, "wendu_low")) {
+                sscanf((strstr((char *)esp8266_buf, "wendu_low") + 9), "=%d", &set_wendu_low);
+                parse_count++;
+                cmd_processed = 1;
+                Serial_Printf("收到温度下限设置\r\n");
             }
-            ESP8266_Clear(); // 所有解析完成后再清除缓冲区
-        }
+            if (strstr((char *)esp8266_buf, "shidu_high")) {
+                sscanf((strstr((char *)esp8266_buf, "shidu_high") + 10), "=%d", &set_shidu_high);
+                parse_count++;
+                cmd_processed = 1;
+                Serial_Printf("收到湿度上限设置\r\n");
+            }
+            if (strstr((char *)esp8266_buf, "shidu_low")) {
+                sscanf((strstr((char *)esp8266_buf, "shidu_low") + 9), "=%d", &set_shidu_low);
+                parse_count++;
+                cmd_processed = 1;
+                Serial_Printf("收到湿度下限设置\r\n");
+            }
+            if (parse_count > 0) {
+                config_changed = 1; // 配置已改变
+                last_save_time = sys_tick_ms;
+            }
+            // 验证并调整上下限关系
+            if (parse_count > 0) {
+                // 温度上下限验证
+                if (set_wendu_low >= set_wendu_high) {
+                    set_wendu_high = set_wendu_low + 1;
+                }
+                // 湿度上下限验证
+                if (set_shidu_low >= set_shidu_high) {
+                    set_shidu_high = set_shidu_low + 1;
+                }
+            }
 
-        /*********************************配置保存逻辑区************************************/
-        // 检查配置是否发生变化，延时保存避免频繁写入Flash
-        if(config_changed && (sys_tick_ms - last_save_time > CONFIG_SAVE_DELAY))
-        {
-            SystemConfig_Save();
-            config_changed = 0;
-            last_save_time = sys_tick_ms;
-            Serial_Printf("配置已保存到Flash\n\r");
-        }
+            /*********************************配置保存逻辑区************************************/
+            // 检查配置是否发生变化，延时保存避免频繁写入Flash
+            if(config_changed && (sys_tick_ms - last_save_time > CONFIG_SAVE_DELAY))
+            {
+                SystemConfig_Save();
+                config_changed = 0;
+                last_save_time = sys_tick_ms;
+                Serial_Printf("配置已保存到Flash\n\r");
+            }
 
-        /*********************************模式控制区**************************************************/
-        //APP模式切换
-        if(strstr((const char *)esp8266_buf, "ZD") != 0) //自动模式
-        {
-            mode = 1;
-            jiare = 0;    //关闭加热
-            zhileng = 0;  //关闭制冷
-            chushi = 0;   //关闭除湿
-            jiashi = 0; //关闭加湿
-            config_changed = 1; // 配置已改变
-            last_save_time = sys_tick_ms;
-        }
-        else if(strstr((const char *)esp8266_buf, "SD") != 0) //手动模式
-        {
-            mode = 2;
-            jiare = 0;    //关闭加热
-            zhileng = 0;  //关闭制冷
-            chushi = 0;   //关闭除湿
-            jiashi = 0; //关闭加湿
-            config_changed = 1; // 配置已改变
-            last_save_time = sys_tick_ms;
-        } 
+            /*********************************模式控制区**************************************************/
+            //APP模式切换
+            if(strstr((const char *)esp8266_buf, "ZD") != 0) //自动模式
+            {
+                mode = 1;
+                jiare = 0;    //关闭加热
+                zhileng = 0;  //关闭制冷
+                chushi = 0;   //关闭除湿
+                jiashi = 0; //关闭加湿
+                config_changed = 1; // 配置已改变
+                last_save_time = sys_tick_ms;
+                cmd_processed = 1;  // 标记有指令被处理
+                Serial_Printf("切换到自动模式\r\n");
+            }
+            else if(strstr((const char *)esp8266_buf, "SD") != 0) //手动模式
+            {
+                mode = 2;
+                jiare = 0;    //关闭加热
+                zhileng = 0;  //关闭制冷
+                chushi = 0;   //关闭除湿
+                jiashi = 0; //关闭加湿
+                config_changed = 1; // 配置已改变
+                last_save_time = sys_tick_ms;
+                cmd_processed = 1;  // 标记有指令被处理
+                Serial_Printf("切换到手动模式\r\n");
+            } 
+        }  // 【新增】闭合else块，结束模式切换指令的处理
 
         //自动模式逻辑
         if(mode == 1)
-        {
-            // float current_temp = DHT22_Data.temperature / 10.0f;
-            // float current_humi = DHT22_Data.humidity / 10.0f;
-            
-            // 温度控制逻辑
-            if(current_temp > set_wendu_high)
             {
-                zhileng = 1;
-                jiare = 0; // 制冷时关闭加热
-            }
-            else if(current_temp < set_wendu_low)
-            {
-                jiare = 1;
-                zhileng = 0; // 加热时关闭制冷
-            }
-            else
-            {
-                jiare = 0;
-                zhileng = 0;
-            }
-            
-            // 湿度控制逻辑
-            if(current_humi > set_shidu_high)
-            {
-                chushi = 1;
-                jiashi = 0; // 除湿时关闭加湿
-            }
-            else if(current_humi < set_shidu_low)
-            {
-                jiashi = 1;
-                chushi = 0; // 加湿时关闭除湿
-            }
-            else
-            {
-                chushi = 0;
-                jiashi = 0;
-            }
-        }
-        
-        //手动模式逻辑
-        if(mode == 2)
-        {
-            if(Flagout == 1)
-            {
-                //远程控制加热
-                if(strstr((const char *)esp8266_buf, "KJR") != 0) //开启加热
-                {
-                    jiare = 1;
-                    zhileng = 0; // 开启加热时关闭制冷
-                }
-                if(strstr((const char *)esp8266_buf, "GJR") != 0) //关闭加热
-                {
-                    jiare = 0;
-                }
+                // float current_temp = DHT22_Data.temperature / 10.0f;
+                // float current_humi = DHT22_Data.humidity / 10.0f;
                 
-                //远程控制制冷
-                if(strstr((const char *)esp8266_buf, "KZL") != 0) //开启制冷
+                // 温度控制逻辑
+                if(current_temp > set_wendu_high)
                 {
                     zhileng = 1;
-                    jiare = 0; // 开启制冷时关闭加热
+                    jiare = 0; // 制冷时关闭加热
                 }
-                if(strstr((const char *)esp8266_buf, "GZL") != 0) //关闭制冷
+                else if(current_temp < set_wendu_low)
                 {
+                    jiare = 1;
+                    zhileng = 0; // 加热时关闭制冷
+                }
+                else
+                {
+                    jiare = 0;
                     zhileng = 0;
                 }
                 
-                //远程控制除湿
-                if(strstr((const char *)esp8266_buf, "KCS") != 0) //开启除湿
+                // 湿度控制逻辑
+                if(current_humi > set_shidu_high)
                 {
                     chushi = 1;
-                    jiashi = 0; // 开启除湿时关闭加湿
+                    jiashi = 0; // 除湿时关闭加湿
                 }
-                if(strstr((const char *)esp8266_buf, "GCS") != 0) //关闭除湿
-                {
-                    chushi = 0;
-                }
-                
-                //远程控制加湿
-                if(strstr((const char *)esp8266_buf, "KJS") != 0) //开启加湿
+                else if(current_humi < set_shidu_low)
                 {
                     jiashi = 1;
-                    chushi = 0; // 开启加湿时关闭除湿
+                    chushi = 0; // 加湿时关闭除湿
                 }
-                if(strstr((const char *)esp8266_buf, "GJS") != 0) //关闭加湿
+                else
                 {
+                    chushi = 0;
                     jiashi = 0;
                 }
             }
-        }
+            
+            //手动模式逻辑
+            if(mode == 2)
+            {
+                if(Flagout == 1)
+                {
+                    //远程控制加热
+                    if(strstr((const char *)esp8266_buf, "KJR") != 0) //开启加热
+                    {
+                        jiare = 1;
+                        zhileng = 0; // 开启加热时关闭制冷
+                        cmd_processed = 1;  // 标记有指令被处理
+                        Serial_Printf("执行：开启加热\r\n");
+                    }
+                    if(strstr((const char *)esp8266_buf, "GJR") != 0) //关闭加热
+                    {
+                        jiare = 0;
+                        cmd_processed = 1;  // 标记有指令被处理
+                        Serial_Printf("执行：关闭加热\r\n");
+                    }
+                    
+                    //远程控制制冷
+                    if(strstr((const char *)esp8266_buf, "KZL") != 0) //开启制冷
+                    {
+                        zhileng = 1;
+                        jiare = 0; // 开启制冷时关闭加热
+                        cmd_processed = 1;  // 标记有指令被处理
+                        Serial_Printf("执行：开启制冷\r\n");
+                    }
+                    if(strstr((const char *)esp8266_buf, "GZL") != 0) //关闭制冷
+                    {
+                        zhileng = 0;
+                        cmd_processed = 1;  // 标记有指令被处理
+                        Serial_Printf("执行：关闭制冷\r\n");
+                    }
+                    
+                    //远程控制除湿
+                    if(strstr((const char *)esp8266_buf, "KCS") != 0) //开启除湿
+                    {
+                        chushi = 1;
+                        jiashi = 0; // 开启除湿时关闭加湿
+                        cmd_processed = 1;  // 标记有指令被处理
+                        Serial_Printf("执行：开启除湿\r\n");
+                    }
+                    if(strstr((const char *)esp8266_buf, "GCS") != 0) //关闭除湿
+                    {
+                        chushi = 0;
+                        cmd_processed = 1;  // 标记有指令被处理
+                        Serial_Printf("执行：关闭除湿\r\n");
+                    }
+                    
+                    //远程控制加湿
+                    if(strstr((const char *)esp8266_buf, "KJS") != 0) //开启加湿
+                    {
+                        jiashi = 1;
+                        chushi = 0; // 开启加湿时关闭除湿
+                        cmd_processed = 1;  // 标记有指令被处理
+                        Serial_Printf("执行：开启加湿\r\n");
+                    }
+                    if(strstr((const char *)esp8266_buf, "GJS") != 0) //关闭加湿
+                    {
+                        jiashi = 0;
+                        cmd_processed = 1;  // 标记有指令被处理
+                        Serial_Printf("执行：关闭加湿\r\n");
+                    }
+                }
+            }
+            
+            /*********************************指令解析完成后清空缓冲区************************************/
+            // 【优化】在所有指令解析和处理完成后，统一清空接收缓冲区
+            // 这样可以确保云平台下发的指令有足够时间被完整接收和解析
+            if(cmd_processed == 1)
+            {
+                ESP8266_Clear();  // 指令处理完成后清空缓冲区
+                Serial_Printf("云平台指令已处理，缓冲区已清空\r\n");
+            }
+            else
+            {
+                // 没有处理任何指令，可能是AT响应或无效数据
+                // 检查缓冲区是否过大，防止溢出
+                if(esp8266_cnt > buf_len - 50)
+                {
+                    ESP8266_Clear();  // 缓冲区接近满时清理
+                    Serial_Printf("缓冲区接近满，已清理\r\n");
+                }
+            }
 	}
 }
 
