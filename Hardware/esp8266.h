@@ -63,7 +63,7 @@
  * 巴法云订阅主题指令
  * 注意：需要修改为实际的巴法云用户秘钥
  */
-#define ESP8266_TOPIC   "cmd=1&uid=ae6e47ba373f46e79db0e8ce6e50ea3d&topic=data,control,online\r\n"  // 订阅主题指令
+#define ESP8266_TOPIC "cmd=1&uid=ae6e47ba373f46e79db0e8ce6e50ea3d&topic=data,control,online\r\n"  // 订阅主题指令
                          
 /**
  * 返回时间指令
@@ -74,6 +74,14 @@
  * 全局变量声明
  */
 extern unsigned char Secret_Key[];  // 加密密钥
+
+// 【优化】双缓冲区职责明确声明
+extern unsigned char esp8266_buf[buf_len];      // 应用层接收缓冲区：专用于解析云端下发的异步指令
+extern unsigned short esp8266_cnt;               // 应用层缓冲区计数
+extern unsigned char esp8266_recive_flag;        // 应用层接收完成标志
+
+extern uint8_t ESP8266_RecvBuf[buf_len];         // 驱动层接收缓冲区：专用于处理AT指令的同步响应
+extern uint16_t ESP8266_RecvLen;                 // 驱动层缓冲区数据长度
 
 /**
  * ESP8266函数声明
