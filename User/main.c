@@ -336,10 +336,23 @@ int main(void)
                     char sign_str[2] = "";
                     if (DHT22_Data.temperature < 0) strcpy(sign_str, "-"); 
 
-                    // 构建数据上传格式 
-                    sprintf(data, "cmd=2&uid=%s&topic=data&msg=Mode:%d temp:%s%d.%d humi:%d.%d\r\n", 
-                    BEMFA_ID, mode, sign_str, abs_temp / 10, abs_temp % 10, 
-                    DHT22_Data.humidity / 10, DHT22_Data.humidity % 10);
+                    // 构建包含阈值和设备状态的数据上传格式
+                    sprintf(data, "cmd=2&uid=%s&topic=data&msg=Mode:%d th:%d tl:%d hh:%d hl:%d jr:%d zl:%d cs:%d js:%d temp:%s%d.%d humi:%d.%d\r\n", 
+                        BEMFA_ID, 
+                        mode, 
+                        set_wendu_high, 
+                        set_wendu_low, 
+                        set_shidu_high, 
+                        set_shidu_low, 
+                        jiare, 
+                        zhileng, 
+                        chushi, 
+                        jiashi,
+                        sign_str, 
+                        abs_temp / 10, 
+                        abs_temp % 10, 
+                        DHT22_Data.humidity / 10, 
+                        DHT22_Data.humidity % 10);
                 
                     // 发送数据
                     if(ESP8266_SendData((unsigned char *)data) == 0)
@@ -808,8 +821,8 @@ int main(void)
             sscanf((strstr((char *)esp8266_buf, "wendu_high") + 10), "=%d", &set_wendu_high);
             parse_count++;
         }
-        if (strstr((char *)esp8266_buf, "wendu_lou")) {
-            sscanf((strstr((char *)esp8266_buf, "wendu_lou") + 9), "=%d", &set_wendu_low);
+        if (strstr((char *)esp8266_buf, "wendu_low")) {
+            sscanf((strstr((char *)esp8266_buf, "wendu_low") + 9), "=%d", &set_wendu_low);
             parse_count++;
         }
         if (strstr((char *)esp8266_buf, "shidu_high")) {
