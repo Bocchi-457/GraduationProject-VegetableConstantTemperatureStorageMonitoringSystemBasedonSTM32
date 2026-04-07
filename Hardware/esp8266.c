@@ -5,7 +5,6 @@
 #include "stdio.h"
 
 // 全局变量定义
-unsigned char Secret_Key[] = "1234567890";
 unsigned char esp8266_buf[buf_len]; // ESP8266接收缓冲区
 unsigned short esp8266_cnt = 0;      // 接收缓冲区计数
 unsigned char esp8266_recive_flag = REV_WAIT; // 接收标志
@@ -182,8 +181,7 @@ void ESP8266_Init(unsigned int bound)
                                 OLED_ShowWiFiProgress(i);
                                 delay_ms(30);
                             }
-                            
-                            // delay_ms(500); // 额外等待
+
                             // 连接巴法云
                             int bemfa_retry = 3;
                             while (bemfa_retry > 0)
@@ -196,7 +194,6 @@ void ESP8266_Init(unsigned int bound)
                                 }
                                 if(ESP8266_SendATCmd(ESP8266_ONENET_INFO, "CONNECT", 5000) == 0)
                                 {
-                                    // delay_ms(500);
                                     // 订阅主题
                                     // 显示订阅主题进度
                                     for (; i <= 70; i += 1)
@@ -211,7 +208,6 @@ void ESP8266_Init(unsigned int bound)
                                         OLED_ShowWiFiProgress(i);
                                         delay_ms(15);
                                     }
-                                    // delay_ms(500);
                                     // 显示连接成功提示
                                     OLED_Clear(0);
                                     OLED_ShowCHinese(0, 0, 56); // 联
@@ -301,7 +297,7 @@ uint8_t ESP8266_SendATCmd(char *cmd, char *ack, uint32_t timeout)
     // 等待响应（超时退出）
     while(timeout--)
     {
-        delay_ms(1); // 需确保delay_ms函数已实现（STM32毫秒延时）
+        delay_ms(1);
         // 检查驱动层缓冲区是否包含期望的响应
         if(strstr((char*)ESP8266_RecvBuf, ack) != NULL)
         {
@@ -380,53 +376,6 @@ void Usart_SendString(USART_TypeDef *USARTx, unsigned char *str, unsigned short 
 }
 
 /**
- * @brief  连接WiFi网络
- * @note   需确保ESP8266已配置为STA模式
- * @param  ssid: WiFi名称（字符串）
- * @param  pwd: WiFi密码（字符串）
- * @retval 0: 连接成功；1: 连接失败
- */
-uint8_t ESP8266_ConnectWiFi(char *ssid, char *pwd)
-{
-    char at_cmd[64] = {0};
-
-    // 拼接连接WiFi的AT指令：AT+CWJAP="ssid","pwd"\r\n
-    sprintf(at_cmd, "AT+CWJAP=\"%s\",\"%s\"\r\n", ssid, pwd);
-
-    // 发送指令，等待"WIFI CONNECTED"响应（超时10秒）
-    if(ESP8266_SendATCmd(at_cmd, "WIFI CONNECTED", 10000) == 0)
-    {
-        // 额外检查是否获取到IP（可选）
-        if(ESP8266_SendATCmd("AT+CIFSR\r\n", "STAIP", 2000) == 0)
-        {
-            return 0;
-        }
-    }
-    return 1;
-}
-
-/**
- * @brief  连接巴法云TCP服务器
- * @param  server: 服务器域名/IP
- * @param  port: 服务器端口（如80）
- * @retval 0: 连接成功；1: 连接失败
- */
-uint8_t ESP8266_ConnectBafaCloud(char *server, uint16_t port)
-{
-    char at_cmd[64] = {0};
-
-    // 拼接TCP连接指令：AT+CIPSTART="TCP","server",port\r\n
-    sprintf(at_cmd, "AT+CIPSTART=\"TCP\",\"%s\",%d\r\n", server, port);
-
-    // 发送指令，等待"CONNECT"响应（超时5秒）
-    if(ESP8266_SendATCmd(at_cmd, "CONNECT", 5000) == 0)
-    {
-        return 0;
-    }
-    return 1;
-}
-
-/**
  * @brief  向巴法云TCP服务器发送数据
  * @param  data: 要发送的字符串数据
  * @retval 0: 发送成功；1: 发送失败
@@ -475,64 +424,6 @@ uint8_t ESP8266_SendData(unsigned char *data)
     }
     
     return 0; // 发送成功
-}
-
-/**
- * @brief  读取从巴法云接收的数据
- * @note   将接收缓冲区的数据拷贝到用户缓冲区
- * @param  buf: 用户接收缓冲区
- * @param  len: 要读取的最大长度
- * @retval 0: 读取成功；1: 无数据/长度超限
- */
-uint8_t ESP8266_RecvData(char *buf, uint16_t len)
-{
-    if(ESP8266_RecvLen == 0 || len < ESP8266_RecvLen)
-    {
-        return 1; // 无数据或用户缓冲区长度不足
-    }
-
-    // 拷贝数据到用户缓冲区
-    memcpy(buf, ESP8266_RecvBuf, ESP8266_RecvLen);
-
-    // 清空接收缓冲区，准备下一次接收
-    ESP8266_RecvLen = 0;
-    memset(ESP8266_RecvBuf, 0, buf_len);
-
-    return 0;
-}
-
-/**
- * @brief  关闭TCP连接
- * @note   发送AT+CIPCLOSE指令关闭当前TCP连接
- * @param  无
- * @retval 无
- */
-void ESP8266_CloseTCP(void)
-{
-    ESP8266_SendATCmd("AT+CIPCLOSE\r\n", "CLOSED", 2000);
-}
-
-/**
- * @brief 模式选择函数
- * @param 无
- * @return 无
- */
-void mode_choice(void)
-{
-    // 预留函数，可根据需要实现
-}
-
-/**
- * @brief 提取小时和分钟的函数
- * @param input: 输入字符串
- * @param hour: 提取的小时
- * @param minute: 提取的分钟
- * @return 无
- */
-void extractHourAndMinute(const char *input, int *hour, int *minute)
-{
-    // 简单实现，假设输入格式为 "HH:MM"
-    sscanf(input, "%d:%d", hour, minute);
 }
 
 /**

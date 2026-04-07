@@ -40,7 +40,7 @@
  * WiFi连接配置
  * 注意：根据实际WiFi网络修改这些定义
  */
-#define ESP8266_WIFI_INFO		"AT+CWJAP=\"TheWorld\",\"2020625663\"\r\n"  // WiFi名称和密码
+#define ESP8266_WIFI_INFO		"AT+CWJAP=\"bocchi457\",\"2020625663\"\r\n"  // WiFi名称和密码
 
 /**
  * 巴法云平台连接配置
@@ -73,8 +73,6 @@
 /**
  * 全局变量声明
  */
-extern unsigned char Secret_Key[];  // 加密密钥
-
 // 【优化】双缓冲区职责明确声明
 extern unsigned char esp8266_buf[buf_len];      // 应用层接收缓冲区：专用于解析云端下发的异步指令
 extern unsigned short esp8266_cnt;               // 应用层缓冲区计数
@@ -99,13 +97,5 @@ uint8_t ESP8266_SendData(unsigned char *data);  // 发送数据到巴法云
 void ESP8266_Init(unsigned int bound);  // ESP8266初始化
 
 void USART2_IRQHandler(void);  // USART2中断处理函数
-
-void mode_choice(void);  // 模式选择函数
-
-/**
- * 工具函数声明
- */
-// 提取小时和分钟的函数
-void extractHourAndMinute(const char *input, int *hour, int *minute);
 
 #endif // _ESP8266_H_

@@ -904,7 +904,6 @@ int main(void)
             
             // 从ESP8266接收的数据中解析设置值
             int parse_count = 0;
-            // uint8_t cmd_processed = 0;  // 【删除】已在外部定义
             
             if (strstr((char *)esp8266_buf, "wendu_high")) {
                 sscanf((strstr((char *)esp8266_buf, "wendu_high") + 10), "=%d", &set_wendu_high);
