@@ -56,7 +56,7 @@ typedef struct {
  * WiFi连接配置
  * 注意：根据实际WiFi网络修改这些定义
  */
-#define ESP8266_WIFI_INFO		"AT+CWJAP=\"bocchi457\",\"2020625663\"\r\n"  // WiFi名称和密码
+#define ESP8266_WIFI_INFO		"AT+CWJAP=\"TheWorld\",\"2020625663\"\r\n"  // WiFi名称和密码
 
 /**
  * 巴法云平台连接配置
@@ -91,7 +91,7 @@ typedef struct {
  */
 extern unsigned char Secret_Key[];  // 加密密钥
 
-// 【优化】双缓冲区职责明确声明
+// 双缓冲区职责明确声明
 extern unsigned char esp8266_buf[buf_len];      // 应用层接收缓冲区：专用于解析云端下发的异步指令
 extern unsigned short esp8266_cnt;               // 应用层缓冲区计数
 extern unsigned char esp8266_recive_flag;        // 应用层接收完成标志
@@ -99,7 +99,7 @@ extern unsigned char esp8266_recive_flag;        // 应用层接收完成标志
 extern uint8_t ESP8266_RecvBuf[buf_len];         // 驱动层接收缓冲区：专用于处理AT指令的同步响应
 extern uint16_t ESP8266_RecvLen;                 // 驱动层缓冲区数据长度
 
-// 【新增】指令队列声明
+// 指令队列声明
 extern CmdQueue_t cmd_queue;                     // 云平台指令队列
 
 /**
@@ -122,7 +122,7 @@ void USART2_IRQHandler(void);  // USART2中断处理函数
 void mode_choice(void);  // 模式选择函数
 
 /**
- * 【新增】指令队列管理函数声明
+ * 指令队列管理函数声明
  */
 void CmdQueue_Init(CmdQueue_t *queue);                          // 初始化指令队列
 uint8_t CmdQueue_Push(CmdQueue_t *queue, const char *cmd);     // 指令入队

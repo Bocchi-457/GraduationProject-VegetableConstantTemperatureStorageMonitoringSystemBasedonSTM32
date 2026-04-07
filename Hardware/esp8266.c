@@ -10,11 +10,10 @@ unsigned char esp8266_buf[buf_len]; // ESP8266接收缓冲区
 unsigned short esp8266_cnt = 0;      // 接收缓冲区计数
 unsigned char esp8266_recive_flag = REV_WAIT; // 接收标志
 
-// 新代码使用的全局变量
 uint8_t ESP8266_RecvBuf[buf_len] = {0}; // 接收缓冲区
 uint16_t ESP8266_RecvLen = 0;                        // 接收数据长度
 
-// 【新增】指令队列定义
+// 指令队列定义
 CmdQueue_t cmd_queue;  // 云平台指令队列
 
 // 函数声明
@@ -47,7 +46,7 @@ void USART2_IRQHandler(void)
             ESP8266_RecvBuf[ESP8266_RecvLen++] = data;
         }
         
-        // 【优化】接收到有效数据即更新标志位，不过度依赖换行符
+        // 接收到有效数据即更新标志位，不过度依赖换行符
         esp8266_recive_flag = REV_OK;
         
         USART_ClearITPendingBit(Bemfa_USART, USART_IT_RXNE); // 清除中断标志
@@ -144,7 +143,7 @@ void ESP8266_Init(unsigned int bound)
     ESP8266_RecvLen = 0;
     ESP8266_Clear();
     
-    // 【新增】初始化指令队列
+    // 初始化指令队列
     CmdQueue_Init(&cmd_queue);
             
     // 3. 发送AT指令检测ESP8266是否在线
@@ -292,7 +291,7 @@ void ESP8266_Init(unsigned int bound)
  */
 uint8_t ESP8266_SendATCmd(char *cmd, char *ack, uint32_t timeout)
 {
-    // 【优化】只清空驱动层缓冲区，不影响应用层缓冲区（云平台指令）
+    // 只清空驱动层缓冲区，不影响应用层缓冲区（云平台指令）
     // 避免在发送AT指令时误删正在接收的云平台下行指令
     ESP8266_RecvLen = 0;
     memset(ESP8266_RecvBuf, 0, buf_len);
@@ -319,7 +318,7 @@ uint8_t ESP8266_SendATCmd(char *cmd, char *ack, uint32_t timeout)
 
 /**
  * @brief 清空ESP8266接收缓冲区
- * @note 【优化】原子性清空所有相关接收缓冲区，防止状态不同步
+ * @note 原子性清空所有相关接收缓冲区，防止状态不同步
  * @param 无
  * @return 无
  */
@@ -434,8 +433,6 @@ uint8_t ESP8266_ConnectBafaCloud(char *server, uint16_t port)
 
 /**
  * @brief  向巴法云TCP服务器发送数据
- * @note   【优化】简化发送流程，减少阻塞时间
- *         原流程阻塞6-11秒，优化后阻塞2-4秒
  * @param  data: 要发送的字符串数据
  * @retval 0: 发送成功；1: 发送失败
  */
@@ -444,18 +441,12 @@ uint8_t ESP8266_SendData(unsigned char *data)
     char at_cmd[32] = {0};
     uint16_t data_len = strlen((char *)data);
 
-    // 【优化1】移除每次发送前的AT连接检查
-    // 理由：如果TCP断开，后续的CIPSEND会直接失败，无需额外检查
-    // 收益：节省1秒阻塞时间
-
-    // 2. 发送数据长度指令：AT+CIPSEND=len\r\n
+    // 发送数据长度指令：AT+CIPSEND=len\r\n
     sprintf(at_cmd, "AT+CIPSEND=%d\r\n", data_len);
     
-    // 【优化2】缩短超时时间从2秒到1秒
     if(ESP8266_SendATCmd(at_cmd, ">", 1000) != 0)
     {
         // TCP连接可能已断开，尝试重新建立连接
-        // 【优化3】缩短重连超时时间
         if(ESP8266_SendATCmd(ESP8266_ONENET_INFO, "CONNECT", 3000) != 0)
         {
             return 1; // 重连失败
@@ -470,20 +461,18 @@ uint8_t ESP8266_SendData(unsigned char *data)
         }
     }
 
-    // 3. 【重要】只清空驱动层缓冲区，保护应用层缓冲区的云平台指令
-    // 原代码错误：这里会清空所有缓冲区，导致正在接收的云平台指令丢失
+    // 清空驱动层缓冲区，保护应用层缓冲区的云平台指令
     ESP8266_RecvLen = 0;
     memset(ESP8266_RecvBuf, 0, buf_len);
     // 注意：不清空 esp8266_buf 和 esp8266_cnt
 
-    // 4. 发送实际数据
+    // 发送实际数据
     while(*data)
     {
         USART_SendData(Bemfa_USART, *data++);
         while(USART_GetFlagStatus(Bemfa_USART, USART_FLAG_TXE) == RESET);
     }
 
-    // 5. 【优化4】缩短SEND OK等待时间从3秒到1.5秒
     if(ESP8266_SendATCmd("", "SEND OK", 1500) != 0)
     {
         return 1; // 发送失败
@@ -604,7 +593,7 @@ void OLED_ShowWiFiProgress(int progress)
 
 /**
  * ============================================================================
- * 【新增】指令队列管理函数实现
+ * 指令队列管理函数实现
  * ============================================================================
  */
 

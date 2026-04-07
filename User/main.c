@@ -403,8 +403,7 @@ int main(void)
                         // 检查是否超时 (发送后过了 6 秒仍未解析成功，触发重发机制)
                         if ((sys_tick_ms - time_sync_timer) > 6000) {
                             time_sync_state = 0; // 重置为发送请求状态
-                            // 【优化】不清空应用层缓冲区，只清空驱动层
-                            // ESP8266_Clear();  // 原代码会误删云平台指令
+                            // 不清空应用层缓冲区，只清空驱动层
                             memset(ESP8266_RecvBuf, 0, buf_len);
                             ESP8266_RecvLen = 0;
                             Serial_Printf("时间同步超时，进入重试机制\r\n");
@@ -467,12 +466,12 @@ int main(void)
         }
 
         /********************************* WiFi指令入队处理 ************************************/
-        // 【优化】只处理有效的巴法云业务数据，过滤AT响应
+        // 只处理有效的巴法云业务数据，过滤AT响应
         if(Flagout == 1 && !need_time_sync)
         {
             if(Is_Bemfa_Data((const char *)esp8266_buf))
             {
-                // 【新增】确认为巴法云业务数据，先入队保存
+                // 确认为巴法云业务数据，先入队保存
                 if(CmdQueue_Push(&cmd_queue, (const char *)esp8266_buf))
                 {
                     // Serial_Printf("指令已入队，当前队列长度: %d\r\n", CmdQueue_GetCount(&cmd_queue));
@@ -916,13 +915,13 @@ int main(void)
         }
         
         /********************************* WiFi指令入队与解析处理 ************************************/
-        // 【优化】只处理有效的巴法云业务数据，过滤AT响应
+        // 只处理有效的巴法云业务数据，过滤AT响应
         
         if(Flagout == 1 && !need_time_sync)
         {
             if(Is_Bemfa_Data((const char *)esp8266_buf))
             {
-                // 【新增】确认为巴法云业务数据，先入队保存
+                // 确认为巴法云业务数据，先入队保存
                 if(CmdQueue_Push(&cmd_queue, (const char *)esp8266_buf))
                 {
                     // Serial_Printf("指令已入队，当前队列长度: %d\r\n", CmdQueue_GetCount(&cmd_queue));
@@ -937,7 +936,7 @@ int main(void)
             }
         }
         
-        // 【新增】从队列中取出所有待处理指令并执行
+        // 从队列中取出所有待处理指令并执行
         char cmd_buffer[CMD_MAX_LEN];
         while(!CmdQueue_IsEmpty(&cmd_queue))
         {
