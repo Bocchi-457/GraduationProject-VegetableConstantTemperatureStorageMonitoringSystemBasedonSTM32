@@ -40,7 +40,7 @@
  * WiFi连接配置
  * 注意：根据实际WiFi网络修改这些定义
  */
-#define ESP8266_WIFI_INFO		"AT+CWJAP=\"bocchi457\",\"2020625663\"\r\n"  // WiFi名称和密码
+#define ESP8266_WIFI_INFO		"AT+CWJAP=\"TheWorld\",\"2020625663\"\r\n"  // WiFi名称和密码
 
 /**
  * 巴法云平台连接配置

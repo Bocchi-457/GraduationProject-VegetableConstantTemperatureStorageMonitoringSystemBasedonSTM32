@@ -399,8 +399,7 @@ int main(void)
                         // 检查是否超时 (发送后过了 6 秒仍未解析成功，触发重发机制)
                         if ((sys_tick_ms - time_sync_timer) > 6000) {
                             time_sync_state = 0; // 重置为发送请求状态
-                            // 【优化】不清空应用层缓冲区，只清空驱动层
-                            // ESP8266_Clear();  // 原代码会误删云平台指令
+                            // 不清空应用层缓冲区，只清空驱动层
                             memset(ESP8266_RecvBuf, 0, buf_len);
                             ESP8266_RecvLen = 0;
                             Serial_Printf("时间同步超时，进入重试机制\r\n");
@@ -458,9 +457,6 @@ int main(void)
                         ESP8266_SendData((unsigned char *)data);
                         heart_beat_count = 0;
                     }
-
-                    // 【已移除】禁止在固定周期无条件清空缓冲区，避免丢失云平台下发的指令
-                    // ESP8266_Clear();  // 原代码：常规上传完毕后清空接收缓冲区
                 }
             }  
         }
@@ -893,7 +889,7 @@ int main(void)
             }
         }
         
-        // 【优化】只处理有效的巴法云业务数据，过滤AT响应
+        // 只处理有效的巴法云业务数据，过滤AT响应
         uint8_t cmd_processed = 0;  // 标记是否有指令被处理
         
         if(!Is_Bemfa_Data((const char *)esp8266_buf))
@@ -986,7 +982,7 @@ int main(void)
                 cmd_processed = 1;  // 标记有指令被处理
                 Serial_Printf("切换到手动模式\r\n");
             } 
-        }  // 【新增】闭合else块，结束模式切换指令的处理
+        }
 
         //自动模式逻辑
         if(mode == 1)
@@ -1097,7 +1093,7 @@ int main(void)
             }
             
             /*********************************指令解析完成后清空缓冲区************************************/
-            // 【优化】在所有指令解析和处理完成后，统一清空接收缓冲区
+            // 在所有指令解析和处理完成后，统一清空接收缓冲区
             // 这样可以确保云平台下发的指令有足够时间被完整接收和解析
             if(cmd_processed == 1)
             {
