@@ -27,25 +27,29 @@ void USART2_IRQHandler(void)
 {
     if(USART_GetITStatus(Bemfa_USART, USART_IT_RXNE) != RESET) // 接收中断
     {
-        unsigned char data = USART_ReceiveData(Bemfa_USART);
-        
-        // 中断需要同时向两个缓冲区写入数据
-        // 应用层缓冲区：用于解析云平台下发的异步指令
-        if(esp8266_cnt < buf_len) // 防止缓冲区溢出
-        {
+        uint8_t data = (uint8_t)USART_ReceiveData(Bemfa_USART);
+
+        // 应用层缓冲区（解析云平台下发的异步业务指令）
+        if (esp8266_cnt < buf_len - 1) {      // 保留1字节用于终止符
             esp8266_buf[esp8266_cnt++] = data;
+            esp8266_buf[esp8266_cnt] = '\0';
+        } else {
+            // 缓冲区已满，丢弃新数据或可设置溢出标志（这里简单丢弃）
         }
-        
-        // 驱动层缓冲区：用于接收AT指令的同步响应
-        if(ESP8266_RecvLen < buf_len) // 防止缓冲区溢出
-        {
+
+        // 驱动层缓冲区（用于AT应答的同步处理）
+        if (ESP8266_RecvLen < buf_len - 1) {
             ESP8266_RecvBuf[ESP8266_RecvLen++] = data;
+            ESP8266_RecvBuf[ESP8266_RecvLen] = '\0';
+        } else {
+            // 驱动缓冲区溢出处理（简单丢弃）
         }
-        
-        // 接收到有效数据即更新标志位，不过度依赖换行符
+
+        // 表示接收完成（应用层可读取 local 拷贝）
         esp8266_recive_flag = REV_OK;
-        
-        USART_ClearITPendingBit(Bemfa_USART, USART_IT_RXNE); // 清除中断标志
+
+        // 清中断标志
+        USART_ClearITPendingBit(Bemfa_USART, USART_IT_RXNE);
     }
 }
 
