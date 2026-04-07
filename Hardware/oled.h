@@ -46,15 +46,15 @@
  * @{
  */
 
-#define OLED_MODE 0               /**< OLED模式 */
-#define SIZE 8                    /**< 字体大小 */
-#define XLevelL 0x00              /**< X轴低电平 */
-#define XLevelH 0x10              /**< X轴高电平 */
-#define Max_Column 128            /**< 最大列数 */
-#define Max_Row 64                /**< 最大行数 */
-#define Brightness 0xFF           /**< 亮度 */
-#define X_WIDTH 128               /**< X轴宽度 */
-#define Y_WIDTH 64                /**< Y轴宽度 */
+#define OLED_MODE 0     /**< OLED模式 */
+#define SIZE 8          /**< 字体大小 */
+#define XLevelL 0x00    /**< X轴低电平 */
+#define XLevelH 0x10    /**< X轴高电平 */
+#define Max_Column 128  /**< 最大列数 */
+#define Max_Row 64      /**< 最大行数 */
+#define Brightness 0xFF /**< 亮度 */
+#define X_WIDTH 128     /**< X轴宽度 */
+#define Y_WIDTH 64      /**< Y轴宽度 */
 
 /**
  * @defgroup OLED_IIC_Pins OLED IIC端口定义

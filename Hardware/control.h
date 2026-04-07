@@ -6,10 +6,10 @@
  * 测试硬件：STM32F103RCT6
  */
 
-#ifndef	__CONTROL_H
-#define	__CONTROL_H
+#ifndef __CONTROL_H
+#define __CONTROL_H
 
-#include "stm32f10x.h"                  // Device header
+#include "stm32f10x.h" // Device header
 
 /**
  * @brief 蜂鸣器初始化函数
@@ -59,7 +59,7 @@ void zhileng_init(void);
  * @return 无
  * @note 初始化除湿模块控制引脚
  */
-void chushi_init(void); 
+void chushi_init(void);
 
 /**
  * @brief 除湿模块控制宏定义

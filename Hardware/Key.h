@@ -31,22 +31,22 @@ void Key_Init(void);
  * @retval KEY4_PRES-KEY4按键按下
  * @note 按键优先级：KEY1 > KEY2 > KEY3 > KEY4
  */
-u8 KEY_Scan(u8 mode);   	// 按键扫描函数		
+u8 KEY_Scan(u8 mode); // 按键扫描函数
 
 /**
  * 按键引脚定义
  */
-#define KEY1  PBin(4)  // 读取按键1 (PB4)
-#define KEY2  PBin(5)  // 读取按键2 (PB5)
-#define KEY3  PBin(6)  // 读取按键3 (PB6)
-#define KEY4  PBin(7)  // 读取按键4 (PB7)
+#define KEY1 PBin(4) // 读取按键1 (PB4)
+#define KEY2 PBin(5) // 读取按键2 (PB5)
+#define KEY3 PBin(6) // 读取按键3 (PB6)
+#define KEY4 PBin(7) // 读取按键4 (PB7)
 
 /**
  * 按键返回值定义
  */
-#define KEY1_PRES 	1	// KEY1按下
-#define KEY2_PRES 	2	// KEY2按下
-#define KEY3_PRES 	3	// KEY3按下
-#define KEY4_PRES 	4	// KEY4按下
-		  
+#define KEY1_PRES 1 // KEY1按下
+#define KEY2_PRES 2 // KEY2按下
+#define KEY3_PRES 3 // KEY3按下
+#define KEY4_PRES 4 // KEY4按下
+
 #endif

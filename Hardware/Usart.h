@@ -9,34 +9,34 @@
 #ifndef __USART_H
 #define __USART_H
 
-#include "stdio.h"    
-#include "sys.h" 
+#include "stdio.h"
+#include "sys.h"
 
 /**
  * @brief 数据包长度
  */
-#define Packet_Len  8
+#define Packet_Len 8
 
 /**
  * @brief 串口使能宏定义
  * @note 1: 使能，0: 禁用
  */
-#define USART1_ENABLE		1  // 使能USART1
-#define USART2_ENABLE		0  // 禁用USART2
-#define USART3_ENABLE		0  // 禁用USART3
+#define USART1_ENABLE 1 // 使能USART1
+#define USART2_ENABLE 0 // 禁用USART2
+#define USART3_ENABLE 0 // 禁用USART3
 
 /**
  * @brief 发送串口选择
  */
-#define SEND_USART		USART1
+#define SEND_USART USART1
 
 /**
  * @brief 全局变量声明
  */
-extern unsigned short data_cnt;         // 数据计数器
-extern uint8_t Seria1_TxPacket[];       // 发送数据包
-extern char Serial_RxPacket[];          // 接收数据包
-extern uint8_t Serial_RxFlag;           // 接收标志位
+extern unsigned short data_cnt;   // 数据计数器
+extern uint8_t Seria1_TxPacket[]; // 发送数据包
+extern char Serial_RxPacket[];    // 接收数据包
+extern uint8_t Serial_RxFlag;     // 接收标志位
 
 /**
  * @brief 串口初始化函数
@@ -95,7 +95,7 @@ void Serial_SendPacket(void);
  * @param 无
  * @return 接收标志位状态
  */
-uint8_t Serial_GetRxFlag(void);  
+uint8_t Serial_GetRxFlag(void);
 
 #endif
 
