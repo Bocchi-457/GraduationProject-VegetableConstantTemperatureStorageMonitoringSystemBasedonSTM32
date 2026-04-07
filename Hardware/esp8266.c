@@ -339,7 +339,7 @@ _Bool ESP8266_WaitRecive(void)
     {
         delay_ms(10);
         time_out++;
-        if (time_out > 1000) // 10000ms超时
+        if (time_out > 100) // 1000ms超时
             return 0;
     }
     esp8266_recive_flag = REV_WAIT;
@@ -387,23 +387,22 @@ uint8_t ESP8266_SendData(unsigned char *data)
 
     // 发送数据长度指令：AT+CIPSEND=len\r\n
     sprintf(at_cmd, "AT+CIPSEND=%d\r\n", data_len);
-    
-    // 缩短超时时间从2秒到1秒
+
     if(ESP8266_SendATCmd(at_cmd, ">", 1000) != 0)
     {
-        // TCP连接可能已断开，尝试重新建立连接
-        if(ESP8266_SendATCmd(ESP8266_ONENET_INFO, "CONNECT", 3000) != 0)
-        {
-            return 1; // 重连失败
-        }
+        // // TCP连接可能已断开，尝试重新建立连接
+        // if(ESP8266_SendATCmd(ESP8266_ONENET_INFO, "CONNECT", 3000) != 0)
+        // {
+        //     return 1; // 重连失败
+        // }
         
-        delay_ms(200); // 短暂等待连接稳定
+        // delay_ms(200); // 短暂等待连接稳定
         
-        // 再次尝试发送数据长度指令
-        if(ESP8266_SendATCmd(at_cmd, ">", 1000) != 0)
-        {
-            return 1; // 等待">"提示符失败
-        }
+        // // 再次尝试发送数据长度指令
+        // if(ESP8266_SendATCmd(at_cmd, ">", 1000) != 0)
+        // {
+        //     return 1; // 等待">"提示符失败
+        // }
     }
 
     // 只清空驱动层缓冲区，保护应用层缓冲区的云平台指令
