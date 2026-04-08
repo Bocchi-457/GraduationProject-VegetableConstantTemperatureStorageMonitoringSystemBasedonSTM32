@@ -10,19 +10,19 @@
   {                                                                            \
     GPIOC->CRH &= 0xF0FFFFFF;                                                  \
     GPIOC->CRH |= 0x08000000;                                                  \
-  } // 低八位引脚的PC11脚定义为输入
+  } // 低八位引脚的PC14脚定义为输入
 #define DS1302_IO_OUT()                                                        \
   {                                                                            \
     GPIOC->CRH &= 0xF0FFFFFF;                                                  \
     GPIOC->CRH |= 0x03000000;                                                  \
-  } // 低八位引脚的PC11脚定义为输出
+  } // 低八位引脚的PC14脚定义为输出
 // IO操作函数
-#define DIO_OUT PCout(14) // 数据端口	PC11
-#define DIO_IN PCin(14)   // 数据端口	PC11
-#define DIO PCout(14)     // PC11
+#define DIO_OUT PCout(14) // 数据端口	PC14
+#define DIO_IN PCin(14)   // 数据端口	PC14
+#define DIO PCout(14)     // PC14
 
-#define CE PCout(15)   // PC10
-#define SCLK PCout(13) // PC12
+#define CE PCout(15)   // PC15
+#define SCLK PCout(13) // PC13
 /**
  * 下一个时间结构体
  */

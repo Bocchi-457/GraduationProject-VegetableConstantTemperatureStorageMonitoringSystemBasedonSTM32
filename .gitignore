@@ -1,6 +1,7 @@
 # 编译输出目录
 OUTPUT/
 OBJ/
+参考资料/
 
 # 二进制文件
 *.hex
@@ -43,3 +44,6 @@ Thumbs.db
 
 # 日志文件
 *.scvd
+
+*.deb
+Objects/project_Target_1.dep

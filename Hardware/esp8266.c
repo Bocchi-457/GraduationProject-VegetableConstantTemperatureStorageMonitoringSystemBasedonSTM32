@@ -12,6 +12,29 @@ unsigned char esp8266_recive_flag = REV_WAIT; // 接收标志
 uint8_t ESP8266_RecvBuf[buf_len] = {0}; // 接收缓冲区
 uint16_t ESP8266_RecvLen = 0;           // 接收数据长度
 
+/**
+ * 【新增】全局连接状态变量定义
+ */
+volatile ConnState_t g_conn_state = CONN_STATE_IDLE;  // 当前连接状态
+uint8_t g_send_fail_count = 0;                        // 连续发送失败计数
+uint32_t g_last_reconnect_time = 0;                   // 上次重连时间戳（用于防抖）
+
+// 【新增】引用main.c中的系统时钟
+extern volatile uint32_t sys_tick_ms;
+
+/**
+ * 【调试开关】串口日志输出控制
+ * 定义 DEBUG_RECONNECT 启用重连相关日志
+ * 生产环境建议注释掉以提升性能
+ */
+#define DEBUG_RECONNECT  1  // 1=启用日志, 0=禁用日志
+
+#if DEBUG_RECONNECT
+  #define RECONNECT_LOG(fmt, ...) Serial_Printf(fmt, ##__VA_ARGS__)
+#else
+  #define RECONNECT_LOG(fmt, ...)  // 空宏，不产生任何代码
+#endif
+
 // 函数声明
 uint8_t ESP8266_SendATCmd(char *cmd, char *ack, uint32_t timeout);
 void OLED_ShowFailureWithCountdown(u8 *message, int time);
@@ -145,7 +168,7 @@ void ESP8266_Init(unsigned int bound) {
   while (at_retry > 0) {
     if (ESP8266_SendATCmd("AT\r\n", "OK", 1000) == 0) {
       // 4. 恢复出厂设置（可选，确保初始状态）
-      ESP8266_SendATCmd("AT+RESTORE\r\n", "OK", 3000);
+      // ESP8266_SendATCmd("AT+RESTORE\r\n", "OK", 3000);
 
       // 5. 设置ESP8266为STA模式（连接路由器）
       int mode_retry = 3;
@@ -167,7 +190,7 @@ void ESP8266_Init(unsigned int bound) {
             if (ESP8266_SendATCmd(ESP8266_WIFI_INFO, "WIFI CONNECTED", 10000) ==
                 0) {
               // 额外检查是否获取到IP
-              ESP8266_SendATCmd("AT+CIFSR\r\n", "STAIP", 2000);
+              // ESP8266_SendATCmd("AT+CIFSR\r\n", "STAIP", 2000);
 
               // 等待WiFi连接
               for (; i <= 40; i += 1) {
@@ -348,50 +371,67 @@ void Usart_SendString(USART_TypeDef *USARTx, unsigned char *str,
 }
 
 /**
- * @brief  向巴法云TCP服务器发送数据
+ * @brief  向巴法云TCP服务器发送数据（优化版）
  * @param  data: 要发送的字符串数据
- * @retval 0: 发送成功；1: 发送失败
+ * @retval 0: 发送成功；1: 发送失败（需进一步诊断）
+ * @note   增加重试机制和详细的状态反馈
  */
 uint8_t ESP8266_SendData(unsigned char *data) {
   char at_cmd[32] = {0};
   uint16_t data_len = strlen((char *)data);
+  uint8_t retry_count = 0;
+  const uint8_t MAX_RETRY = 2;  // 最多重试2次
+  
+  while (retry_count <= MAX_RETRY) {
+    // 发送数据长度指令：AT+CIPSEND=len\r\n
+    sprintf(at_cmd, "AT+CIPSEND=%d\r\n", data_len);
 
-  // 发送数据长度指令：AT+CIPSEND=len\r\n
-  sprintf(at_cmd, "AT+CIPSEND=%d\r\n", data_len);
+    if (ESP8266_SendATCmd(at_cmd, ">", 1000) != 0) {
+      // 未收到 ">" 提示符，TCP连接可能已断开
+      RECONNECT_LOG("[SEND] Failed to get '>' prompt\r\n");
+      
+      if (retry_count < MAX_RETRY) {
+        retry_count++;
+        RECONNECT_LOG("[SEND] Retry %d/%d...\r\n", retry_count, MAX_RETRY);
+        delay_ms(500);  // 短暂延时后重试
+        continue;  // 重试
+      }
+      
+      return 1; // 重试后仍失败
+    }
 
-  if (ESP8266_SendATCmd(at_cmd, ">", 1000) != 0) {
-    // // TCP连接可能已断开，尝试重新建立连接
-    // if(ESP8266_SendATCmd(ESP8266_ONENET_INFO, "CONNECT", 3000) != 0)
-    // {
-    //     return 1; // 重连失败
-    // }
+    // 只清空驱动层缓冲区，保护应用层缓冲区的云平台指令
+    ESP8266_RecvLen = 0;
+    memset(ESP8266_RecvBuf, 0, buf_len);
+    // 注意：不清空 esp8266_buf 和 esp8266_cnt
 
-    // delay_ms(200); // 短暂等待连接稳定
+    // 发送实际数据（逐字节发送）
+    const unsigned char *pData = data;  // 使用临时指针
+    while (*pData) {
+      USART_SendData(Bemfa_USART, *pData++);
+      while (USART_GetFlagStatus(Bemfa_USART, USART_FLAG_TXE) == RESET);
+    }
 
-    // // 再次尝试发送数据长度指令
-    // if(ESP8266_SendATCmd(at_cmd, ">", 1000) != 0)
-    // {
-    //     return 1; // 等待">"提示符失败
-    // }
+    // 等待 "SEND OK" 响应（超时1.5秒）
+    if (ESP8266_SendATCmd("", "SEND OK", 1500) != 0) {
+      RECONNECT_LOG("[SEND] Failed to get 'SEND OK'\r\n");
+      
+      if (retry_count < MAX_RETRY) {
+        retry_count++;
+        RECONNECT_LOG("[SEND] Retry %d/%d...\r\n", retry_count, MAX_RETRY);
+        delay_ms(500);
+        continue;  // 重试
+      }
+      
+      return 1; // 发送失败
+    }
+
+    // 发送成功
+    RECONNECT_LOG("[SEND] Data sent successfully\r\n");
+    return 0;
   }
-
-  // 只清空驱动层缓冲区，保护应用层缓冲区的云平台指令
-  ESP8266_RecvLen = 0;
-  memset(ESP8266_RecvBuf, 0, buf_len);
-  // 注意：不清空 esp8266_buf 和 esp8266_cnt
-
-  // 发送实际数据
-  while (*data) {
-    USART_SendData(Bemfa_USART, *data++);
-    while (USART_GetFlagStatus(Bemfa_USART, USART_FLAG_TXE) == RESET)
-      ;
-  }
-
-  if (ESP8266_SendATCmd("", "SEND OK", 1500) != 0) {
-    return 1; // 发送失败
-  }
-
-  return 0; // 发送成功
+  
+  return 1;  // 理论上不会到达这里
 }
 
 /**
@@ -440,4 +480,308 @@ void OLED_ShowWiFiProgress(int progress) {
   char progress_str[10];
   sprintf(progress_str, "%d%%", progress);
   OLED_ShowString(60, 6, (u8 *)progress_str, 16);
+}
+
+/**
+ * @brief 【新增】获取当前连接状态
+ * @param 无
+ * @return 当前连接状态枚举值
+ */
+ConnState_t ESP8266_GetConnState(void) {
+  return g_conn_state;
+}
+
+/**
+ * @brief 【新增】更新连接状态
+ * @param state: 新的连接状态
+ * @return 无
+ */
+void ESP8266_UpdateConnState(ConnState_t state) {
+  g_conn_state = state;
+  RECONNECT_LOG("[CONN] State changed to: %d\r\n", state);
+}
+
+/**
+ * @brief 【新增】诊断连接状态（非阻塞，需配合状态机使用）
+ * @note 通过AT+CIPSTATUS检测TCP连接状态
+ * @return 诊断结果枚举值
+ */
+DiagResult_t ESP8266_DiagnoseConnection(void) {
+  char response_buf[64] = {0};
+  
+  // 步骤1：检测TCP连接状态
+  ESP8266_RecvLen = 0;
+  memset(ESP8266_RecvBuf, 0, buf_len);
+  
+  if (ESP8266_SendATCmd("AT+CIPSTATUS\r\n", "STATUS:", 1000) == 0) {
+    // 解析响应：+CIPSTATUS:<link ID>,<type>,<remote IP>,<remote port>,<local port>,<tetype>
+    // STATUS:2 表示已连接，STATUS:3/4 表示断开
+    if (strstr((char*)ESP8266_RecvBuf, "STATUS:2") != NULL) {
+      RECONNECT_LOG("[DIAG] TCP connected\r\n");
+      return DIAG_OK;  // TCP连接正常，可能是网络拥塞
+    } else if (strstr((char*)ESP8266_RecvBuf, "STATUS:3") != NULL ||
+               strstr((char*)ESP8266_RecvBuf, "STATUS:4") != NULL) {
+      RECONNECT_LOG("[DIAG] TCP disconnected\r\n");
+      return DIAG_TCP_DISCONNECTED;  // TCP断开
+    }
+  }
+  
+  // 步骤2：如果CIPSTATUS超时或无响应，检测WiFi状态
+  ESP8266_RecvLen = 0;
+  memset(ESP8266_RecvBuf, 0, buf_len);
+  
+  if (ESP8266_SendATCmd("AT+CWJAP?\r\n", "+CWJAP:", 1000) == 0) {
+    // WiFi仍连接
+    RECONNECT_LOG("[DIAG] WiFi connected, but TCP lost\r\n");
+    return DIAG_TCP_DISCONNECTED;
+  } else {
+    // WiFi可能断开
+    RECONNECT_LOG("[DIAG] WiFi disconnected\r\n");
+    return DIAG_WIFI_DISCONNECTED;
+  }
+}
+
+/**
+ * @brief 【新增】TCP层重连（非阻塞状态机实现）
+ * @note 需要多次调用才能完成重连流程
+ * @return 0=重连成功, 1=重连中, 2=重连失败
+ */
+uint8_t ESP8266_TCP_Reconnect(void) {
+  static uint8_t step = 0;
+  static uint32_t step_start_time = 0;
+  uint32_t current_time = sys_tick_ms;  // 假设main.c中有sys_tick_ms
+  
+  switch (step) {
+    case 0:  // 步骤0：检查防抖（距离上次重连至少60秒）
+      if ((current_time - g_last_reconnect_time) < 60000) {
+        RECONNECT_LOG("[TCP] Reconnect blocked by debounce\r\n");
+        return 2;  // 被防抖阻止
+      }
+      
+      RECONNECT_LOG("[TCP] Starting TCP reconnect...\r\n");
+      ESP8266_UpdateConnState(CONN_STATE_TCP_CONNECTING);
+      step = 1;
+      step_start_time = current_time;
+      break;
+      
+    case 1:  // 步骤1：关闭现有TCP连接
+      ESP8266_RecvLen = 0;
+      memset(ESP8266_RecvBuf, 0, buf_len);
+      ESP8266_SendATCmd("AT+CIPCLOSE\r\n", "CLOSED", 1000);
+      delay_ms(200);
+      
+      step = 2;
+      step_start_time = current_time;
+      RECONNECT_LOG("[TCP] Step 1: Close old connection\r\n");
+      break;
+      
+    case 2:  // 步骤2：重新建立TCP连接
+      if (ESP8266_SendATCmd(ESP8266_ONENET_INFO, "CONNECT", 5000) == 0) {
+        RECONNECT_LOG("[TCP] Step 2: TCP connected\r\n");
+        
+        // 步骤3：重新订阅主题
+        step = 3;
+      } else {
+        // TCP连接失败，重试
+        if ((current_time - step_start_time) > 15000) {  // 15秒超时
+          RECONNECT_LOG("[TCP] TCP connect failed after retry\r\n");
+          step = 0;  // 重置状态
+          ESP8266_UpdateConnState(CONN_STATE_TCP_LOST);
+          return 2;  // 重连失败
+        }
+        RECONNECT_LOG("[TCP] Step 2: Retrying TCP connect...\r\n");
+      }
+      break;
+      
+    case 3:  // 步骤3：重新订阅主题
+      if (ESP8266_SendData((unsigned char *)ESP8266_TOPIC) == 0) {
+        RECONNECT_LOG("[TCP] Step 3: Topic subscribed\r\n");
+        
+        // 重连成功
+        step = 0;  // 重置状态
+        g_send_fail_count = 0;  // 清零失败计数
+        g_last_reconnect_time = current_time;
+        ESP8266_UpdateConnState(CONN_STATE_CONNECTED);
+        
+        RECONNECT_LOG("[TCP] Reconnect SUCCESS\r\n");
+        return 0;  // 重连成功
+      } else {
+        RECONNECT_LOG("[TCP] Step 3: Subscribe failed, retrying...\r\n");
+        if ((current_time - step_start_time) > 10000) {  // 10秒超时
+          step = 0;
+          ESP8266_UpdateConnState(CONN_STATE_TCP_LOST);
+          return 2;  // 重连失败
+        }
+      }
+      break;
+      
+    default:
+      step = 0;
+      break;
+  }
+  
+  return 1;  // 重连中
+}
+
+/**
+ * @brief 【新增】WiFi层重连（非阻塞状态机实现）
+ * @note 需要多次调用才能完成重连流程
+ * @return 0=重连成功, 1=重连中, 2=重连失败
+ */
+uint8_t ESP8266_WIFI_Reconnect(void) {
+  static uint8_t step = 0;
+  static uint32_t step_start_time = 0;
+  uint32_t current_time = sys_tick_ms;
+  
+  switch (step) {
+    case 0:  // 步骤0：检查防抖
+      if ((current_time - g_last_reconnect_time) < 60000) {
+        RECONNECT_LOG("[WIFI] Reconnect blocked by debounce\r\n");
+        return 2;
+      }
+      
+      RECONNECT_LOG("[WIFI] Starting WiFi reconnect...\r\n");
+      ESP8266_UpdateConnState(CONN_STATE_WIFI_CONNECTING);
+      step = 1;
+      step_start_time = current_time;
+      break;
+      
+    case 1:  // 步骤1：重新连接WiFi
+      ESP8266_RecvLen = 0;
+      memset(ESP8266_RecvBuf, 0, buf_len);
+      
+      if (ESP8266_SendATCmd(ESP8266_WIFI_INFO, "WIFI CONNECTED", 10000) == 0) {
+        RECONNECT_LOG("[WIFI] Step 1: WiFi connected\r\n");
+        delay_ms(1000);  // 等待获取IP
+        
+        step = 2;
+      } else {
+        // WiFi连接失败，重试
+        if ((current_time - step_start_time) > 30000) {  // 30秒超时
+          RECONNECT_LOG("[WIFI] WiFi connect failed after retry\r\n");
+          step = 0;
+          ESP8266_UpdateConnState(CONN_STATE_WIFI_LOST);
+          return 2;  // 重连失败
+        }
+        RECONNECT_LOG("[WIFI] Step 1: Retrying WiFi connect...\r\n");
+      }
+      break;
+      
+    case 2:  // 步骤2：重建TCP连接（调用TCP重连）
+      {
+        uint8_t tcp_result = ESP8266_TCP_Reconnect();
+        if (tcp_result == 0) {
+          // TCP重连成功
+          step = 0;
+          g_last_reconnect_time = current_time;
+          ESP8266_UpdateConnState(CONN_STATE_CONNECTED);
+          
+          RECONNECT_LOG("[WIFI] Full reconnect SUCCESS\r\n");
+          return 0;  // 重连成功
+        } else if (tcp_result == 2) {
+          // TCP重连失败
+          step = 0;
+          ESP8266_UpdateConnState(CONN_STATE_TCP_LOST);
+          return 2;
+        }
+        // tcp_result == 1 表示重连中，继续等待
+      }
+      break;
+      
+    default:
+      step = 0;
+      break;
+  }
+  
+  return 1;  // 重连中
+}
+
+/**
+ * @brief 【新增】模块复位重连（最激进的重连方式）
+ * @note 通过硬件复位引脚重启ESP8266，然后重新初始化
+ * @return 0=重连成功, 1=重连中, 2=重连失败
+ */
+uint8_t ESP8266_Module_Reset(void) {
+  static uint8_t step = 0;
+  static uint32_t step_start_time = 0;
+  uint32_t current_time = sys_tick_ms;
+  
+  switch (step) {
+    case 0:  // 步骤0：检查防抖（复位需要更长的间隔，至少120秒）
+      if ((current_time - g_last_reconnect_time) < 120000) {
+        RECONNECT_LOG("[RESET] Reset blocked by debounce\r\n");
+        return 2;
+      }
+      
+      RECONNECT_LOG("[RESET] Starting module reset...\r\n");
+      ESP8266_UpdateConnState(CONN_STATE_MODULE_ERROR);
+      step = 1;
+      step_start_time = current_time;
+      break;
+      
+    case 1:  // 步骤1：硬件复位
+      GPIO_ResetBits(ESP01S_RST_PROT, ESP01S_RST_PIN);
+      delay_ms(500);
+      GPIO_SetBits(ESP01S_RST_PROT, ESP01S_RST_PIN);
+      delay_ms(2000);  // 等待模块启动
+      
+      RECONNECT_LOG("[RESET] Step 1: Hardware reset done\r\n");
+      step = 2;
+      break;
+      
+    case 2:  // 步骤2：重新初始化（调用ESP8266_Init的部分逻辑）
+      // 注意：这里不调用完整的ESP8266_Init，避免OLED显示干扰
+      // 只执行必要的AT指令序列
+      
+      // 2.1 测试AT
+      if (ESP8266_SendATCmd("AT\r\n", "OK", 1000) != 0) {
+        if ((current_time - step_start_time) > 10000) {
+          RECONNECT_LOG("[RESET] AT test failed\r\n");
+          step = 0;
+          return 2;
+        }
+        RECONNECT_LOG("[RESET] Step 2: Retrying AT test...\r\n");
+        break;
+      }
+      
+      // 2.2 设置STA模式
+      if (ESP8266_SendATCmd("AT+CWMODE=1\r\n", "OK", 1000) != 0) {
+        RECONNECT_LOG("[RESET] Set STA mode failed\r\n");
+        step = 0;
+        return 2;
+      }
+      
+      // 2.3 关闭多路连接
+      ESP8266_SendATCmd("AT+CIPMUX=0\r\n", "OK", 1000);
+      
+      RECONNECT_LOG("[RESET] Step 2: Module initialized\r\n");
+      step = 3;
+      break;
+      
+    case 3:  // 步骤3：重新连接WiFi
+      {
+        uint8_t wifi_result = ESP8266_WIFI_Reconnect();
+        if (wifi_result == 0) {
+          // WiFi重连成功
+          step = 0;
+          g_last_reconnect_time = current_time;
+          ESP8266_UpdateConnState(CONN_STATE_CONNECTED);
+          
+          RECONNECT_LOG("[RESET] Full module reset SUCCESS\r\n");
+          return 0;  // 重连成功
+        } else if (wifi_result == 2) {
+          // WiFi重连失败
+          step = 0;
+          return 2;
+        }
+        // wifi_result == 1 表示重连中
+      }
+      break;
+      
+    default:
+      step = 0;
+      break;
+  }
+  
+  return 1;  // 重连中
 }

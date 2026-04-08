@@ -23,6 +23,20 @@
 #include <string.h>
 
 /**
+ * 【调试开关】重连日志输出控制（与esp8266.c保持一致）
+ * 生产环境建议设置为0以提升性能
+ */
+#ifndef DEBUG_RECONNECT
+  #define DEBUG_RECONNECT  1  // 1=启用日志, 0=禁用日志
+#endif
+
+#if DEBUG_RECONNECT
+  #define RECONNECT_LOG(fmt, ...) Serial_Printf(fmt, ##__VA_ARGS__)
+#else
+  #define RECONNECT_LOG(fmt, ...)  // 空宏，不产生任何代码
+#endif
+
+/**
  * Flash配置参数结构体
  * 用于存储需要持久化的系统参数
  */
@@ -131,7 +145,22 @@ u8 key_num = 0; // 按键返回值
 char WiFiInit_time;            // WiFi初始化时间
 char Flagout = 0;              // 输出标志（0：禁止，1：允许）
 uint32_t heart_beat_count = 0; // 心跳包计数器
-uint32_t reconnect_count = 0;  // 重连计数器
+uint32_t reconnect_count = 0;  // 重连计数器（保留用于兼容）
+
+/**
+ * 【新增】智能重连状态机变量
+ */
+uint8_t diag_retry_count = 0;           // 诊断重试计数
+uint32_t last_diag_time = 0;            // 上次诊断时间
+uint8_t reconnect_state = 0;            // 重连状态机步骤 (0=空闲, 1=诊断中, 2=TCP重连, 3=WiFi重连, 4=模块复位)
+uint32_t reconnect_start_time = 0;      // 重连开始时间
+
+/**
+ * 【新增】离线模式变量
+ */
+uint8_t offline_mode = 0;               // 离线模式标志 (0=在线, 1=离线)
+uint32_t last_reconnect_attempt_time = 0;  // 上次重连尝试时间
+#define RECONNECT_ATTEMPT_INTERVAL 30000  // 离线模式下重连尝试间隔（30秒）
 
 /**
  * OLED显示相关变量
@@ -223,7 +252,7 @@ int main(void) {
   OLED_Init();         // OLED显示初始化
   OLED_Clear(0);       // 清屏
   Serial_Iint(115200); // 串口初始化，用于调试
-  Serial_Printf("系统初始化中...\n\r");
+  RECONNECT_LOG("系统初始化中...\n\r");
   Ds1302_Init();  // DS1302实时时钟初始化
   beep_init();    // 蜂鸣器初始化
   jiare_init();   // 加热模块初始化
@@ -234,7 +263,7 @@ int main(void) {
 
   // 初始化系统配置（从Flash读取或使用默认值）
   SystemConfig_Init();
-  Serial_Printf("系统配置初始化完成\n\r");
+  RECONNECT_LOG("系统配置初始化完成\n\r");
 
   // 全局上电延时，确保DHT22 2s稳定期
   OLED_ShowCHinese(0, 3, 19);  // 系
@@ -247,10 +276,10 @@ int main(void) {
   delay_ms(2000);              // 等待DHT22稳定
 
   // 初始化DHT22
-  Serial_Printf("初始化DHT22...\n\r");
+  RECONNECT_LOG("初始化DHT22...\n\r");
   if (DHT22_Init() == 0) {
-    Serial_Printf("DHT22初始化成功\n\r");
-    Serial_Printf("系统初始化完成\n\r");
+    RECONNECT_LOG("DHT22初始化成功\n\r");
+    RECONNECT_LOG("系统初始化完成\n\r");
 
     // 第一次读取的是上一次数据，连续读两次获取实时值
     Read_DHT22(&DHT22_Data); // 丢弃第一次
@@ -259,7 +288,7 @@ int main(void) {
       data_valid = 1;
     }
   } else {
-    Serial_Printf("DHT22初始化失败，请检查接线\n\r");
+    RECONNECT_LOG("DHT22初始化失败，请检查接线\n\r");
   }
   OLED_Clear(0);
   // 系统初始化完成，蜂鸣器鸣响一下（低电平触发）
@@ -290,7 +319,7 @@ int main(void) {
     {
       OLED_Clear(0);
 
-      Serial_Printf("初始化ESP8266模块...\n\r");
+      RECONNECT_LOG("初始化ESP8266模块...\n\r");
       ESP8266_Init(115200); // 初始化ESP8266模块，波特率115200
       Flagout = 1;          // 允许数据输出
       break;
@@ -353,7 +382,7 @@ int main(void) {
               r_second < 60) {
 
             RTC_Set(r_year, r_month, r_day, r_hour, r_minute, r_second);
-            Serial_Printf("时间同步成功: %04d-%02d-%02d %02d:%02d:%02d\r\n",
+            RECONNECT_LOG("时间同步成功: %04d-%02d-%02d %02d:%02d:%02d\r\n",
                           r_year, r_month, r_day, r_hour, r_minute, r_second);
 
             need_time_sync = 0;
@@ -377,7 +406,7 @@ int main(void) {
       if (Read_DHT22(&DHT22_Data) == SUCCESS) {
         wendu_display_force_update = 1; // 刷新屏幕标志
       } else {
-        Serial_Printf("DHT22 Read Error\r\n");
+        RECONNECT_LOG("DHT22 Read Error\r\n");
         // 读取失败会保持上一次读取的数据
       }
 
@@ -392,7 +421,7 @@ int main(void) {
             ESP8266_SendData((unsigned char *)Return_Time);
             time_sync_state = 1;           // 切换为等待响应状态
             time_sync_timer = sys_tick_ms; // 记录发送时刻
-            Serial_Printf("正在请求服务器时间...\r\n");
+            RECONNECT_LOG("正在请求服务器时间...\r\n");
           } else if (time_sync_state == 1) {
             // 检查是否超时 (发送后过了 6 秒仍未解析成功，触发重发机制)
             if ((sys_tick_ms - time_sync_timer) > 6000) {
@@ -400,7 +429,7 @@ int main(void) {
               // 不清空应用层缓冲区，只清空驱动层
               memset(ESP8266_RecvBuf, 0, buf_len);
               ESP8266_RecvLen = 0;
-              Serial_Printf("时间同步超时，进入重试机制\r\n");
+              RECONNECT_LOG("时间同步超时，进入重试机制\r\n");
             }
           }
         } else {
@@ -420,17 +449,41 @@ int main(void) {
                   abs_temp / 10, abs_temp % 10, DHT22_Data.humidity / 10,
                   DHT22_Data.humidity % 10);
 
-          // 发送数据
+          // 发送数据（优化版：带重试机制）
           if (ESP8266_SendData((unsigned char *)data) == 0) {
-            heart_beat_count = 0; // 重置心跳计数器
-            reconnect_count = 0;  // 重置重连计数器
+            heart_beat_count = 0;       // 重置心跳计数器
+            reconnect_count = 0;        // 重置重连计数器
+            g_send_fail_count = 0;      // 【新增】清零诊断失败计数
+            diag_retry_count = 0;       // 【新增】清零诊断重试计数
+            reconnect_state = 0;        // 【新增】重置重连状态机
           } else {
+            // 发送失败，累加计数
+            g_send_fail_count++;
             reconnect_count++;
-            // 连续5次发送失败，尝试重连
-            if (reconnect_count >= 5) {
+            
+            RECONNECT_LOG("[MAIN] Send failed, count=%d\r\n", g_send_fail_count);
+            
+            // 【优化】连续2次失败后，启动智能诊断
+            if (g_send_fail_count >= 2 && reconnect_state == 0) {
+              RECONNECT_LOG("[MAIN] Starting connection diagnosis...\r\n");
+              reconnect_state = 1;  // 进入诊断状态
+              last_diag_time = sys_tick_ms;
+            }
+            
+            // 【优化】连续5次失败且未完成重连，强制进入模块复位（终极兜底）
+            if (reconnect_count >= 5 && reconnect_state == 0) {
+              RECONNECT_LOG("[MAIN] Emergency module reset triggered...\r\n");
+              reconnect_state = 4;  // 直接进入模块复位状态
+              reconnect_count = 0;
+            }
+
+            // 【优化】连续5次失败且未完成重连，强制完全重连（保留原有逻辑作为兜底）
+            if (reconnect_count >= 5 && reconnect_state == 0) {
+              RECONNECT_LOG("[MAIN] Emergency full reconnect...\r\n");
               OLED_Clear(0);
               ESP8266_Init(115200);
               reconnect_count = 0;
+              g_send_fail_count = 0;
             }
           }
 
@@ -443,6 +496,133 @@ int main(void) {
             ESP8266_SendData((unsigned char *)data);
             heart_beat_count = 0;
           }
+          
+          /********************************* 【新增】智能重连状态机处理 ************************************/
+          // 非阻塞式重连状态机，在主循环中逐步执行
+          if (reconnect_state > 0) {
+            uint8_t result = 1;  // 默认：重连中
+            
+            switch (reconnect_state) {
+              case 1:  // 诊断阶段
+                {
+                  DiagResult_t diag_result = ESP8266_DiagnoseConnection();
+                  
+                  if (diag_result == DIAG_OK) {
+                    // 诊断通过，连接正常，可能是临时网络拥塞
+                    RECONNECT_LOG("[RECONNECT] Diagnosis OK, network congested\r\n");
+                    reconnect_state = 0;  // 重置状态
+                    g_send_fail_count = 0;
+                  } else if (diag_result == DIAG_TCP_DISCONNECTED) {
+                    // TCP断开，启动TCP重连
+                    RECONNECT_LOG("[RECONNECT] TCP disconnected, starting TCP reconnect\r\n");
+                    reconnect_state = 2;  // 进入TCP重连状态
+                  } else if (diag_result == DIAG_WIFI_DISCONNECTED) {
+                    // WiFi断开，启动WiFi重连
+                    RECONNECT_LOG("[RECONNECT] WiFi disconnected, starting WiFi reconnect\r\n");
+                    reconnect_state = 3;  // 进入WiFi重连状态
+                  } else if (diag_result == DIAG_MODULE_ERROR) {
+                    // 模块异常，需要复位
+                    RECONNECT_LOG("[RECONNECT] Module error, starting reset\r\n");
+                    reconnect_state = 4;  // 进入模块复位状态
+                  }
+                  
+                  diag_retry_count++;
+                  if (diag_retry_count > 3) {
+                    // 诊断超过3次仍未成功，强制进入模块复位
+                    RECONNECT_LOG("[RECONNECT] Diagnosis timeout, triggering module reset\r\n");
+                    reconnect_state = 4;  // 进入模块复位状态
+                    diag_retry_count = 0;
+                  }
+                }
+                break;
+                
+              case 2:  // TCP重连阶段
+                result = ESP8266_TCP_Reconnect();
+                if (result == 0) {
+                  // TCP重连成功
+                  RECONNECT_LOG("[RECONNECT] TCP reconnect SUCCESS\r\n");
+                  reconnect_state = 0;
+                  g_send_fail_count = 0;
+                  reconnect_count = 0;
+                } else if (result == 2) {
+                  // TCP重连失败，升级到WiFi重连
+                  RECONNECT_LOG("[RECONNECT] TCP reconnect failed, upgrading to WiFi reconnect\r\n");
+                  reconnect_state = 3;
+                }
+                // result == 1 表示重连中，继续等待
+                break;
+                
+              case 3:  // WiFi重连阶段
+                result = ESP8266_WIFI_Reconnect();
+                if (result == 0) {
+                  // WiFi重连成功（包含TCP重连）
+                  RECONNECT_LOG("[RECONNECT] WiFi reconnect SUCCESS\r\n");
+                  reconnect_state = 0;
+                  g_send_fail_count = 0;
+                  reconnect_count = 0;
+                } else if (result == 2) {
+                  // WiFi重连失败，升级到模块复位
+                  RECONNECT_LOG("[RECONNECT] WiFi reconnect failed, upgrading to module reset\r\n");
+                  reconnect_state = 4;
+                }
+                break;
+                
+              case 4:  // 模块复位阶段
+                result = ESP8266_Module_Reset();
+                if (result == 0) {
+                  // 模块复位成功
+                  RECONNECT_LOG("[RECONNECT] Module reset SUCCESS\r\n");
+                  reconnect_state = 0;
+                  g_send_fail_count = 0;
+                  reconnect_count = 0;
+                  offline_mode = 0;  // 退出离线模式
+                } else if (result == 2) {
+                  // 模块复位失败，进入离线模式
+                  RECONNECT_LOG("[RECONNECT] Module reset FAILED, entering offline mode\r\n");
+                  offline_mode = 1;  // 进入离线模式
+                  reconnect_state = 0;  // 重置状态机
+                  
+                  // 显示离线提示
+                  OLED_Clear(0);
+                  OLED_ShowCHinese(0, 0, 25);  // 模
+                  OLED_ShowCHinese(18, 0, 26); // 块
+                  OLED_ShowCHinese(36, 0, 29); // 故
+                  OLED_ShowCHinese(54, 0, 30); // 障
+                  OLED_ShowString(0, 3, (u8 *)"Offline Mode", 16);
+                  OLED_ShowString(0, 6, (u8 *)"Auto retry 30s", 16);
+                  
+                  // 记录进入离线模式的时间
+                  last_reconnect_attempt_time = sys_tick_ms;
+                }
+                break;
+                
+              default:
+                reconnect_state = 0;
+                break;
+            }
+          }
+          /********************************* 智能重连状态机处理结束 ************************************/
+          
+          /********************************* 【新增】离线模式周期性重连尝试 ************************************/
+          if (offline_mode) {
+            // 每隔30秒尝试一次完整重连
+            if ((sys_tick_ms - last_reconnect_attempt_time) >= RECONNECT_ATTEMPT_INTERVAL) {
+              RECONNECT_LOG("[OFFLINE] Attempting reconnect...\r\n");
+              
+              // 显示重连尝试提示
+              OLED_Clear(0);
+              OLED_ShowCHinese(0, 0, 56);  // 联
+              OLED_ShowCHinese(18, 0, 57); // 网
+              OLED_ShowCHinese(36, 0, 31); // 尝
+              OLED_ShowCHinese(54, 0, 32); // 试
+              OLED_ShowString(0, 3, (u8 *)"Reconnecting...", 16);
+              
+              // 触发模块复位状态机（非阻塞）
+              reconnect_state = 4;  // 进入模块复位状态
+              last_reconnect_attempt_time = sys_tick_ms;  // 更新计时
+            }
+          }
+          /********************************* 离线模式处理结束 ************************************/
         }
       }
     }
@@ -844,7 +1024,7 @@ int main(void) {
       // 不是有效的业务数据，跳过解析
     } else {
       // 确认为巴法云业务数据，开始解析（全部使用 local_buf）
-      Serial_Printf("检测到云平台指令（本地解析）\r\n");
+      RECONNECT_LOG("检测到云平台指令（本地解析）\r\n");
 
       int parse_count = 0;
 
@@ -853,25 +1033,25 @@ int main(void) {
         sscanf(pos + strlen("wendu_high"), "=%d", &set_wendu_high);
         parse_count++;
         cmd_processed = 1;
-        Serial_Printf("收到温度上限设置\r\n");
+        RECONNECT_LOG("收到温度上限设置\r\n");
       }
       if ((pos = strstr(local_buf, "wendu_low")) != NULL) {
         sscanf(pos + strlen("wendu_low"), "=%d", &set_wendu_low);
         parse_count++;
         cmd_processed = 1;
-        Serial_Printf("收到温度下限设置\r\n");
+        RECONNECT_LOG("收到温度下限设置\r\n");
       }
       if ((pos = strstr(local_buf, "shidu_high")) != NULL) {
         sscanf(pos + strlen("shidu_high"), "=%d", &set_shidu_high);
         parse_count++;
         cmd_processed = 1;
-        Serial_Printf("收到湿度上限设置\r\n");
+        RECONNECT_LOG("收到湿度上限设置\r\n");
       }
       if ((pos = strstr(local_buf, "shidu_low")) != NULL) {
         sscanf(pos + strlen("shidu_low"), "=%d", &set_shidu_low);
         parse_count++;
         cmd_processed = 1;
-        Serial_Printf("收到湿度下限设置\r\n");
+        RECONNECT_LOG("收到湿度下限设置\r\n");
       }
       if (parse_count > 0) {
         config_changed = 1;
@@ -888,7 +1068,7 @@ int main(void) {
         SystemConfig_Save();
         config_changed = 0;
         last_save_time = sys_tick_ms;
-        Serial_Printf("配置已保存到Flash\n\r");
+        RECONNECT_LOG("配置已保存到Flash\n\r");
       }
 
       // 模式切换（使用 local_buf）
@@ -899,7 +1079,7 @@ int main(void) {
         config_changed = 1;
         last_save_time = sys_tick_ms;
         cmd_processed = 1;
-        Serial_Printf("切换到自动模式（远程）\r\n");
+        RECONNECT_LOG("切换到自动模式（远程）\r\n");
       } else if (strstr(local_buf, "SD") != NULL) // 手动模式
       {
         mode = 2;
@@ -907,7 +1087,7 @@ int main(void) {
         config_changed = 1;
         last_save_time = sys_tick_ms;
         cmd_processed = 1;
-        Serial_Printf("切换到手动模式（远程）\r\n");
+        RECONNECT_LOG("切换到手动模式（远程）\r\n");
       }
     }
     // 自动模式逻辑
@@ -946,58 +1126,58 @@ int main(void) {
         jiare = 1;
         zhileng = 0;
         cmd_processed = 1;
-        Serial_Printf("执行：开启加热\r\n");
+        RECONNECT_LOG("执行：开启加热\r\n");
       }
       if (strstr(local_buf, "GJR") != NULL) {
         jiare = 0;
         cmd_processed = 1;
-        Serial_Printf("执行：关闭加热\r\n");
+        RECONNECT_LOG("执行：关闭加热\r\n");
       }
       if (strstr(local_buf, "KZL") != NULL) {
         zhileng = 1;
         jiare = 0;
         cmd_processed = 1;
-        Serial_Printf("执行：开启制冷\r\n");
+        RECONNECT_LOG("执行：开启制冷\r\n");
       }
       if (strstr(local_buf, "GZL") != NULL) {
         zhileng = 0;
         cmd_processed = 1;
-        Serial_Printf("执行：关闭制冷\r\n");
+        RECONNECT_LOG("执行：关闭制冷\r\n");
       }
       if (strstr(local_buf, "KCS") != NULL) {
         chushi = 1;
         jiashi = 0;
         cmd_processed = 1;
-        Serial_Printf("执行：开启除湿\r\n");
+        RECONNECT_LOG("执行：开启除湿\r\n");
       }
       if (strstr(local_buf, "GCS") != NULL) {
         chushi = 0;
         cmd_processed = 1;
-        Serial_Printf("执行：关闭除湿\r\n");
+        RECONNECT_LOG("执行：关闭除湿\r\n");
       }
       if (strstr(local_buf, "KJS") != NULL) {
         jiashi = 1;
         chushi = 0;
         cmd_processed = 1;
-        Serial_Printf("执行：开启加湿\r\n");
+        RECONNECT_LOG("执行：开启加湿\r\n");
       }
       if (strstr(local_buf, "GJS") != NULL) {
         jiashi = 0;
         cmd_processed = 1;
-        Serial_Printf("执行：关闭加湿\r\n");
+        RECONNECT_LOG("执行：关闭加湿\r\n");
       }
     }
 
     // 指令解析完成后统一处理缓冲区清理
     if (cmd_processed == 1) {
       ESP8266_Clear(); // 指令处理完成清空接收与驱动缓冲
-      Serial_Printf("云平台指令已处理，缓冲区已清空\r\n");
+      RECONNECT_LOG("云平台指令已处理，缓冲区已清空\r\n");
     } else {
       // 若应用层缓存接近满，为防止堵塞，清理驱动层或应用层
       __disable_irq();
       if (esp8266_cnt > buf_len - 50) {
         ESP8266_Clear();
-        Serial_Printf("缓冲区接近满，已清理\r\n");
+        RECONNECT_LOG("缓冲区接近满，已清理\r\n");
       }
       __enable_irq();
     }
@@ -1158,7 +1338,7 @@ void SystemConfig_Init(void) {
     set_shidu_low = system_config.humidity_low / 10;
     mode = system_config.work_mode;
 
-    Serial_Printf("从Flash读取配置成功\n\r");
+    RECONNECT_LOG("从Flash读取配置成功\n\r");
   } else {
     // 使用默认配置
     system_config.temperature_high = DEFAULT_TEMP_HIGH;
@@ -1175,7 +1355,7 @@ void SystemConfig_Init(void) {
     set_shidu_low = system_config.humidity_low / 10;
     mode = system_config.work_mode;
 
-    Serial_Printf("使用默认配置\n\r");
+    RECONNECT_LOG("使用默认配置\n\r");
   }
 }
 

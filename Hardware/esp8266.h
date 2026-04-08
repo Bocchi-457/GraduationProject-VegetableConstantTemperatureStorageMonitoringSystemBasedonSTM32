@@ -20,6 +20,31 @@
 #define buf_len 256 // 串口接收缓冲区总长度
 
 /**
+ * 【新增】ESP8266连接状态枚举
+ */
+typedef enum {
+  CONN_STATE_IDLE = 0,      // 空闲状态
+  CONN_STATE_WIFI_CONNECTING,   // WiFi连接中
+  CONN_STATE_TCP_CONNECTING,    // TCP连接中
+  CONN_STATE_CONNECTED,         // 已连接（正常）
+  CONN_STATE_TCP_LOST,          // TCP断开
+  CONN_STATE_WIFI_LOST,         // WiFi断开
+  CONN_STATE_MODULE_ERROR,      // 模块异常
+  CONN_STATE_RECONNECTING       // 重连中
+} ConnState_t;
+
+/**
+ * 【新增】网络诊断结果枚举
+ */
+typedef enum {
+  DIAG_OK = 0,              // 诊断通过，连接正常
+  DIAG_NETWORK_CONGESTED,   // 网络拥塞
+  DIAG_TCP_DISCONNECTED,    // TCP连接断开
+  DIAG_WIFI_DISCONNECTED,   // WiFi断开
+  DIAG_MODULE_ERROR         // 模块异常
+} DiagResult_t;
+
+/**
  * 串口选择定义
  */
 #define Bemfa_USART1 0 // 使用USART1
@@ -88,6 +113,13 @@ extern uint8_t
 extern uint16_t ESP8266_RecvLen; // 驱动层缓冲区数据长度
 
 /**
+ * 【新增】全局连接状态和诊断变量
+ */
+extern volatile ConnState_t g_conn_state;     // 当前连接状态
+extern uint8_t g_send_fail_count;             // 连续发送失败计数
+extern uint32_t g_last_reconnect_time;        // 上次重连时间戳（用于防抖）
+
+/**
  * ESP8266函数声明
  */
 void ESP8266_Clear(void); // 清空ESP8266接收缓冲区
@@ -101,8 +133,18 @@ void Usart_SendString(USART_TypeDef *USARTx, unsigned char *str,
 
 uint8_t ESP8266_SendData(unsigned char *data); // 发送数据到巴法云
 
-void ESP8266_Init(unsigned int bound); // ESP8266初始化
+void ESP8266_Init(unsigned int bound); // ESP8266初始化（仅上电时调用）
 
 void USART2_IRQHandler(void); // USART2中断处理函数
+
+/**
+ * 【新增】连接状态诊断与重连函数声明
+ */
+DiagResult_t ESP8266_DiagnoseConnection(void);  // 诊断连接状态
+uint8_t ESP8266_TCP_Reconnect(void);            // TCP层重连（非阻塞，需多次调用）
+uint8_t ESP8266_WIFI_Reconnect(void);           // WiFi层重连（非阻塞，需多次调用）
+uint8_t ESP8266_Module_Reset(void);             // 模块复位重连（非阻塞，需多次调用）
+ConnState_t ESP8266_GetConnState(void);         // 获取当前连接状态
+void ESP8266_UpdateConnState(ConnState_t state); // 更新连接状态
 
 #endif // _ESP8266_H_
