@@ -54,4 +54,10 @@ void DHT22_Rst(void);                             // 发送复位/起始信号
 uint8_t Read_DHT22(DHT22_Data_TypeDef *data);     // 读取温湿度数据
 uint8_t DHT22_CheckSum(DHT22_Data_TypeDef *data); // 校验和验证
 
+/**
+ * 全局变量声明（DHT22数据结构）
+ * @note 实际定义在dht22.c中，其他模块通过extern访问
+ */
+extern DHT22_Data_TypeDef DHT22_Data;
+
 #endif

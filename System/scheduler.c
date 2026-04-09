@@ -6,7 +6,7 @@
  */
 
 #include "scheduler.h"
-#include "../Hardware/Timer.h"  // sys_tick_ms
+#include "Timer.h"  // sys_tick_ms
 #include <string.h>
 
 /**
@@ -57,8 +57,11 @@ uint8_t Scheduler_Register(TaskFunc_t func, uint32_t interval) {
  * @brief 注销任务
  */
 void Scheduler_Unregister(uint8_t task_id) {
-    if (task_id >= task_count) {
-        return;  // 无效任务ID
+    if (task_id >= MAX_TASKS) {  // 改为检查最大容量
+        return;
+    }
+    if (tasks[task_id].func == NULL) {
+        return;  // 任务已注销或从未注册
     }
     
     // 标记为禁用

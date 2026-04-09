@@ -10,6 +10,12 @@
 #include "delay.h"
 
 /**
+ * DHT22数据结构全局变量（唯一实例）
+ * @note 其他模块通过extern访问，遵循单一定义原则
+ */
+DHT22_Data_TypeDef DHT22_Data = {0};
+
+/**
  * 发送复位/起始信号
  * 时序：拉低≥800us，典型值1ms
  */

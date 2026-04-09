@@ -147,4 +147,66 @@ uint8_t ESP8266_Module_Reset(void);             // 模块复位重连（非阻�
 ConnState_t ESP8266_GetConnState(void);         // 获取当前连接状态
 void ESP8266_UpdateConnState(ConnState_t state); // 更新连接状态
 
+/**
+ * AT指令非阻塞执行状态枚举
+ */
+typedef enum {
+    AT_STATE_IDLE = 0,      // 空闲
+    AT_STATE_SENDING_CMD,   // 发送AT指令中
+    AT_STATE_WAITING_ACK,   // 等待响应
+    AT_STATE_SENDING_DATA,  // 发送数据阶段（CIPSEND两阶段）
+    AT_STATE_DONE,          // 完成
+    AT_STATE_TIMEOUT,       // 超时
+    AT_STATE_ERROR          // 错误
+} AT_State_t;
+
+/**
+ * AT指令执行结果
+ */
+typedef enum {
+    AT_RESULT_OK = 0,       // 成功
+    AT_RESULT_BUSY,         // 忙（正在执行其他AT指令）
+    AT_RESULT_TIMEOUT,      // 超时
+    AT_RESULT_ERROR,        // 错误
+    AT_RESULT_IN_PROGRESS   // 进行中
+} AT_Result_t;
+
+/**
+ * @brief 初始化AT指令非阻塞执行器
+ * @note 在ESP8266_Init之后调用
+ */
+void AT_Executor_Init(void);
+
+/**
+ * @brief 非阻塞执行AT指令（无数据阶段）
+ * @param cmd: AT指令字符串（如"AT\r\n"）
+ * @param expected_ack: 期望的响应关键字（如"OK"）
+ * @param timeout_ms: 超时时间（毫秒）
+ * @return AT_Result_t
+ * @note 需周期性调用直到返回非AT_RESULT_IN_PROGRESS
+ */
+AT_Result_t AT_Execute_NonBlocking(const char *cmd, const char *expected_ack, uint32_t timeout_ms);
+
+/**
+ * @brief 非阻塞执行AT+CIPSEND两阶段发送
+ * @param data: 要发送的数据
+ * @param len: 数据长度
+ * @param timeout_ms: 超时时间（毫秒）
+ * @return AT_Result_t
+ * @note 阶段1: 发送"AT+CIPSEND=len"，等待">"
+ *       阶段2: 发送数据，等待"SEND OK"
+ */
+AT_Result_t AT_SendData_NonBlocking(const uint8_t *data, uint16_t len, uint32_t timeout_ms);
+
+/**
+ * @brief 获取当前AT执行状态
+ */
+AT_State_t AT_GetState(void);
+
+/**
+ * @brief 强制重置AT执行器状态
+ * @note 用于异常情况下的状态恢复
+ */
+void AT_Reset(void);
+
 #endif // _ESP8266_H_

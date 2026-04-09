@@ -1,8 +1,17 @@
-#ifndef __NETWORK_MANAGER_H
-#define __NETWORK_MANAGER_H
+#ifndef __NETWORK_MANAGER_H__
+#define __NETWORK_MANAGER_H__
 
+#include "esp8266.h"
 #include <stdint.h>
-#include "../Hardware/esp8266.h"
+
+/**
+ * 【调试开关】网络管理模块日志控制
+ * 生产环境建议设置为0以提升性能
+ * ⚠️ 必须在包含此头文件之前定义，或在项目配置中定义
+ */
+#ifndef DEBUG_NETWORK
+  #define DEBUG_NETWORK  1  // 1=启用日志, 0=禁用日志
+#endif
 
 /**
  * 网络状态枚举
@@ -16,19 +25,31 @@ typedef enum {
 } NetworkState_t;
 
 /**
+ * 云端指令类型枚举
+ */
+typedef enum {
+    CMD_NONE = 0,           // 无指令
+    CMD_AUTO_MODE,          // 自动模式 ZD:0/1
+    CMD_MANUAL_MODE,        // 手动模式 SD:0/1
+    CMD_HEATER,             // 加热控制 KJR:0/1
+    CMD_COOLER,             // 制冷控制 LZ:0/1
+    CMD_DEHUMIDIFIER,       // 除湿控制 CS:0/1
+    CMD_HUMIDIFIER,         // 加湿控制 JS:0/1
+    CMD_TEMP_HIGH,          // 温度上限 TH:xxx
+    CMD_TEMP_LOW,           // 温度下限 TL:xxx
+    CMD_HUM_HIGH,           // 湿度上限 HH:xxx
+    CMD_HUM_LOW             // 湿度下限 HL:xxx
+} CommandType_t;
+
+/**
  * 云端指令结构体
  */
 typedef struct {
-    uint8_t mode;           // 模式：1=自动, 2=手动
-    int16_t wendu_high;     // 温度上限
-    int16_t wendu_low;      // 温度下限
-    int16_t shidu_high;     // 湿度上限
-    int16_t shidu_low;      // 湿度下限
-    uint8_t jiare;          // 加热：0=关, 1=开
-    uint8_t zhileng;        // 制冷：0=关, 1=开
-    uint8_t jiangshi;       // 降湿：0=关, 1=开
-    uint8_t zhaoming;       // 照明：0=关, 1=开
-    uint8_t valid;          // 指令有效标志
+    CommandType_t type;     // 指令类型
+    int16_t value;          // 指令值
+#if DEBUG_NETWORK
+    char payload[64];       // 原始载荷（仅调试模式，节省RAM）
+#endif
 } CloudCommand_t;
 
 /**
@@ -38,11 +59,10 @@ typedef struct {
 void Network_Manager_Init(void);
 
 /**
- * @brief 网络任务调度（需在主循环中周期性调用）
- * @return 当前网络状态
- * @note 非阻塞，每次调用只执行少量工作
+ * @brief 网络任务调度（非阻塞，每50ms执行一次）
+ * @note 此函数被调度器调用，返回类型为void
  */
-NetworkState_t Network_Task(void);
+void Network_Task(void);
 
 /**
  * @brief 获取当前网络状态

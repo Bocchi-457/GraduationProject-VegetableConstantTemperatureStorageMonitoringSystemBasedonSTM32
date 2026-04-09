@@ -10,14 +10,21 @@
 #include "stm32f10x.h" // Device header
 
 
-char TIMER_IT = 0; // 定时器中断标志
+char TIMER_IT = 0;                      // 定时器中断标志
+
+/**
+ * 全局毫秒计数器（由TIM2中断每10ms递增）
+ * @note 其他模块通过extern访问，遵循单一定义原则
+ */
+volatile uint32_t sys_tick_ms = 0;      // 全局毫秒计数器
 
 /**
  * @brief 初始化定时器
  * @param 无
  * @return 无
- * @note 初始化TIM2定时器，配置为1毫秒中断一次
- *       时钟频率：72MHz / 72 / 1000 = 1kHz
+ * @note 初始化TIM2定时器，配置为10毫秒中断一次
+ *       时钟频率：72MHz / 7200 / 100 = 100Hz (10ms)
+ *       PSC=7200-1, ARR=100-1 → 72MHz/(7200*100) = 100Hz
  */
 void Timer_Init(void) {
   TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure;
@@ -34,14 +41,10 @@ void Timer_Init(void) {
       TIM_CKD_DIV1; // 时钟分频，选择不分频
   TIM_TimeBaseInitStructure.TIM_CounterMode =
       TIM_CounterMode_Up; // 计数器模式，选择向上计数
-  // TIM_TimeBaseInitStructure.TIM_Period = 1000 - 1;                    //
-  // 计数周期，即ARR的值，定时1ms TIM_TimeBaseInitStructure.TIM_Prescaler = 72 -
-  // 1;                   // 预分频器，即PSC的值 时钟频率 72MHz。预分频设为
-  // 7200-1，则定时器频率为 10kHz (0.1ms)
-
-  // 计数周期设为 20000-1，则 20000 * 0.1ms = 2000ms = 2秒
-  TIM_TimeBaseInitStructure.TIM_Period = 20000 - 1;   // ARR
-  TIM_TimeBaseInitStructure.TIM_Prescaler = 7200 - 1; // PSC
+  
+  // ✅ 修改为10ms周期：72MHz / 7200 / 100 = 100Hz (10ms)
+  TIM_TimeBaseInitStructure.TIM_Period = 100 - 1;    // ARR = 100
+  TIM_TimeBaseInitStructure.TIM_Prescaler = 7200 - 1; // PSC = 7200
 
   TIM_TimeBaseInitStructure.TIM_RepetitionCounter =
       0; // 重复计数器，高级定时器才会用到
@@ -72,8 +75,8 @@ void Timer_Init(void) {
 
 void TIM2_IRQHandler(void) {
   if (TIM_GetITStatus(TIM2, TIM_IT_Update) == SET) {
-    TIMER_IT = 1;        // 标志位，每2秒置1一次
-    sys_tick_ms += 2000; // 每2秒增加2000毫秒
+    TIMER_IT = 1;       // 标志位，每10ms置1一次
+    sys_tick_ms += 10;  // ✅ 每10毫秒增加10毫秒
     TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
   }
 }

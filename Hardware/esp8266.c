@@ -112,8 +112,9 @@ static void ESP8266_USART_Init(unsigned int bound) {
 
   // 5. 配置中断（接收中断）
   NVIC_InitStruct.NVIC_IRQChannel = USART2_IRQn;
-  NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 3; // 抢占优先级3
-  NVIC_InitStruct.NVIC_IRQChannelSubPriority = 3;        // 子优先级3
+  // ✅ 提升优先级至(2,2)，确保网络数据接收实时性，与DHT22读取兼容
+  NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 2; // 抢占优先级2
+  NVIC_InitStruct.NVIC_IRQChannelSubPriority = 2;        // 子优先级2
   NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
   NVIC_Init(&NVIC_InitStruct);
 
