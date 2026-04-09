@@ -393,7 +393,7 @@ uint8_t ESP8266_SendData(unsigned char *data) {
       if (retry_count < MAX_RETRY) {
         retry_count++;
         RECONNECT_LOG("[SEND] Retry %d/%d...\r\n", retry_count, MAX_RETRY);
-        delay_ms(500);  // 短暂延时后重试
+        delay_ms(50);  // 短暂延时后重试
         continue;  // 重试
       }
       
@@ -419,7 +419,7 @@ uint8_t ESP8266_SendData(unsigned char *data) {
       if (retry_count < MAX_RETRY) {
         retry_count++;
         RECONNECT_LOG("[SEND] Retry %d/%d...\r\n", retry_count, MAX_RETRY);
-        delay_ms(500);
+        delay_ms(50);
         continue;  // 重试
       }
       

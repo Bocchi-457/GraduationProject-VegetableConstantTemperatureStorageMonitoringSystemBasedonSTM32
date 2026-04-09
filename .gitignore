@@ -2,6 +2,7 @@
 OUTPUT/
 OBJ/
 参考资料/
+.lingma/
 
 # 二进制文件
 *.hex
@@ -47,3 +48,5 @@ Thumbs.db
 
 *.deb
 Objects/project_Target_1.dep
+
+

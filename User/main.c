@@ -160,7 +160,7 @@ uint32_t reconnect_start_time = 0;      // 重连开始时间
  */
 uint8_t offline_mode = 0;               // 离线模式标志 (0=在线, 1=离线)
 uint32_t last_reconnect_attempt_time = 0;  // 上次重连尝试时间
-#define RECONNECT_ATTEMPT_INTERVAL 30000  // 离线模式下重连尝试间隔（30秒）
+#define RECONNECT_ATTEMPT_INTERVAL 120000  // 离线模式下重连尝试间隔（120秒）
 
 /**
  * OLED显示相关变量
@@ -216,25 +216,38 @@ uint8_t Is_Bemfa_Data(const char *buf) {
     return 0;
 
   // 巴法云协议特征：包含cmd=参数
-  if (strstr(buf, "cmd=") != NULL)
-    return 1;
+  // if (strstr(buf, "cmd=") != NULL)
+  //   return 1;
 
   // 或者直接包含控制指令（ZD/SD/KJR等）
   // 但需要排除AT响应中的误匹配
-  if (!Is_AT_Response(buf)) {
-    if (strstr(buf, "ZD") != NULL || strstr(buf, "SD") != NULL)
-      return 1;
-    if (strstr(buf, "KJR") != NULL || strstr(buf, "GJR") != NULL)
-      return 1;
-    if (strstr(buf, "KZL") != NULL || strstr(buf, "GZL") != NULL)
-      return 1;
-    if (strstr(buf, "KCS") != NULL || strstr(buf, "GCS") != NULL)
-      return 1;
-    if (strstr(buf, "KJS") != NULL || strstr(buf, "GJS") != NULL)
-      return 1;
-    if (strstr(buf, "wendu_") != NULL || strstr(buf, "shidu_") != NULL)
-      return 1;
-  }
+  // if (!Is_AT_Response(buf)) {
+  //   if (strstr(buf, "ZD") != NULL || strstr(buf, "SD") != NULL)
+  //     return 1;
+  //   if (strstr(buf, "KJR") != NULL || strstr(buf, "GJR") != NULL)
+  //     return 1;
+  //   if (strstr(buf, "KZL") != NULL || strstr(buf, "GZL") != NULL)
+  //     return 1;
+  //   if (strstr(buf, "KCS") != NULL || strstr(buf, "GCS") != NULL)
+  //     return 1;
+  //   if (strstr(buf, "KJS") != NULL || strstr(buf, "GJS") != NULL)
+  //     return 1;
+  //   if (strstr(buf, "wendu_") != NULL || strstr(buf, "shidu_") != NULL)
+  //     return 1;
+  // }
+
+  if (strstr(buf, "ZD") != NULL || strstr(buf, "SD") != NULL)
+    return 1;
+  if (strstr(buf, "KJR") != NULL || strstr(buf, "GJR") != NULL)
+    return 1;
+  if (strstr(buf, "KZL") != NULL || strstr(buf, "GZL") != NULL)
+    return 1;
+  if (strstr(buf, "KCS") != NULL || strstr(buf, "GCS") != NULL)
+    return 1;
+  if (strstr(buf, "KJS") != NULL || strstr(buf, "GJS") != NULL)
+    return 1;
+  if (strstr(buf, "wendu_") != NULL || strstr(buf, "shidu_") != NULL)
+    return 1;
 
   return 0;
 }
@@ -463,8 +476,8 @@ int main(void) {
             
             RECONNECT_LOG("[MAIN] Send failed, count=%d\r\n", g_send_fail_count);
             
-            // 【优化】连续2次失败后，启动智能诊断
-            if (g_send_fail_count >= 2 && reconnect_state == 0) {
+            // 【优化】连续3次失败后，启动智能诊断
+            if (g_send_fail_count >= 3 && reconnect_state == 0) {
               RECONNECT_LOG("[MAIN] Starting connection diagnosis...\r\n");
               reconnect_state = 1;  // 进入诊断状态
               last_diag_time = sys_tick_ms;
@@ -477,14 +490,14 @@ int main(void) {
               reconnect_count = 0;
             }
 
-            // 【优化】连续5次失败且未完成重连，强制完全重连（保留原有逻辑作为兜底）
-            if (reconnect_count >= 5 && reconnect_state == 0) {
-              RECONNECT_LOG("[MAIN] Emergency full reconnect...\r\n");
-              OLED_Clear(0);
-              ESP8266_Init(115200);
-              reconnect_count = 0;
-              g_send_fail_count = 0;
-            }
+            // // 【优化】连续5次失败且未完成重连，强制完全重连（保留原有逻辑作为兜底）
+            // if (reconnect_count >= 5 && reconnect_state == 0) {
+            //   RECONNECT_LOG("[MAIN] Emergency full reconnect...\r\n");
+            //   OLED_Clear(0);
+            //   ESP8266_Init(115200);
+            //   reconnect_count = 0;
+            //   g_send_fail_count = 0;
+            // }
           }
 
           // 定期发送心跳包
@@ -583,13 +596,9 @@ int main(void) {
                   reconnect_state = 0;  // 重置状态机
                   
                   // 显示离线提示
-                  OLED_Clear(0);
-                  OLED_ShowCHinese(0, 0, 25);  // 模
-                  OLED_ShowCHinese(18, 0, 26); // 块
-                  OLED_ShowCHinese(36, 0, 29); // 故
-                  OLED_ShowCHinese(54, 0, 30); // 障
-                  OLED_ShowString(0, 3, (u8 *)"Offline Mode", 16);
-                  OLED_ShowString(0, 6, (u8 *)"Auto retry 30s", 16);
+                  // OLED_Clear(0);
+                  // OLED_ShowString(0, 0, (u8 *)"Offline Mode", 16);
+                  // OLED_ShowString(0, 3, (u8 *)"Auto retry 30s", 16);
                   
                   // 记录进入离线模式的时间
                   last_reconnect_attempt_time = sys_tick_ms;
@@ -605,17 +614,14 @@ int main(void) {
           
           /********************************* 【新增】离线模式周期性重连尝试 ************************************/
           if (offline_mode) {
-            // 每隔30秒尝试一次完整重连
+            // 每隔120秒尝试一次完整重连
             if ((sys_tick_ms - last_reconnect_attempt_time) >= RECONNECT_ATTEMPT_INTERVAL) {
               RECONNECT_LOG("[OFFLINE] Attempting reconnect...\r\n");
               
               // 显示重连尝试提示
-              OLED_Clear(0);
-              OLED_ShowCHinese(0, 0, 56);  // 联
-              OLED_ShowCHinese(18, 0, 57); // 网
-              OLED_ShowCHinese(36, 0, 31); // 尝
-              OLED_ShowCHinese(54, 0, 32); // 试
-              OLED_ShowString(0, 3, (u8 *)"Reconnecting...", 16);
+              // OLED_Clear(0);
+              // OLED_ShowString(0, 0, (u8 *)"WiFi and Bemfa", 16);
+              // OLED_ShowString(0, 3, (u8 *)"Reconnecting...", 16);
               
               // 触发模块复位状态机（非阻塞）
               reconnect_state = 4;  // 进入模块复位状态
