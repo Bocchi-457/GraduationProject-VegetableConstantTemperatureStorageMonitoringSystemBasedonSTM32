@@ -7,10 +7,11 @@
 
 #include "network_manager.h"
 #include "esp8266.h"
+#include "control_task.h"  // ✅ 新增：访问g_temp_high等全局变量和阈值设置函数
 #include "Timer.h"  // sys_tick_ms
 #include <string.h>
 #include <stdio.h>
-#include <stdlib.h>  // abs()
+#include <stdlib.h>  // abs(), atof()
 
 #if DEBUG_NETWORK
   #include "Usart.h"  // Serial_Printf
@@ -56,13 +57,15 @@ static void Parse_Cloud_Command(void);
  */
 void Network_Manager_Init(void) {
     // ESP8266硬件初始化（仅上电调用一次）
+    // ⚠️ 注意：ESP8266_Init是阻塞式的，会完成WiFi连接、TCP连接、主题订阅
     ESP8266_Init(115200);
     
     // ✅ 初始化AT非阻塞执行器
     AT_Executor_Init();
     
-    // 初始化状态
-    g_net_state = NET_CONNECTING;
+    // ✅ 关键修复：ESP8266_Init成功后，直接设置为已连接状态
+    // 避免立即进入重连状态机导致不必要的诊断
+    g_net_state = NET_CONNECTED;
     g_reconnect_step = 0;
     g_send_fail_count = 0;
     g_cmd_available = 0;
@@ -72,7 +75,7 @@ void Network_Manager_Init(void) {
     g_time_sync_state = 0;
     g_synced_time[0] = '\0';
     
-    NETWORK_LOG("[INFO] Network manager initialized\r\n");
+    NETWORK_LOG("[INFO] Network manager initialized (CONNECTED)\r\n");
 }
 
 /**
@@ -180,14 +183,16 @@ uint8_t Network_UploadSensorData(int16_t temp_x10, int16_t hum_x10,
     char data[256];
     
     // 构建巴法云数据包（与旧代码格式完全兼容）
-    // sprintf的%d格式符自动处理负号，无需手动判断
+    // ✅ 关键修复：阈值需要除以10，因为内部存储是放大10倍的值
     sprintf(data, 
         "cmd=2&uid=%s&topic=data&msg=Mode:%d th:%d tl:%d hh:%d hl:%d "
         "jr:%d zl:%d cs:%d js:%d temp:%d.%d humi:%d.%d\r\n",
         BEMFA_ID,
         mode,
-        wendu_high, wendu_low,
-        shidu_high, shidu_low,
+        wendu_high / 10,    // ✅ 修复：250 → 25
+        wendu_low / 10,     // ✅ 修复：200 → 20
+        shidu_high / 10,    // ✅ 修复：650 → 65
+        shidu_low / 10,     // ✅ 修复：500 → 50
         jiare, zhileng, chushi, jiashi,
         temp_x10 / 10,           // ✅ 自动处理负号
         abs(temp_x10) % 10,      // 取绝对值的个位
@@ -338,6 +343,11 @@ static void Reconnect_StateMachine(void) {
                 // 使用AT+CIPSTATUS诊断
                 result = AT_Execute_NonBlocking("AT+CIPSTATUS\r\n", "STATUS:", 2000);
                 
+                // ✅ 关键修复：如果正在等待响应，立即返回，不要重置状态机
+                if (result == AT_RESULT_IN_PROGRESS) {
+                    return;  // 等待下次调度
+                }
+                
                 if (result == AT_RESULT_OK) {
                     // 检查响应中是否包含"STATUS:2"或"STATUS:3"（已连接）
                     if (strstr((char *)ESP8266_RecvBuf, "STATUS:2") != NULL ||
@@ -355,21 +365,30 @@ static void Reconnect_StateMachine(void) {
                     NETWORK_LOG("[ERR] Diagnosis timeout\r\n");
                     g_reconnect_step = 4;  // 直接进入WiFi检测
                 }
-                // result == IN_PROGRESS 时继续等待
             }
             break;
             
-        case 1:  // TCP层重连
+        case 1:  // TCP层重连 - 步骤1：关闭连接
             {
                 NETWORK_LOG("[RECONNECT] TCP layer reconnecting (retry=%d)...\r\n", g_reconnect_retry_count);
                 
                 // 步骤1.1: 关闭当前连接
                 result = AT_Execute_NonBlocking("AT+CIPCLOSE\r\n", "CLOSED", 2000);
-                if (result == AT_RESULT_IN_PROGRESS) return;  // ✅ 等待完成
-                if (result != AT_RESULT_OK) {
-                    NETWORK_LOG("[WARN] CIPCLOSE failed, continue anyway\r\n");
-                }
                 
+                if (result == AT_RESULT_IN_PROGRESS) {
+                    return;  // ✅ 等待完成
+                } else if (result == AT_RESULT_OK) {
+                    NETWORK_LOG("[OK] Connection closed\r\n");
+                    g_reconnect_step = 6;  // ✅ 进入子步骤：建立新连接
+                } else {
+                    NETWORK_LOG("[WARN] CIPCLOSE failed, continue anyway\r\n");
+                    g_reconnect_step = 6;  // 即使失败也尝试重新连接
+                }
+            }
+            break;
+            
+        case 6:  // TCP层重连 - 步骤2：建立新连接
+            {
                 // 步骤1.2: 重新建立TCP连接
                 static char connect_cmd[128];  // ✅ 使用static避免栈溢出
                 sprintf(connect_cmd, "AT+CIPSTART=\"TCP\",\"bemfa.com\",8344\r\n");
@@ -388,7 +407,10 @@ static void Reconnect_StateMachine(void) {
                         g_reconnect_step = 4;  // 进入WiFi检测
                         g_reconnect_retry_count = 0;
                     }
-                    // 否则继续重试（保持step=1）
+                    // 否则继续重试（回到case 1）
+                    else {
+                        g_reconnect_step = 1;
+                    }
                 } else {
                     // ERROR或其他异常
                     NETWORK_LOG("[ERR] TCP reconnect error\r\n");
@@ -516,10 +538,16 @@ static void Reconnect_StateMachine(void) {
                     return;  // ✅ 等待响应
                 } else if (result == AT_RESULT_OK) {
                     NETWORK_LOG("[OK] Module reset triggered\r\n");
+                    
+                    // ✅ 关键修复：立即更新时间戳，防止重复触发
+                    g_last_reconnect_time = sys_tick_ms;
+                    
                     g_reconnect_step = 8;
                     g_reconnect_start_time = sys_tick_ms;
                 } else {
                     NETWORK_LOG("[ERR] Reset command failed, retry later\r\n");
+                    // ✅ 关键修复：即使失败也更新时间戳，避免无限重试
+                    g_last_reconnect_time = sys_tick_ms;
                     // 保持当前状态，下次继续尝试
                 }
             }
@@ -594,6 +622,19 @@ static void Parse_Cloud_Command(void) {
     payload_start = strstr((char *)esp8266_buf, "msg=");
     
     if (payload_start == NULL) {
+        // ✅ 关键修复：如果没有找到msg=，检查是否是分片数据
+        // 如果缓冲区包含部分关键字（如wend/shidu/ZD/SD等），保留等待完整数据
+        if (strstr((char *)esp8266_buf, "wend") != NULL || 
+            strstr((char *)esp8266_buf, "shidu") != NULL ||
+            strstr((char *)esp8266_buf, "ZD") != NULL ||
+            strstr((char *)esp8266_buf, "SD") != NULL ||
+            strstr((char *)esp8266_buf, "KJR") != NULL ||
+            strstr((char *)esp8266_buf, "GJR") != NULL) {
+            // 可能是分片数据，保留缓冲区等待下次接收
+            NETWORK_LOG("[DEBUG] Incomplete data, waiting for more...\r\n");
+            return;
+        }
+        
         // 无有效载荷，清空缓冲区
         NETWORK_LOG("[DEBUG] No valid payload, clearing buffer\r\n");
         memset(esp8266_buf, 0, esp8266_cnt);
@@ -633,6 +674,232 @@ static void Parse_Cloud_Command(void) {
         esp8266_cnt = 0;
         return;
     }
+    
+    // ===== 【新增】优先尝试解析旧格式（巴法云标准格式）=====
+    // ✅ 实际格式：wendu_low=20.0;wendu_high=25.0;shidu_low=50.0;shidu_high=64.0
+    // 分隔符为分号;，数值为浮点数
+    
+    // ✅ 关键修复：过滤自己上传的数据回显
+    // 上传格式：Mode:1 th:25 tl:20 hh:65 hl:50 jr:0 zl:0 cs:0 js:0 temp:24.3 humi:59.2
+    if (strstr(payload_start, "Mode:") != NULL && strstr(payload_start, "th:") != NULL) {
+        // 这是自己上传的数据回显，直接忽略
+        NETWORK_LOG("[DEBUG] Ignoring own upload data echo\r\n");
+        memset(esp8266_buf, 0, esp8266_cnt);
+        esp8266_cnt = 0;
+        return;
+    }
+    
+    // ✅ 调试：输出完整载荷内容
+    if (strstr(payload_start, "wendu") != NULL || strstr(payload_start, "shidu") != NULL ||
+        strstr(payload_start, "ZD") != NULL || strstr(payload_start, "SD") != NULL) {
+        NETWORK_LOG("[DEBUG] Payload: %.*s\r\n", payload_len, payload_start);
+    }
+    
+    // ===== 解析复合阈值消息（一次性包含四个阈值）=====
+    // 格式：wendu_high=25.0;wendu_low=20.0;shidu_high=64.0;shidu_low=50.0
+    if (strstr(payload_start, "wendu_high=") != NULL || 
+        strstr(payload_start, "wendu_low=") != NULL ||
+        strstr(payload_start, "shidu_high=") != NULL ||
+        strstr(payload_start, "shidu_low=") != NULL) {
+        
+        int temp_high_found = 0, temp_low_found = 0;
+        int humid_high_found = 0, humid_low_found = 0;
+        int16_t temp_high_val = 0, temp_low_val = 0;
+        int16_t humid_high_val = 0, humid_low_val = 0;
+        
+        // 解析温度上限 wendu_high=25.0
+        char *pos = strstr(payload_start, "wendu_high=");
+        if (pos != NULL) {
+            pos += 11;  // 跳过"wendu_high="
+            float fval = atof(pos);  // ✅ 使用atof解析浮点数
+            
+            // ✅ 关键修复：先校验浮点数范围，再转换
+            if (fval >= -40.0f && fval <= 80.0f) {
+                temp_high_val = (int16_t)(fval * 10.0f);  // ✅ 直接乘以10保留精度（如25.5→255）
+                temp_high_found = 1;
+                NETWORK_LOG("[PARSED] Temp high: %.1f -> %d\r\n", fval, temp_high_val);
+            } else {
+                NETWORK_LOG("[ERR] Temp high out of range: %.1f (valid: -40.0~80.0)\r\n", fval);
+            }
+        }
+        
+        // 解析温度下限 wendu_low=20.0
+        pos = strstr(payload_start, "wendu_low=");
+        if (pos != NULL) {
+            pos += 10;  // 跳过"wendu_low="
+            float fval = atof(pos);
+            
+            // ✅ 先校验浮点数范围
+            if (fval >= -40.0f && fval <= 80.0f) {
+                temp_low_val = (int16_t)(fval * 10.0f);
+                temp_low_found = 1;
+                NETWORK_LOG("[PARSED] Temp low: %.1f -> %d\r\n", fval, temp_low_val);
+            } else {
+                NETWORK_LOG("[ERR] Temp low out of range: %.1f (valid: -40.0~80.0)\r\n", fval);
+            }
+        }
+        
+        // 解析湿度上限 shidu_high=64.0
+        pos = strstr(payload_start, "shidu_high=");
+        if (pos != NULL) {
+            pos += 11;  // 跳过"shidu_high="
+            float fval = atof(pos);
+            
+            // ✅ 先校验浮点数范围
+            if (fval >= 0.0f && fval <= 100.0f) {
+                humid_high_val = (int16_t)(fval * 10.0f);
+                humid_high_found = 1;
+                NETWORK_LOG("[PARSED] Humid high: %.1f -> %d\r\n", fval, humid_high_val);
+            } else {
+                NETWORK_LOG("[ERR] Humid high out of range: %.1f (valid: 0.0~100.0)\r\n", fval);
+            }
+        }
+        
+        // 解析湿度下限 shidu_low=50.0
+        pos = strstr(payload_start, "shidu_low=");
+        if (pos != NULL) {
+            pos += 10;  // 跳过"shidu_low="
+            float fval = atof(pos);
+            
+            // ✅ 先校验浮点数范围
+            if (fval >= 0.0f && fval <= 100.0f) {
+                humid_low_val = (int16_t)(fval * 10.0f);
+                humid_low_found = 1;
+                NETWORK_LOG("[PARSED] Humid low: %.1f -> %d\r\n", fval, humid_low_val);
+            } else {
+                NETWORK_LOG("[ERR] Humid low out of range: %.1f (valid: 0.0~100.0)\r\n", fval);
+            }
+        }
+        
+        // ✅ 批量设置阈值（只有当至少有一个有效值时才设置）
+        if (temp_high_found || temp_low_found || humid_high_found || humid_low_found) {
+            // 使用当前值作为默认值，避免覆盖未下发的阈值
+            int16_t final_temp_high = temp_high_found ? temp_high_val : g_temp_high;
+            int16_t final_temp_low = temp_low_found ? temp_low_val : g_temp_low;
+            int16_t final_humid_high = humid_high_found ? humid_high_val : g_humid_high;
+            int16_t final_humid_low = humid_low_found ? humid_low_val : g_humid_low;
+            
+            // 验证合理性
+            if (final_temp_high > final_temp_low && final_humid_high > final_humid_low) {
+                Control_Task_SetTempThreshold(final_temp_high, final_temp_low);
+                Control_Task_SetHumidThreshold(final_humid_high, final_humid_low);
+                NETWORK_LOG("[OK] All thresholds updated\r\n");
+            } else {
+                NETWORK_LOG("[WARN] Invalid threshold combination, skip update\r\n");
+            }
+            
+            // 清空缓冲区
+            memset(esp8266_buf, 0, esp8266_cnt);
+            esp8266_cnt = 0;
+            return;
+        }
+    }
+    
+    // ===== 单条指令解析（模式切换、设备控制）=====
+    
+    // 模式切换（旧格式）
+    if (strstr(payload_start, "ZD") != NULL && strstr(payload_start, "ZD:") == NULL) {
+        g_pending_cmd.type = CMD_AUTO_MODE;
+        g_pending_cmd.value = 1;
+        g_cmd_available = 1;
+        NETWORK_LOG("[PARSED] Auto mode\r\n");
+        memset(esp8266_buf, 0, esp8266_cnt);
+        esp8266_cnt = 0;
+        return;
+    }
+    
+    if (strstr(payload_start, "SD") != NULL && strstr(payload_start, "SD:") == NULL) {
+        g_pending_cmd.type = CMD_MANUAL_MODE;
+        g_pending_cmd.value = 1;
+        g_cmd_available = 1;
+        NETWORK_LOG("[PARSED] Manual mode\r\n");
+        memset(esp8266_buf, 0, esp8266_cnt);
+        esp8266_cnt = 0;
+        return;
+    }
+    
+    // 手动控制（旧格式：KJR/GJR分离）
+    if (strstr(payload_start, "KJR") != NULL && strstr(payload_start, "KJR:") == NULL) {
+        g_pending_cmd.type = CMD_HEATER;
+        g_pending_cmd.value = 1;  // 开启
+        g_cmd_available = 1;
+        NETWORK_LOG("[PARSED] Heater ON\r\n");
+        memset(esp8266_buf, 0, esp8266_cnt);
+        esp8266_cnt = 0;
+        return;
+    }
+    
+    if (strstr(payload_start, "GJR") != NULL) {
+        g_pending_cmd.type = CMD_HEATER;
+        g_pending_cmd.value = 0;  // 关闭
+        g_cmd_available = 1;
+        NETWORK_LOG("[PARSED] Heater OFF\r\n");
+        memset(esp8266_buf, 0, esp8266_cnt);
+        esp8266_cnt = 0;
+        return;
+    }
+    
+    if (strstr(payload_start, "KZL") != NULL && strstr(payload_start, "KZL:") == NULL) {
+        g_pending_cmd.type = CMD_COOLER;
+        g_pending_cmd.value = 1;
+        g_cmd_available = 1;
+        NETWORK_LOG("[PARSED] Cooler ON\r\n");
+        memset(esp8266_buf, 0, esp8266_cnt);
+        esp8266_cnt = 0;
+        return;
+    }
+    
+    if (strstr(payload_start, "GZL") != NULL) {
+        g_pending_cmd.type = CMD_COOLER;
+        g_pending_cmd.value = 0;
+        g_cmd_available = 1;
+        NETWORK_LOG("[PARSED] Cooler OFF\r\n");
+        memset(esp8266_buf, 0, esp8266_cnt);
+        esp8266_cnt = 0;
+        return;
+    }
+    
+    if (strstr(payload_start, "KCS") != NULL && strstr(payload_start, "KCS:") == NULL) {
+        g_pending_cmd.type = CMD_DEHUMIDIFIER;
+        g_pending_cmd.value = 1;
+        g_cmd_available = 1;
+        NETWORK_LOG("[PARSED] Dehumidifier ON\r\n");
+        memset(esp8266_buf, 0, esp8266_cnt);
+        esp8266_cnt = 0;
+        return;
+    }
+    
+    if (strstr(payload_start, "GCS") != NULL) {
+        g_pending_cmd.type = CMD_DEHUMIDIFIER;
+        g_pending_cmd.value = 0;
+        g_cmd_available = 1;
+        NETWORK_LOG("[PARSED] Dehumidifier OFF\r\n");
+        memset(esp8266_buf, 0, esp8266_cnt);
+        esp8266_cnt = 0;
+        return;
+    }
+    
+    if (strstr(payload_start, "KJS") != NULL && strstr(payload_start, "KJS:") == NULL) {
+        g_pending_cmd.type = CMD_HUMIDIFIER;
+        g_pending_cmd.value = 1;
+        g_cmd_available = 1;
+        NETWORK_LOG("[PARSED] Humidifier ON\r\n");
+        memset(esp8266_buf, 0, esp8266_cnt);
+        esp8266_cnt = 0;
+        return;
+    }
+    
+    if (strstr(payload_start, "GJS") != NULL) {
+        g_pending_cmd.type = CMD_HUMIDIFIER;
+        g_pending_cmd.value = 0;
+        g_cmd_available = 1;
+        NETWORK_LOG("[PARSED] Humidifier OFF\r\n");
+        memset(esp8266_buf, 0, esp8266_cnt);
+        esp8266_cnt = 0;
+        return;
+    }
+    
+    // ===== 如果旧格式都不匹配，再尝试新格式 =====
     
     // 4. 调试模式下拷贝有效载荷到结构体
 #if DEBUG_NETWORK

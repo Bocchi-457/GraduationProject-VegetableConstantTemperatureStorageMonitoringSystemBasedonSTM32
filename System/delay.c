@@ -50,4 +50,4 @@ void delay_s(uint32_t xs)
 	{
 		delay_ms(1000);  //每次循环延时1000毫秒（1秒）
 	}
-} 
+}

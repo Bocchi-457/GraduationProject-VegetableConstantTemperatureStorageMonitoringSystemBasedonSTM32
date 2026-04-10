@@ -181,3 +181,4 @@ uint8_t Read_DHT22(DHT22_Data_TypeDef *data) {
   data->check_sum = buf[4];
   return SUCCESS;
 }
+

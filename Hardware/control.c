@@ -50,6 +50,9 @@ void jiare_init(void) {
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;  // 推挽输出模式
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz; // 高速模式
   GPIO_Init(GPIOB, &GPIO_InitStructure);
+  
+  // 3. 设置初始状态为关闭（低电平）
+  GPIO_ResetBits(GPIOB, GPIO_Pin_10);
 }
 
 /**
@@ -70,6 +73,9 @@ void zhileng_init(void) {
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;  // 推挽输出模式
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz; // 高速模式
   GPIO_Init(GPIOB, &GPIO_InitStructure);
+  
+  // 3. 设置初始状态为关闭（低电平）
+  GPIO_ResetBits(GPIOB, GPIO_Pin_11);
 }
 
 /**
@@ -90,6 +96,9 @@ void chushi_init(void) {
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;  // 推挽输出模式
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz; // 高速模式
   GPIO_Init(GPIOB, &GPIO_InitStructure);
+  
+  // 3. 设置初始状态为关闭（低电平）
+  GPIO_ResetBits(GPIOB, GPIO_Pin_1);
 }
 
 /**
@@ -110,4 +119,7 @@ void jiashi_init(void) {
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;  // 推挽输出模式
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz; // 高速模式
   GPIO_Init(GPIOB, &GPIO_InitStructure);
+  
+  // 3. 设置初始状态为关闭（低电平）
+  GPIO_ResetBits(GPIOB, GPIO_Pin_0);
 }

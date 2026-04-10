@@ -207,8 +207,7 @@ void ESP8266_Init(unsigned int bound) {
                   OLED_ShowWiFiProgress(i);
                   delay_ms(20);
                 }
-                if (ESP8266_SendATCmd(ESP8266_ONENET_INFO, "CONNECT", 5000) ==
-                    0) {
+                if (ESP8266_SendATCmd(ESP8266_ONENET_INFO, "CONNECT", 8000) == 0) {
                   // 订阅主题
                   // 显示订阅主题进度
                   for (; i <= 70; i += 1) {

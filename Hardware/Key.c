@@ -70,3 +70,4 @@ u8 KEY_Scan(u8 mode) {
     key_up = 1;
   return 0; // 无按键按下
 }
+

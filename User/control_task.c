@@ -56,11 +56,11 @@ void Control_Task_Init(void) {
     g_humid_high = 650;
     g_humid_low = 500;
     
-    // 关闭所有执行器
-    jiare = 1;     // 高电平关闭
-    zhileng = 1;
-    chushi = 1;
-    jiashi = 1;
+    // 关闭所有执行器（低电平=关闭，高电平=打开）
+    jiare = 0;     // ✅ 修改：1 → 0，低电平关闭
+    zhileng = 0;   // ✅ 修改：1 → 0
+    chushi = 0;    // ✅ 修改：1 → 0
+    jiashi = 0;    // ✅ 修改：1 → 0
     
     g_heater_state = 0;
     g_cooler_state = 0;
@@ -99,54 +99,54 @@ void Control_Task_Run(void) {
     
     // 温度控制逻辑（滞回比较防止抖动）
     if (temp > g_temp_high) {
-        // 温度过高 → 开启制冷
-        zhileng = 0;  // 低电平开启
+        // 温度过高 → 开启制冷（高电平=开）
+        zhileng = 1;  // ✅ 高电平开启
         g_cooler_state = 1;
-        jiare = 1;    // 关闭加热
+        jiare = 0;    // ✅ 低电平关闭加热
         g_heater_state = 0;
         CONTROL_LOG("Temp high: %d.%d > %d.%d, cooler ON\r\n",
                    temp / 10, abs(temp % 10),
                    g_temp_high / 10, abs(g_temp_high % 10));
     } else if (temp < g_temp_low) {
-        // 温度过低 → 开启加热
-        jiare = 0;    // 低电平开启
+        // 温度过低 → 开启加热（高电平=开）
+        jiare = 1;    // ✅ 高电平开启
         g_heater_state = 1;
-        zhileng = 1;  // 关闭制冷
+        zhileng = 0;  // ✅ 低电平关闭制冷
         g_cooler_state = 0;
         CONTROL_LOG("Temp low: %d.%d < %d.%d, heater ON\r\n",
                    temp / 10, abs(temp % 10),
                    g_temp_low / 10, abs(g_temp_low % 10));
     } else {
-        // 温度正常 → 关闭加热和制冷
-        jiare = 1;
-        zhileng = 1;
+        // 温度正常 → 关闭加热和制冷（低电平=关）
+        jiare = 0;    // ✅ 低电平关闭
+        zhileng = 0;  // ✅ 低电平关闭
         g_heater_state = 0;
         g_cooler_state = 0;
     }
     
     // 湿度控制逻辑
     if (humid > g_humid_high) {
-        // 湿度过高 → 开启除湿
-        chushi = 0;   // 低电平开启
+        // 湿度过高 → 开启除湿（高电平=开）
+        chushi = 1;   // ✅ 高电平开启
         g_dehumid_state = 1;
-        jiashi = 1;   // 关闭加湿
+        jiashi = 0;   // ✅ 低电平关闭加湿
         g_humidifier_state = 0;
         CONTROL_LOG("Humid high: %d.%d > %d.%d, dehumid ON\r\n",
                    humid / 10, abs(humid % 10),
                    g_humid_high / 10, abs(g_humid_high % 10));
     } else if (humid < g_humid_low) {
-        // 湿度过低 → 开启加湿
-        jiashi = 0;   // 低电平开启
+        // 湿度过低 → 开启加湿（高电平=开）
+        jiashi = 1;   // ✅ 高电平开启
         g_humidifier_state = 1;
-        chushi = 1;   // 关闭除湿
+        chushi = 0;   // ✅ 低电平关闭除湿
         g_dehumid_state = 0;
         CONTROL_LOG("Humid low: %d.%d < %d.%d, humidifier ON\r\n",
                    humid / 10, abs(humid % 10),
                    g_humid_low / 10, abs(g_humid_low % 10));
     } else {
-        // 湿度正常 → 关闭除湿和加湿
-        chushi = 1;
-        jiashi = 1;
+        // 湿度正常 → 关闭除湿和加湿（低电平=关）
+        chushi = 0;   // ✅ 低电平关闭
+        jiashi = 0;   // ✅ 低电平关闭
         g_dehumid_state = 0;
         g_humidifier_state = 0;
     }
@@ -161,13 +161,20 @@ void Control_Task_SetMode(uint8_t mode) {
         g_work_mode = mode;
         CONTROL_LOG("Mode set to: %s\r\n", mode == 1 ? "Auto" : "Manual");
         
-        // 切换到手动模式时，关闭所有执行器
-        if (mode == 2) {
-            jiare = 1;
-            zhileng = 1;
-            chushi = 1;
-            jiashi = 1;
-        }
+        // // ✅ 关键修复：切换到手动模式时，关闭所有执行器（低电平=关）
+        // if (mode == 2) {
+        //     jiare = 0;      // ✅ 低电平关闭
+        //     zhileng = 0;    // ✅ 低电平关闭
+        //     chushi = 0;     // ✅ 低电平关闭
+        //     jiashi = 0;     // ✅ 低电平关闭
+            
+        //     g_heater_state = 0;
+        //     g_cooler_state = 0;
+        //     g_dehumid_state = 0;
+        //     g_humidifier_state = 0;
+            
+        //     CONTROL_LOG("[MODE] All actuators OFF in manual mode\r\n");
+        // }
     }
 }
 
@@ -185,27 +192,63 @@ void Control_Task_ManualControl(ControlDevice_t actuator, uint8_t state) {
     
     switch (actuator) {
         case CTRL_HEATER:
-            jiare = (state == 1) ? 0 : 1;  // 低电平开启
-            g_heater_state = state;
-            CONTROL_LOG("[MANUAL] Heater: %s\r\n", state ? "ON" : "OFF");
+            if (state == 1) {
+                // ✅ 开启加热时，强制关闭制冷（互斥）
+                jiare = 1;
+                zhileng = 0;
+                g_heater_state = 1;
+                g_cooler_state = 0;
+                CONTROL_LOG("[MANUAL] Heater ON, Cooler OFF (mutex)\r\n");
+            } else {
+                jiare = 0;
+                g_heater_state = 0;
+                CONTROL_LOG("[MANUAL] Heater OFF\r\n");
+            }
             break;
             
         case CTRL_COOLER:
-            zhileng = (state == 1) ? 0 : 1;
-            g_cooler_state = state;
-            CONTROL_LOG("[MANUAL] Cooler: %s\r\n", state ? "ON" : "OFF");
+            if (state == 1) {
+                // ✅ 开启制冷时，强制关闭加热（互斥）
+                zhileng = 1;
+                jiare = 0;
+                g_cooler_state = 1;
+                g_heater_state = 0;
+                CONTROL_LOG("[MANUAL] Cooler ON, Heater OFF (mutex)\r\n");
+            } else {
+                zhileng = 0;
+                g_cooler_state = 0;
+                CONTROL_LOG("[MANUAL] Cooler OFF\r\n");
+            }
             break;
             
         case CTRL_DEHUMID:
-            chushi = (state == 1) ? 0 : 1;
-            g_dehumid_state = state;
-            CONTROL_LOG("[MANUAL] Dehumidifier: %s\r\n", state ? "ON" : "OFF");
+            if (state == 1) {
+                // ✅ 开启除湿时，强制关闭加湿（互斥）
+                chushi = 1;
+                jiashi = 0;
+                g_dehumid_state = 1;
+                g_humidifier_state = 0;
+                CONTROL_LOG("[MANUAL] Dehumidifier ON, Humidifier OFF (mutex)\r\n");
+            } else {
+                chushi = 0;
+                g_dehumid_state = 0;
+                CONTROL_LOG("[MANUAL] Dehumidifier OFF\r\n");
+            }
             break;
             
         case CTRL_HUMIDIFIER:
-            jiashi = (state == 1) ? 0 : 1;
-            g_humidifier_state = state;
-            CONTROL_LOG("[MANUAL] Humidifier: %s\r\n", state ? "ON" : "OFF");
+            if (state == 1) {
+                // ✅ 开启加湿时，强制关闭除湿（互斥）
+                jiashi = 1;
+                chushi = 0;
+                g_humidifier_state = 1;
+                g_dehumid_state = 0;
+                CONTROL_LOG("[MANUAL] Humidifier ON, Dehumidifier OFF (mutex)\r\n");
+            } else {
+                jiashi = 0;
+                g_humidifier_state = 0;
+                CONTROL_LOG("[MANUAL] Humidifier OFF\r\n");
+            }
             break;
             
         default:
@@ -216,26 +259,48 @@ void Control_Task_ManualControl(ControlDevice_t actuator, uint8_t state) {
 
 /**
  * @brief 设置温度阈值
- * @param temp_high: 温度上限（放大10倍）
- * @param temp_low: 温度下限（放大10倍）
+ * @param temp_high: 温度上限（放大10倍，如250表示25.0℃）
+ * @param temp_low: 温度下限（放大10倍，如200表示20.0℃）
+ * @note 范围限制：-40.0℃ ~ 80.0℃（即-400 ~ 800）
  */
 void Control_Task_SetTempThreshold(int16_t temp_high, int16_t temp_low) {
+    // ✅ 双重保护：校验范围（-400 ~ 800）
+    if (temp_high < -400 || temp_high > 800 || temp_low < -400 || temp_low > 800) {
+        CONTROL_LOG("[ERR] Temp threshold out of range: high=%d, low=%d\r\n", temp_high, temp_low);
+        return;
+    }
+    
+    // 校验逻辑合理性
     if (temp_high > temp_low) {
         g_temp_high = temp_high;
         g_temp_low = temp_low;
-        CONTROL_LOG("Temp threshold set: high=%d, low=%d\r\n", temp_high, temp_low);
+        CONTROL_LOG("[OK] Temp threshold set: high=%.1f℃, low=%.1f℃\r\n", 
+                   (float)temp_high/10.0f, (float)temp_low/10.0f);
+    } else {
+        CONTROL_LOG("[WARN] Temp high <= low, skip update\r\n");
     }
 }
 
 /**
  * @brief 设置湿度阈值
- * @param humid_high: 湿度上限（放大10倍）
- * @param humid_low: 湿度下限（放大10倍）
+ * @param humid_high: 湿度上限（放大10倍，如650表示65.0%）
+ * @param humid_low: 湿度下限（放大10倍，如500表示50.0%）
+ * @note 范围限制：0.0% ~ 100.0%（即0 ~ 1000）
  */
 void Control_Task_SetHumidThreshold(int16_t humid_high, int16_t humid_low) {
+    // ✅ 双重保护：校验范围（0 ~ 1000）
+    if (humid_high < 0 || humid_high > 1000 || humid_low < 0 || humid_low > 1000) {
+        CONTROL_LOG("[ERR] Humid threshold out of range: high=%d, low=%d\r\n", humid_high, humid_low);
+        return;
+    }
+    
+    // 校验逻辑合理性
     if (humid_high > humid_low) {
         g_humid_high = humid_high;
         g_humid_low = humid_low;
-        CONTROL_LOG("Humid threshold set: high=%d, low=%d\r\n", humid_high, humid_low);
+        CONTROL_LOG("[OK] Humid threshold set: high=%.1f%%, low=%.1f%%\r\n", 
+                   (float)humid_high/10.0f, (float)humid_low/10.0f);
+    } else {
+        CONTROL_LOG("[WARN] Humid high <= low, skip update\r\n");
     }
 }

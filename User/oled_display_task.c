@@ -34,8 +34,8 @@ uint8_t g_page_clear_flag = 0;
 static uint8_t s_page2_index = 1;     // 控制页面索引
 static uint8_t s_page3_index = 1;     // 设置页面索引
 
-// 显示缓冲区
-static char s_oled_str[100];
+// ✅ 显示缓冲区（全局变量，照搬旧系统）
+char oled_str[100];
 
 // 上次执行时间
 static uint32_t s_last_display_time = 0;
@@ -51,19 +51,18 @@ void OLED_Display_Task_Init(void) {
 }
 
 /**
- * @brief 显示温湿度数据
+ * @brief 显示温湿度数据（完全照搬旧系统show_wendu函数）
  */
 void Display_ShowWendu(void) {
     // 提取绝对值用于求模计算
-    int abs_temp = (DHT22_Data.temperature < 0) ? -DHT22_Data.temperature : DHT22_Data.temperature;
+    int abs_temp = (DHT22_Data.temperature < 0) ? -DHT22_Data.temperature 
+                                                : DHT22_Data.temperature;
     char temp_sign = (DHT22_Data.temperature < 0) ? '-' : ' ';  // 负数显示减号，正数补空格对齐
     
-    sprintf(s_oled_str, "T:%c%d.%dC H:%d.%d%%", 
-            temp_sign, 
-            abs_temp / 10, abs_temp % 10, 
-            DHT22_Data.humidity / 10, DHT22_Data.humidity % 10);
+    sprintf(oled_str, "T:%c%d.%dC H:%d.%d%%", temp_sign, abs_temp / 10,
+            abs_temp % 10, DHT22_Data.humidity / 10, DHT22_Data.humidity % 10);
     
-    OLED_ShowString(0, 6, (uint8_t *)s_oled_str, 16);
+    OLED_ShowString(0, 6, (u8 *)oled_str, 16);
 }
 
 /**
@@ -90,8 +89,8 @@ void Display_ShowMode(void) {
 void Display_ShowTime(void) {
     // 简化显示：显示固定时间格式
     // TODO: 后续集成RTC_Get()获取真实时间
-    OLED_ShowString(0, 4, (uint8_t *)"2024-01-01", 16);
-    OLED_ShowString(0, 5, (uint8_t *)"00:00:00", 16);
+    OLED_ShowString(0, 2, (uint8_t *)"2024-01-01", 16);
+    OLED_ShowString(0, 4, (uint8_t *)"00:00:00", 16);
 }
 
 /**
@@ -276,7 +275,7 @@ void OLED_Display_Task_Run(void) {
         OLED_ShowCHinese(32, 0, 124); // 上
         OLED_ShowCHinese(48, 0, 125); // 限
         OLED_ShowChar(64, 0, ':', 16);
-        OLED_ShowNum(72, 0, g_temp_high, 2, 16);
+        OLED_ShowNum(72, 0, g_temp_high / 10, 2, 16);  // ✅ 除以10后显示
         
         // 显示温度下限
         OLED_ShowCHinese(0, 2, 10);   // 温
@@ -284,7 +283,7 @@ void OLED_Display_Task_Run(void) {
         OLED_ShowCHinese(32, 2, 126); // 下
         OLED_ShowCHinese(48, 2, 127); // 限
         OLED_ShowChar(64, 2, ':', 16);
-        OLED_ShowNum(72, 2, g_temp_low, 2, 16);
+        OLED_ShowNum(72, 2, g_temp_low / 10, 2, 16);  // ✅ 除以10后显示
         
         // 显示湿度上限
         OLED_ShowCHinese(0, 4, 11);   // 湿
@@ -292,7 +291,7 @@ void OLED_Display_Task_Run(void) {
         OLED_ShowCHinese(32, 4, 124); // 上
         OLED_ShowCHinese(48, 4, 125); // 限
         OLED_ShowChar(64, 4, ':', 16);
-        OLED_ShowNum(72, 4, g_humid_high, 2, 16);
+        OLED_ShowNum(72, 4, g_humid_high / 10, 2, 16);  // ✅ 除以10后显示
         
         // 显示湿度下限
         OLED_ShowCHinese(0, 6, 11);   // 湿
@@ -300,7 +299,7 @@ void OLED_Display_Task_Run(void) {
         OLED_ShowCHinese(32, 6, 126); // 下
         OLED_ShowCHinese(48, 6, 127); // 限
         OLED_ShowChar(64, 6, ':', 16);
-        OLED_ShowNum(72, 6, g_humid_low, 2, 16);
+        OLED_ShowNum(72, 6, g_humid_low / 10, 2, 16);  // ✅ 除以10后显示
         
         // 光标位置指示和参数调整
         if (s_page3_index == 1) {  // 温度上限

@@ -33,7 +33,7 @@
     extern uint8_t
         g_dht22_data_valid; // DHT22数据有效性（在dht22_task.c中定义）
 
-/**
+/***
  * 函数声明
  */
 void System_Init(void);           // 系统初始化
