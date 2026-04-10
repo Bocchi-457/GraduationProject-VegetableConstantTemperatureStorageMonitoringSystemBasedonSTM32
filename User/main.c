@@ -25,11 +25,13 @@
 // C标准库
 #include <string.h>
 
-/**
- * 全局变量声明
- */
-// extern DHT22_Data_TypeDef DHT22_Data;   // 已通过#include "dht22.h"包含，无需在此重复extern声明
-extern uint8_t g_dht22_data_valid;         // DHT22数据有效性（在dht22_task.c中定义）
+    /**
+     * 全局变量声明
+     */
+    // extern DHT22_Data_TypeDef DHT22_Data;   // 已通过#include
+    // "dht22.h"包含，无需在此重复extern声明
+    extern uint8_t
+        g_dht22_data_valid; // DHT22数据有效性（在dht22_task.c中定义）
 
 /**
  * 函数声明
@@ -50,6 +52,7 @@ void System_Init(void) {
     Serial_Iint(115200);  // 串口初始化（调试日志）
     Serial_Printf("\r\n=== Vegetable Warehouse Monitoring System V2.0 ===\r\n");
     
+    beep_init();          // 蜂鸣器初始化
     Key_Init();           // 按键初始化
     OLED_Init();          // OLED显示初始化
     OLED_Clear(0);        // 清屏

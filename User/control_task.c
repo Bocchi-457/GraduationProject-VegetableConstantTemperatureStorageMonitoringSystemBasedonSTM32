@@ -41,6 +41,12 @@ uint8_t g_humidifier_state = 0; // 加湿
  * @brief 控制任务初始化
  */
 void Control_Task_Init(void) {
+    // 初始化执行器GPIO引脚
+    jiare_init();     // 加热器GPIO初始化
+    zhileng_init();   // 制冷器GPIO初始化
+    chushi_init();    // 除湿器GPIO初始化
+    jiashi_init();    // 加湿器GPIO初始化
+    
     // 默认自动模式
     g_work_mode = 1;
     
@@ -171,7 +177,41 @@ void Control_Task_SetMode(uint8_t mode) {
  * @param state: 状态（0=关, 1=开）
  */
 void Control_Task_ManualControl(ControlDevice_t actuator, uint8_t state) {
-
+    // 仅在手动模式下允许操作
+    if (g_work_mode != 2) {
+        CONTROL_LOG("[WARN] Manual control denied in auto mode\r\n");
+        return;
+    }
+    
+    switch (actuator) {
+        case CTRL_HEATER:
+            jiare = (state == 1) ? 0 : 1;  // 低电平开启
+            g_heater_state = state;
+            CONTROL_LOG("[MANUAL] Heater: %s\r\n", state ? "ON" : "OFF");
+            break;
+            
+        case CTRL_COOLER:
+            zhileng = (state == 1) ? 0 : 1;
+            g_cooler_state = state;
+            CONTROL_LOG("[MANUAL] Cooler: %s\r\n", state ? "ON" : "OFF");
+            break;
+            
+        case CTRL_DEHUMID:
+            chushi = (state == 1) ? 0 : 1;
+            g_dehumid_state = state;
+            CONTROL_LOG("[MANUAL] Dehumidifier: %s\r\n", state ? "ON" : "OFF");
+            break;
+            
+        case CTRL_HUMIDIFIER:
+            jiashi = (state == 1) ? 0 : 1;
+            g_humidifier_state = state;
+            CONTROL_LOG("[MANUAL] Humidifier: %s\r\n", state ? "ON" : "OFF");
+            break;
+            
+        default:
+            CONTROL_LOG("[ERR] Invalid actuator: %d\r\n", actuator);
+            break;
+    }
 }
 
 /**
