@@ -8,6 +8,7 @@
 #include "OLED.h"
 #include "Key.h"
 #include "Timer.h"
+#include "DS1302.h"              // ✅ 新增：DS1302 RTC驱动
 #include "dht22.h"
 #include "control.h"
 #include "control_task.h"
@@ -25,14 +26,13 @@ extern uint8_t g_heater_state;        // 加热状态
 extern uint8_t g_cooler_state;        // 制冷状态
 extern uint8_t g_dehumid_state;       // 除湿状态
 extern uint8_t g_humidifier_state;    // 加湿状态
-extern uint8_t g_key_num;             // ✅ 按键返回值（来自key_task模块）
 
 // 页面清除标志
 uint8_t g_page_clear_flag = 0;
 
-// 页面索引（用于控制页面和设置页面的光标位置）
-static uint8_t s_page2_index = 1;     // 控制页面索引
-static uint8_t s_page3_index = 1;     // 设置页面索引
+// ✅ 页面索引（移除static，使key_task可以访问）
+uint8_t s_page2_index = 1;     // 控制页面索引
+uint8_t s_page3_index = 1;     // 设置页面索引
 
 // ✅ 显示缓冲区（全局变量，照搬旧系统）
 char oled_str[100];
@@ -83,14 +83,12 @@ void Display_ShowMode(void) {
 }
 
 /**
- * @brief 显示时间（简化版，实际需要RTC支持）
- * @note TODO: 需要集成RTC或网络时间同步
+ * @brief 显示时间（直接调用DS1302驱动中的TIME函数）
  */
 void Display_ShowTime(void) {
-    // 简化显示：显示固定时间格式
-    // TODO: 后续集成RTC_Get()获取真实时间
-    OLED_ShowString(0, 2, (uint8_t *)"2024-01-01", 16);
-    OLED_ShowString(0, 4, (uint8_t *)"00:00:00", 16);
+    // ✅ 直接调用DS1302.c中已有的TIME函数，包含日期、时间、星期几的完整显示
+    // TIME()使用y=3显示日期和星期，y=4显示时间
+    TIME();
 }
 
 /**
@@ -104,7 +102,6 @@ void OLED_Display_Task_Run(void) {
     s_last_display_time = sys_tick_ms;
     
     Page_t current_page = Key_Task_GetPage();
-    uint8_t key_num = g_key_num;  // ✅ 直接读取全局按键变量
     
     // 页面切换时清屏
     static Page_t last_page = PAGE_MAIN;
@@ -121,17 +118,11 @@ void OLED_Display_Task_Run(void) {
             OLED_Clear(0);
         }
         
-        Display_ShowMode();    // 显示模式（第0行）
-        Display_ShowTime();    // 显示时间（第4-5行）
-        Display_ShowWendu();   // 显示温湿度（第6行）
+        Display_ShowMode();    // 显示模式（y=0，第0-1页）
+        Display_ShowTime();    // 显示时间（TIME函数使用y=3和y=4，第3-5页）
+        Display_ShowWendu();   // 显示温湿度（y=6，第6-7页）
         
-        // 按键处理：切换模式
-        if (key_num == 4) {  // 切换到手动模式
-            Control_Task_SetMode(2);
-        }
-        if (key_num == 3) {  // 切换到自动模式
-            Control_Task_SetMode(1);
-        }
+        // ✅ 删除：按键处理已移至key_task.c，此处只负责显示
     }
     
     // ===== 页面2：控制页面 =====
@@ -141,11 +132,7 @@ void OLED_Display_Task_Run(void) {
             OLED_Clear(0);
         }
         
-        // 按键2：切换控制项
-        if (key_num == 2) {
-            s_page2_index++;
-            if (s_page2_index > 4) s_page2_index = 1;
-        }
+        // ✅ 删除：按键2/3/4处理已移至key_task.c，此处只负责显示
         
         // 显示加热控制
         OLED_ShowCHinese(0, 0, 116);  // 加
@@ -190,45 +177,7 @@ void OLED_Display_Task_Run(void) {
             OLED_ShowString(60, 6, (uint8_t *)"<", 16);
         }
         
-        // 手动模式下的按键控制
-        if (g_work_mode == 2) {
-            // 加热控制
-            if (s_page2_index == 1) {
-                if (key_num == 3) {  // 开启加热
-                    Control_Task_ManualControl(CTRL_HEATER, 1);
-                    Control_Task_ManualControl(CTRL_COOLER, 0);
-                } else if (key_num == 4) {  // 关闭加热
-                    Control_Task_ManualControl(CTRL_HEATER, 0);
-                }
-            }
-            // 制冷控制
-            else if (s_page2_index == 2) {
-                if (key_num == 3) {  // 开启制冷
-                    Control_Task_ManualControl(CTRL_COOLER, 1);
-                    Control_Task_ManualControl(CTRL_HEATER, 0);
-                } else if (key_num == 4) {  // 关闭制冷
-                    Control_Task_ManualControl(CTRL_COOLER, 0);
-                }
-            }
-            // 除湿控制
-            else if (s_page2_index == 3) {
-                if (key_num == 3) {  // 开启除湿
-                    Control_Task_ManualControl(CTRL_DEHUMID, 1);
-                    Control_Task_ManualControl(CTRL_HUMIDIFIER, 0);
-                } else if (key_num == 4) {  // 关闭除湿
-                    Control_Task_ManualControl(CTRL_DEHUMID, 0);
-                }
-            }
-            // 加湿控制
-            else if (s_page2_index == 4) {
-                if (key_num == 3) {  // 开启加湿
-                    Control_Task_ManualControl(CTRL_HUMIDIFIER, 1);
-                    Control_Task_ManualControl(CTRL_DEHUMID, 0);
-                } else if (key_num == 4) {  // 关闭加湿
-                    Control_Task_ManualControl(CTRL_HUMIDIFIER, 0);
-                }
-            }
-        }
+        // ✅ 删除：手动模式下的按键控制已移至key_task.c
         
         // 显示执行器状态
         if (g_heater_state) {
@@ -263,11 +212,9 @@ void OLED_Display_Task_Run(void) {
             OLED_Clear(0);
         }
         
-        // 按键2：切换设置项
-        if (key_num == 2) {
-            s_page3_index++;
-            if (s_page3_index > 4) s_page3_index = 1;
-        }
+        // ✅ 新增：显示缓冲区（支持小数和负数显示）
+        static char temp_str[8];
+        static char humid_str[8];
         
         // 显示温度上限
         OLED_ShowCHinese(0, 0, 10);   // 温
@@ -275,7 +222,12 @@ void OLED_Display_Task_Run(void) {
         OLED_ShowCHinese(32, 0, 124); // 上
         OLED_ShowCHinese(48, 0, 125); // 限
         OLED_ShowChar(64, 0, ':', 16);
-        OLED_ShowNum(72, 0, g_temp_high / 10, 2, 16);  // ✅ 除以10后显示
+        
+        // ✅ 修改：格式化显示（支持负数和小数，如"25.0"或"-5.0"）
+        sprintf(temp_str, "%d.%d", 
+                g_temp_high / 10, 
+                abs(g_temp_high % 10));
+        OLED_ShowString(72, 0, (uint8_t *)temp_str, 16);
         
         // 显示温度下限
         OLED_ShowCHinese(0, 2, 10);   // 温
@@ -283,7 +235,12 @@ void OLED_Display_Task_Run(void) {
         OLED_ShowCHinese(32, 2, 126); // 下
         OLED_ShowCHinese(48, 2, 127); // 限
         OLED_ShowChar(64, 2, ':', 16);
-        OLED_ShowNum(72, 2, g_temp_low / 10, 2, 16);  // ✅ 除以10后显示
+        
+        // ✅ 修改：格式化显示（支持负数和小数）
+        sprintf(temp_str, "%d.%d", 
+                g_temp_low / 10, 
+                abs(g_temp_low % 10));
+        OLED_ShowString(72, 2, (uint8_t *)temp_str, 16);
         
         // 显示湿度上限
         OLED_ShowCHinese(0, 4, 11);   // 湿
@@ -291,7 +248,12 @@ void OLED_Display_Task_Run(void) {
         OLED_ShowCHinese(32, 4, 124); // 上
         OLED_ShowCHinese(48, 4, 125); // 限
         OLED_ShowChar(64, 4, ':', 16);
-        OLED_ShowNum(72, 4, g_humid_high / 10, 2, 16);  // ✅ 除以10后显示
+        
+        // ✅ 修改：格式化显示（湿度始终为正数）
+        sprintf(humid_str, "%d.%d", 
+                g_humid_high / 10, 
+                g_humid_high % 10);
+        OLED_ShowString(72, 4, (uint8_t *)humid_str, 16);
         
         // 显示湿度下限
         OLED_ShowCHinese(0, 6, 11);   // 湿
@@ -299,61 +261,34 @@ void OLED_Display_Task_Run(void) {
         OLED_ShowCHinese(32, 6, 126); // 下
         OLED_ShowCHinese(48, 6, 127); // 限
         OLED_ShowChar(64, 6, ':', 16);
-        OLED_ShowNum(72, 6, g_humid_low / 10, 2, 16);  // ✅ 除以10后显示
         
-        // 光标位置指示和参数调整
+        // ✅ 修改：格式化显示
+        sprintf(humid_str, "%d.%d", 
+                g_humid_low / 10, 
+                g_humid_low % 10);
+        OLED_ShowString(72, 6, (uint8_t *)humid_str, 16);
+        
+        // ✅ 优化：光标位置指示右移，避免遮挡负号（从x=100移到x=116）
         if (s_page3_index == 1) {  // 温度上限
-            OLED_ShowString(100, 0, (uint8_t *)"<", 16);
-            OLED_ShowString(100, 2, (uint8_t *)" ", 16);
-            OLED_ShowString(100, 4, (uint8_t *)" ", 16);
-            OLED_ShowString(100, 6, (uint8_t *)" ", 16);
-            
-            if (key_num == 3) {  // 增加
-                Control_Task_SetTempThreshold(g_temp_high + 1, g_temp_low);
-            } else if (key_num == 4) {  // 减少
-                if (g_temp_high > g_temp_low + 1) {
-                    Control_Task_SetTempThreshold(g_temp_high - 1, g_temp_low);
-                }
-            }
+            OLED_ShowString(116, 0, (uint8_t *)"<", 16);
+            OLED_ShowString(116, 2, (uint8_t *)" ", 16);
+            OLED_ShowString(116, 4, (uint8_t *)" ", 16);
+            OLED_ShowString(116, 6, (uint8_t *)" ", 16);
         } else if (s_page3_index == 2) {  // 温度下限
-            OLED_ShowString(100, 0, (uint8_t *)" ", 16);
-            OLED_ShowString(100, 2, (uint8_t *)"<", 16);
-            OLED_ShowString(100, 4, (uint8_t *)" ", 16);
-            OLED_ShowString(100, 6, (uint8_t *)" ", 16);
-            
-            if (key_num == 3) {  // 增加
-                if (g_temp_low < g_temp_high - 1) {
-                    Control_Task_SetTempThreshold(g_temp_high, g_temp_low + 1);
-                }
-            } else if (key_num == 4) {  // 减少
-                Control_Task_SetTempThreshold(g_temp_high, g_temp_low - 1);
-            }
+            OLED_ShowString(116, 0, (uint8_t *)" ", 16);
+            OLED_ShowString(116, 2, (uint8_t *)"<", 16);
+            OLED_ShowString(116, 4, (uint8_t *)" ", 16);
+            OLED_ShowString(116, 6, (uint8_t *)" ", 16);
         } else if (s_page3_index == 3) {  // 湿度上限
-            OLED_ShowString(100, 0, (uint8_t *)" ", 16);
-            OLED_ShowString(100, 2, (uint8_t *)" ", 16);
-            OLED_ShowString(100, 4, (uint8_t *)"<", 16);
-            OLED_ShowString(100, 6, (uint8_t *)" ", 16);
-            
-            if (key_num == 3) {  // 增加
-                Control_Task_SetHumidThreshold(g_humid_high + 1, g_humid_low);
-            } else if (key_num == 4) {  // 减少
-                if (g_humid_high > g_humid_low + 1) {
-                    Control_Task_SetHumidThreshold(g_humid_high - 1, g_humid_low);
-                }
-            }
+            OLED_ShowString(116, 0, (uint8_t *)" ", 16);
+            OLED_ShowString(116, 2, (uint8_t *)" ", 16);
+            OLED_ShowString(116, 4, (uint8_t *)"<", 16);
+            OLED_ShowString(116, 6, (uint8_t *)" ", 16);
         } else if (s_page3_index == 4) {  // 湿度下限
-            OLED_ShowString(100, 0, (uint8_t *)" ", 16);
-            OLED_ShowString(100, 2, (uint8_t *)" ", 16);
-            OLED_ShowString(100, 4, (uint8_t *)" ", 16);
-            OLED_ShowString(100, 6, (uint8_t *)"<", 16);
-            
-            if (key_num == 3) {  // 增加
-                if (g_humid_low < g_humid_high - 1) {
-                    Control_Task_SetHumidThreshold(g_humid_high, g_humid_low + 1);
-                }
-            } else if (key_num == 4) {  // 减少
-                Control_Task_SetHumidThreshold(g_humid_high, g_humid_low - 1);
-            }
+            OLED_ShowString(116, 0, (uint8_t *)" ", 16);
+            OLED_ShowString(116, 2, (uint8_t *)" ", 16);
+            OLED_ShowString(116, 4, (uint8_t *)" ", 16);
+            OLED_ShowString(116, 6, (uint8_t *)"<", 16);
         }
     }
 }

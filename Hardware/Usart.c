@@ -43,8 +43,9 @@ FILE __stdout;
 void _sys_exit(int x) { x = x; }
 // 重定义fputc函数
 int fputc(int ch, FILE *f) {
-  while ((USART1->SR & 0X40) == 0) // 循环发送,直到发送完毕
-    USART1->DR = (u8)ch;
+  // ✅ 修复：先发送数据，再等待发送完成
+  USART1->DR = (u8)ch;
+  while ((USART1->SR & 0X40) == 0);  // 等待TXE置位（发送寄存器空）
   return ch;
 }
 #endif

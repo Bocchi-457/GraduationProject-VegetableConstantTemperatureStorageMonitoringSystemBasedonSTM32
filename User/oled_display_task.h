@@ -10,7 +10,9 @@
 #include "stdint.h"
 
 // 外部可访问的变量
-extern uint8_t g_page_clear_flag;  // 页面清除标志
+extern uint8_t g_page_clear_flag;   // 页面清除标志
+extern uint8_t s_page2_index;       // ✅ 控制页面索引（1-加热 2-制冷 3-除湿 4-加湿）
+extern uint8_t s_page3_index;       // ✅ 设置页面索引（1-温度上限 2-温度下限 3-湿度上限 4-湿度下限）
 
 /**
  * @brief OLED显示任务初始化

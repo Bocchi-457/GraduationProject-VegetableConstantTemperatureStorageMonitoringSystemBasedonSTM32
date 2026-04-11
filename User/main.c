@@ -12,6 +12,7 @@
 #include "control_task.h"
 #include "key_task.h"              // ✅ 添加按键任务
 #include "oled_display_task.h"     // ✅ 添加OLED显示任务
+#include "DS1302.h"                // ✅ 新增：DS1302 RTC驱动
 #include "dht22.h"                 // DHT22数据结构定义
 #include "control.h"               // 执行器GPIO定义（jiare/zhileng等）
 #include "OLED.h"
@@ -32,6 +33,9 @@
     // "dht22.h"包含，无需在此重复extern声明
     extern uint8_t
         g_dht22_data_valid; // DHT22数据有效性（在dht22_task.c中定义）
+
+    // ✅ 新增：联网模式标志（1=联网模式，0=离线模式）
+    uint8_t g_network_enabled = 0;
 
 /***
  * 函数声明
@@ -57,9 +61,10 @@ void System_Init(void) {
     OLED_Init();          // OLED显示初始化
     OLED_Clear(0);        // 清屏
     
+    Ds1302_Init();        // ✅ 新增：DS1302 RTC初始化
     Timer_Init();         // 定时器初始化（TIM2: 10ms心跳）
     
-    // 上电延时，确保DHT22稳定（2秒）
+    // ✅ 关键改进：OLED初始化后立即显示提示，避免用户面对黑屏等待
     OLED_ShowCHinese(0, 3, 19);  // 系
     OLED_ShowCHinese(18, 3, 20); // 统
     OLED_ShowCHinese(36, 3, 21); // 正
@@ -67,22 +72,59 @@ void System_Init(void) {
     OLED_ShowCHinese(72, 3, 0);  // 初
     OLED_ShowCHinese(90, 3, 1);  // 始
     OLED_ShowCHinese(108, 3, 2); // 化
+    
+    // ✅ 核心任务初始化（属于系统初始化的一部分，必须在开机引导前完成）
+    DHT22_Task_Init();    // DHT22任务初始化
+    Control_Task_Init();  // 控制任务初始化
+    Key_Task_Init();      // 按键任务初始化
+    OLED_Display_Task_Init();  // OLED显示任务初始化
+    
+    // 上电延时，确保DHT22稳定（2秒）
     delay_ms(2000);
     
-    // 初始化DHT22任务
-    DHT22_Task_Init();
+    // ✅ 系统初始化完成，蜂鸣器鸣响提示
+    beep = 0;
+    delay_ms(100);
+    beep = 1;
     
-    // 初始化控制任务
-    Control_Task_Init();
+    // ✅ 开机引导界面 - 询问是否联网
+    OLED_Clear(0);
     
-    // ✅ 初始化按键任务
-    Key_Task_Init();
+    // 显示标题："是否需要联网？"
+    OLED_ShowCHinese(0, 0, 52);   // 是
+    OLED_ShowCHinese(18, 0, 53);  // 否
+    OLED_ShowCHinese(36, 0, 54);  // 需
+    OLED_ShowCHinese(52, 0, 55);  // 要
+    OLED_ShowCHinese(68, 0, 56);  // 联
+    OLED_ShowCHinese(84, 0, 57);  // 网
+    OLED_ShowCHinese(100, 0, 58); // ？
     
-    // ✅ 初始化OLED显示任务
-    OLED_Display_Task_Init();
+    // 显示菜单选项
+    OLED_ShowString(8, 4, "1.", 16);
+    OLED_ShowCHinese(24, 4, 52); // 是
+    OLED_ShowString(62, 4, "2.", 16);
+    OLED_ShowCHinese(78, 4, 53); // 否
     
-    // 初始化网络管理模块
-    Network_Manager_Init();
+    // 等待用户选择
+    uint8_t key_choice = 0;
+    while (key_choice != 1 && key_choice != 2) {
+        key_choice = KEY_Scan(0);  // 按键扫描
+        delay_ms(50);  // 防止按键抖动
+    }
+    
+    OLED_Clear(0);  // 清屏，准备进入主界面
+    
+    // ✅ 根据用户选择决定是否初始化网络模块
+    if (key_choice == 1) {
+        // 用户选择"是"，初始化网络模块
+        g_network_enabled = 1;
+        Serial_Printf("Initializing network module...\r\n");
+        Network_Manager_Init();
+    } else {
+        // 用户选择"否"，跳过网络初始化
+        g_network_enabled = 0;
+        Serial_Printf("Network module skipped (offline mode)\r\n");
+    }
     
     Serial_Printf("System initialization completed\r\n");
 }
@@ -207,8 +249,15 @@ int main(void) {
     Scheduler_Register(Key_Task_Scan, 50);            // ✅ 按键扫描：50ms
     Scheduler_Register(DHT22_Task_Run, 2000);         // DHT22读取：2s
     Scheduler_Register(Control_Task_Run, 500);        // 控制逻辑：500ms
-    Scheduler_Register(Network_Task, 50);             // 网络任务：50ms（处理重连+指令解析）
-    Scheduler_Register(Network_Upload_Task, 2000);    // 数据上传：2s
+    
+    // ✅ 根据联网模式决定是否注册网络任务
+    if (g_network_enabled) {
+        Scheduler_Register(Network_Task, 50);             // 网络任务：50ms（处理重连+指令解析）
+        Scheduler_Register(Network_Upload_Task, 2000);    // 数据上传：2s
+        Serial_Printf("Network tasks registered\r\n");
+    } else {
+        Serial_Printf("Running in offline mode\r\n");
+    }
     
     Serial_Printf("Scheduler started, entering main loop\r\n");
     
@@ -217,14 +266,13 @@ int main(void) {
         // 调度器运行（非阻塞）
         Scheduler_Run();
         
-        // 处理云端指令
-        Handle_Cloud_Command();
-        
-        // 定期发送心跳（每60秒）
-        static uint32_t last_heartbeat = 0;
-        if (sys_tick_ms - last_heartbeat > 60000) {
-            Network_SendHeartbeat();
-            last_heartbeat = sys_tick_ms;
+        // ✅ 仅在联网模式下处理云端指令
+        if (g_network_enabled) {
+            Handle_Cloud_Command();
+            
+            // ✅ 删除：独立心跳发送逻辑
+            // 根据巴法云协议，每次成功的数据上传即视为心跳，无需单独发送
+            // 这样可以减少AT指令竞争，简化代码逻辑
         }
     }
 }

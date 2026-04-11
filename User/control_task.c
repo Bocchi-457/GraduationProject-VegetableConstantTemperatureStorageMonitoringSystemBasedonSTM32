@@ -8,6 +8,7 @@
 #include "control.h"
 #include "dht22.h"
 #include "dht22_task.h"   // g_dht22_data_valid
+#include "flash_config.h"  // ✅ 新增：Flash配置持久化
 #include "Timer.h"
 #include <stdio.h>
 #include <stdlib.h>       // abs()函数
@@ -21,6 +22,15 @@
 
 // 上次执行时间戳
 static uint32_t g_last_control_time = 0;
+
+// ✅ 新增：Flash延迟保存机制（防止频繁擦写）
+static uint32_t g_last_config_change_time = 0;  // 最后一次配置修改时间
+static uint8_t s_config_dirty = 0;              // 配置是否已修改（待保存）
+#define CONFIG_SAVE_DELAY_MS  5000  // 延迟5秒后保存到Flash
+
+// ✅ 新增：超范围报警状态
+static uint8_t s_beep_count = 0;      // 蜂鸣器计数
+static uint8_t s_beep_state = 0;      // 蜂鸣器状态
 
 // 工作模式（1=自动, 2=手动）
 uint8_t g_work_mode = 1;
@@ -47,29 +57,36 @@ void Control_Task_Init(void) {
     chushi_init();    // 除湿器GPIO初始化
     jiashi_init();    // 加湿器GPIO初始化
     
-    // 默认自动模式
-    g_work_mode = 1;
+    // ✅ 从Flash加载配置（如果无效则使用默认值）
+    Flash_Config_Init();
     
-    // 默认阈值
-    g_temp_high = 250;
-    g_temp_low = 200;
-    g_humid_high = 650;
-    g_humid_low = 500;
+    // 从Flash配置中读取参数
+    SystemConfig_t *config = Flash_Config_Get();
+    g_temp_high = config->temperature_high;
+    g_temp_low = config->temperature_low;
+    g_humid_high = config->humidity_high;
+    g_humid_low = config->humidity_low;
+    g_work_mode = config->work_mode;
     
     // 关闭所有执行器（低电平=关闭，高电平=打开）
-    jiare = 0;     // ✅ 修改：1 → 0，低电平关闭
-    zhileng = 0;   // ✅ 修改：1 → 0
-    chushi = 0;    // ✅ 修改：1 → 0
-    jiashi = 0;    // ✅ 修改：1 → 0
+    jiare = 0;
+    zhileng = 0;
+    chushi = 0;
+    jiashi = 0;
     
     g_heater_state = 0;
     g_cooler_state = 0;
     g_dehumid_state = 0;
     g_humidifier_state = 0;
     
+    // ✅ 新增：初始化蜂鸣器为关闭状态（高电平=关）
+    beep = 1;
+    s_beep_state = 0;
+    s_beep_count = 0;
+    
     g_last_control_time = sys_tick_ms;
     
-    CONTROL_LOG("Control task initialized (Auto mode)\r\n");
+    CONTROL_LOG("Control task initialized (Mode=%d)\r\n", g_work_mode);
 }
 
 /**
@@ -77,6 +94,25 @@ void Control_Task_Init(void) {
  * @note 每500ms执行一次控制判断
  */
 void Control_Task_Run(void) {
+    // ✅ 新增：检查是否需要延迟保存配置到Flash
+    if (s_config_dirty && (sys_tick_ms - g_last_config_change_time >= CONFIG_SAVE_DELAY_MS)) {
+        // 同步内存中的配置到Flash结构体
+        SystemConfig_t *config = Flash_Config_Get();
+        config->temperature_high = g_temp_high;
+        config->temperature_low = g_temp_low;
+        config->humidity_high = g_humid_high;
+        config->humidity_low = g_humid_low;
+        config->work_mode = g_work_mode;
+        
+        // 保存到Flash
+        Flash_Config_Save();
+        
+        // 清除脏数据标记
+        s_config_dirty = 0;
+        
+        CONTROL_LOG("[FLASH] Config saved (delayed)\r\n");
+    }
+    
     // 限流：每500ms执行一次
     if (sys_tick_ms - g_last_control_time < 500) {
         return;
@@ -150,6 +186,44 @@ void Control_Task_Run(void) {
         g_dehumid_state = 0;
         g_humidifier_state = 0;
     }
+    
+    // ✅ 新增：温湿度超范围报警逻辑
+    // 将内部值转换为浮点数便于计算
+    float current_temp = temp / 10.0f;
+    float current_humi = humid / 10.0f;
+    float temp_high_f = g_temp_high / 10.0f;
+    float temp_low_f = g_temp_low / 10.0f;
+    float humi_high_f = g_humid_high / 10.0f;
+    float humi_low_f = g_humid_low / 10.0f;
+    
+    // 计算偏差
+    float temp_diff = 0;
+    if (current_temp > temp_high_f)
+        temp_diff = current_temp - temp_high_f;
+    else if (current_temp < temp_low_f)
+        temp_diff = temp_low_f - current_temp;
+    
+    float humi_diff = 0;
+    if (current_humi > humi_high_f)
+        humi_diff = current_humi - humi_high_f;
+    else if (current_humi < humi_low_f)
+        humi_diff = humi_low_f - current_humi;
+    
+    // 当温度超过范围2度或湿度超过范围5%时报警
+    if (temp_diff >= 2.0f || humi_diff >= 5.0f) {
+        // ✅ 优化：提高报警频率至约1Hz（每0.5秒切换一次状态）
+        s_beep_count++;
+        if (s_beep_count >= 1) {  // 修改：5 → 1，从2.5秒周期改为0.5秒周期
+            s_beep_count = 0;
+            s_beep_state = !s_beep_state;
+            beep = s_beep_state ? 0 : 1;  // 低电平触发
+        }
+    } else {
+        // 正常状态，关闭蜂鸣器（高电平）
+        beep = 1;
+        s_beep_state = 0;
+        s_beep_count = 0;
+    }
 }
 
 /**
@@ -159,22 +233,27 @@ void Control_Task_Run(void) {
 void Control_Task_SetMode(uint8_t mode) {
     if (mode == 1 || mode == 2) {
         g_work_mode = mode;
-        CONTROL_LOG("Mode set to: %s\r\n", mode == 1 ? "Auto" : "Manual");
         
-        // // ✅ 关键修复：切换到手动模式时，关闭所有执行器（低电平=关）
-        // if (mode == 2) {
-        //     jiare = 0;      // ✅ 低电平关闭
-        //     zhileng = 0;    // ✅ 低电平关闭
-        //     chushi = 0;     // ✅ 低电平关闭
-        //     jiashi = 0;     // ✅ 低电平关闭
+        // ✅ 标记配置已修改，延迟保存（防止频繁擦写Flash）
+        s_config_dirty = 1;
+        g_last_config_change_time = sys_tick_ms;
+        
+        CONTROL_LOG("Mode set to: %s (pending save)\r\n", mode == 1 ? "Auto" : "Manual");
+        
+        // ✅ 关键修复：切换到手动模式时，关闭所有执行器（低电平=关）
+        if (mode == 2) {
+            jiare = 0;      // ✅ 低电平关闭
+            zhileng = 0;    // ✅ 低电平关闭
+            chushi = 0;     // ✅ 低电平关闭
+            jiashi = 0;     // ✅ 低电平关闭
             
-        //     g_heater_state = 0;
-        //     g_cooler_state = 0;
-        //     g_dehumid_state = 0;
-        //     g_humidifier_state = 0;
+            g_heater_state = 0;
+            g_cooler_state = 0;
+            g_dehumid_state = 0;
+            g_humidifier_state = 0;
             
-        //     CONTROL_LOG("[MODE] All actuators OFF in manual mode\r\n");
-        // }
+            CONTROL_LOG("[MODE] All actuators OFF in manual mode\r\n");
+        }
     }
 }
 
@@ -274,8 +353,12 @@ void Control_Task_SetTempThreshold(int16_t temp_high, int16_t temp_low) {
     if (temp_high > temp_low) {
         g_temp_high = temp_high;
         g_temp_low = temp_low;
-        CONTROL_LOG("[OK] Temp threshold set: high=%.1f℃, low=%.1f℃\r\n", 
-                   (float)temp_high/10.0f, (float)temp_low/10.0f);
+        
+        // ✅ 标记配置已修改，延迟保存（防止频繁擦写Flash）
+        s_config_dirty = 1;
+        g_last_config_change_time = sys_tick_ms;
+        
+        CONTROL_LOG("[OK] Temp threshold set (pending save)\r\n");
     } else {
         CONTROL_LOG("[WARN] Temp high <= low, skip update\r\n");
     }
@@ -298,8 +381,12 @@ void Control_Task_SetHumidThreshold(int16_t humid_high, int16_t humid_low) {
     if (humid_high > humid_low) {
         g_humid_high = humid_high;
         g_humid_low = humid_low;
-        CONTROL_LOG("[OK] Humid threshold set: high=%.1f%%, low=%.1f%%\r\n", 
-                   (float)humid_high/10.0f, (float)humid_low/10.0f);
+        
+        // ✅ 标记配置已修改，延迟保存（防止频繁擦写Flash）
+        s_config_dirty = 1;
+        g_last_config_change_time = sys_tick_ms;
+        
+        CONTROL_LOG("[OK] Humid threshold set (pending save)\r\n");
     } else {
         CONTROL_LOG("[WARN] Humid high <= low, skip update\r\n");
     }

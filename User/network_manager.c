@@ -23,7 +23,7 @@
 /**
  * WiFi配置常量（需根据实际网络修改）
  */
-#define BEMFA_WIFI_SSID "TheWorld"   
+#define BEMFA_WIFI_SSID "bocchi457"
 #define BEMFA_WIFI_PASS "2020625663"
 
 /**
