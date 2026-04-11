@@ -10,7 +10,7 @@
  * ⚠️ 必须在包含此头文件之前定义，或在项目配置中定义
  */
 #ifndef DEBUG_NETWORK
-  #define DEBUG_NETWORK  1  // 1=启用日志, 0=禁用日志
+  #define DEBUG_NETWORK  1  // 1=启用日志, 0=禁用日志 (临时开启用于调试重连状态机)
 #endif
 
 /**

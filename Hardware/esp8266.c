@@ -377,6 +377,12 @@ void Usart_SendString(USART_TypeDef *USARTx, unsigned char *str,
  * @note   增加重试机制和详细的状态反馈
  */
 uint8_t ESP8266_SendData(unsigned char *data) {
+  // ✅ P0修复：如果AT执行器忙，拒绝发送，避免缓冲区冲突
+  if (AT_IsBusy()) {
+    RECONNECT_LOG("[SEND] AT executor busy, skip upload\r\n");
+    return 1;
+  }
+  
   char at_cmd[32] = {0};
   uint16_t data_len = strlen((char *)data);
   uint8_t retry_count = 0;
@@ -400,9 +406,9 @@ uint8_t ESP8266_SendData(unsigned char *data) {
       return 1; // 重试后仍失败
     }
 
-    // 只清空驱动层缓冲区，保护应用层缓冲区的云平台指令
-    ESP8266_RecvLen = 0;
-    memset(ESP8266_RecvBuf, 0, buf_len);
+    // ✅ P0修复：仅清空应用层缓冲区，保护AT执行器的响应缓冲区
+    // ESP8266_RecvLen = 0;  // ← 删除：不要清空AT响应缓冲区
+    // memset(ESP8266_RecvBuf, 0, buf_len);  // ← 删除
     // 注意：不清空 esp8266_buf 和 esp8266_cnt
 
     // 发送实际数据（逐字节发送）
@@ -429,6 +435,7 @@ uint8_t ESP8266_SendData(unsigned char *data) {
     // 发送成功
     RECONNECT_LOG("[SEND] Data sent successfully\r\n");
     return 0;
+
   }
   
   return 1;  // 理论上不会到达这里

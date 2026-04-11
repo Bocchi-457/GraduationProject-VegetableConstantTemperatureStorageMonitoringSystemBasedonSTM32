@@ -37,6 +37,9 @@ static uint8_t g_at_retry_count = 0;
 static const uint8_t *g_send_data = NULL;
 static uint16_t g_send_len = 0;
 
+// AT执行器忙标志（防止并发调用）
+volatile uint8_t g_at_busy = 0;
+
 /**
  * @brief 初始化AT指令非阻塞执行器
  */
@@ -48,6 +51,7 @@ void AT_Executor_Init(void) {
     g_at_retry_count = 0;
     g_send_data = NULL;
     g_send_len = 0;
+    g_at_busy = 0;  // ✅ 初始化为空闲
 }
 
 /**
@@ -65,7 +69,16 @@ void AT_Reset(void) {
     g_at_start_time = 0;
     g_expected_ack = NULL;
     g_send_data = NULL;
+    g_at_busy = 0;  // ✅ 重置时清除忙标志
     AT_LOG("[WARN] AT executor reset\r\n");
+}
+
+/**
+ * @brief 获取AT执行器忙标志
+ * @return 1=忙（正在执行AT指令），0=空闲
+ */
+uint8_t AT_IsBusy(void) {
+    return g_at_busy;
 }
 
 /**
@@ -88,6 +101,11 @@ static uint8_t Check_Ack(const char *expected) {
  * @brief 非阻塞执行AT指令（无数据阶段）
  */
 AT_Result_t AT_Execute_NonBlocking(const char *cmd, const char *expected_ack, uint32_t timeout_ms) {
+    // ✅ 检查忙标志，防止并发调用
+    if (g_at_busy && g_at_state != AT_STATE_IDLE) {
+        return AT_RESULT_BUSY;
+    }
+    
     // 状态机逻辑
     switch (g_at_state) {
         case AT_STATE_IDLE:
@@ -95,6 +113,9 @@ AT_Result_t AT_Execute_NonBlocking(const char *cmd, const char *expected_ack, ui
             if (cmd == NULL || expected_ack == NULL) {
                 return AT_RESULT_ERROR;
             }
+            
+            // ✅ 设置忙标志
+            g_at_busy = 1;
             
             // 清空AT响应缓冲区
             memset(ESP8266_RecvBuf, 0, sizeof(ESP8266_RecvBuf));
@@ -113,17 +134,41 @@ AT_Result_t AT_Execute_NonBlocking(const char *cmd, const char *expected_ack, ui
             return AT_RESULT_IN_PROGRESS;
             
         case AT_STATE_WAITING_ACK:
+            // ✅ 新增：每次进入都输出状态信息，方便诊断超时失效问题
+            {
+                static uint32_t last_debug_time = 0;
+                uint32_t elapsed = sys_tick_ms - g_at_start_time;
+                
+                // 每500ms输出一次调试信息，避免日志风暴
+                if (sys_tick_ms - last_debug_time > 500) {
+                    AT_LOG("[DBG] Waiting ACK: elapsed=%lu ms, timeout=%lu ms, recv_len=%d\r\n", 
+                           elapsed, g_at_timeout, ESP8266_RecvLen);
+                    last_debug_time = sys_tick_ms;
+                }
+            }
+            
             // 检查超时
             if (sys_tick_ms - g_at_start_time > g_at_timeout) {
                 g_at_state = AT_STATE_TIMEOUT;
+                g_at_busy = 0;  // ✅ 超时时清除忙标志
                 AT_LOG("[ERR] Timeout waiting for: %s\r\n", g_expected_ack);
+                // ✅ 新增：输出超时时的缓冲区内容，方便诊断
+                if (ESP8266_RecvLen > 0) {
+                    ESP8266_RecvBuf[ESP8266_RecvLen] = '\0';  // 确保字符串结束
+                    AT_LOG("[DBG] Recv buffer (%d bytes): [%s]\r\n", ESP8266_RecvLen, ESP8266_RecvBuf);
+                } else {
+                    AT_LOG("[DBG] Recv buffer is empty\r\n");
+                }
                 return AT_RESULT_TIMEOUT;
             }
             
             // 检查是否收到期望响应
             if (Check_Ack(g_expected_ack)) {
                 g_at_state = AT_STATE_DONE;
+                // ✅ 新增：输出收到的完整响应内容
+                ESP8266_RecvBuf[ESP8266_RecvLen] = '\0';  // 确保字符串结束
                 AT_LOG("[OK] Received: %s\r\n", g_expected_ack);
+                AT_LOG("[DBG] Full response (%d bytes): [%s]\r\n", ESP8266_RecvLen, ESP8266_RecvBuf);
                 return AT_RESULT_OK;
             }
             
@@ -133,6 +178,7 @@ AT_Result_t AT_Execute_NonBlocking(const char *cmd, const char *expected_ack, ui
         case AT_STATE_DONE:
             // 完成后重置状态
             g_at_state = AT_STATE_IDLE;
+            g_at_busy = 0;  // ✅ 完成时清除忙标志
             return AT_RESULT_OK;
             
         case AT_STATE_TIMEOUT:
@@ -151,12 +197,20 @@ AT_Result_t AT_Execute_NonBlocking(const char *cmd, const char *expected_ack, ui
 AT_Result_t AT_SendData_NonBlocking(const uint8_t *data, uint16_t len, uint32_t timeout_ms) {
     static uint8_t cipsend_cmd[64];
     
+    // ✅ 检查忙标志，防止并发调用
+    if (g_at_busy && g_at_state != AT_STATE_IDLE) {
+        return AT_RESULT_BUSY;
+    }
+    
     switch (g_at_state) {
         case AT_STATE_IDLE:
             // 阶段1：发送AT+CIPSEND=len
             if (data == NULL || len == 0) {
                 return AT_RESULT_ERROR;
             }
+            
+            // ✅ 设置忙标志
+            g_at_busy = 1;
             
             sprintf((char *)cipsend_cmd, "AT+CIPSEND=%d\r\n", len);
             
@@ -180,6 +234,7 @@ AT_Result_t AT_SendData_NonBlocking(const uint8_t *data, uint16_t len, uint32_t 
             // 检查超时
             if (sys_tick_ms - g_at_start_time > g_at_timeout) {
                 g_at_state = AT_STATE_TIMEOUT;
+                g_at_busy = 0;  // ✅ 超时时清除忙标志
                 AT_LOG("[ERR] Timeout waiting for '>'\r\n");
                 return AT_RESULT_TIMEOUT;
             }
@@ -202,6 +257,7 @@ AT_Result_t AT_SendData_NonBlocking(const uint8_t *data, uint16_t len, uint32_t 
             // 检查超时
             if (sys_tick_ms - g_at_start_time > g_at_timeout) {
                 g_at_state = AT_STATE_TIMEOUT;
+                g_at_busy = 0;  // ✅ 超时时清除忙标志
                 AT_LOG("[ERR] Timeout waiting for 'SEND OK'\r\n");
                 return AT_RESULT_TIMEOUT;
             }
@@ -209,6 +265,7 @@ AT_Result_t AT_SendData_NonBlocking(const uint8_t *data, uint16_t len, uint32_t 
             // 检查是否收到"SEND OK"
             if (Check_Ack("SEND OK")) {
                 g_at_state = AT_STATE_DONE;
+                g_at_busy = 0;  // ✅ 完成时清除忙标志
                 AT_LOG("[OK] Data sent successfully\r\n");
                 return AT_RESULT_OK;
             }

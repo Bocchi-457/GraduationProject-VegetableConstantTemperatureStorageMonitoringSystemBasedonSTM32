@@ -113,6 +113,9 @@ void Network_Task(void) {
     }
     last_task_time = sys_tick_ms;
     
+    // ✅ 修复：移除AT忙检查，允许重连状态机持续运行以检测超时
+    // AT执行器内部已有超时机制和忙标志位保护，无需在此重复检查
+    
     switch (g_net_state) {
         case NET_CONNECTING:
         case NET_RECONNECTING:
@@ -323,32 +326,64 @@ static void Reconnect_StateMachine(void) {
     AT_Result_t result;
     static uint8_t warn_logged = 0;  // ✅ 防止重复输出警告
     
-    // 防抖：最小重连间隔60秒（模块复位120秒）
-    if (sys_tick_ms - g_last_reconnect_time < 60000 && g_reconnect_step < 7) {
-        if (!warn_logged) {  // ✅ 仅在首次输出
+    // ✅ 关键修复：仅在step=0且刚进入重连状态时检查防抖
+    // 一旦通过检查并更新时间戳，后续调用（包括等待AT响应期间）不应再被拦截
+    if (g_reconnect_step == 0 && !warn_logged) {
+        // 防抖：最小重连间隔60秒（模块复位120秒）
+        if (sys_tick_ms - g_last_reconnect_time < 60000) {
             NETWORK_LOG("[WARN] Reconnect too frequent, wait %d ms\r\n", 
                        60000 - (sys_tick_ms - g_last_reconnect_time));
             warn_logged = 1;
+            return;
         }
-        return;
+        
+        // ✅ 通过防抖检查，更新时间戳
+        g_last_reconnect_time = sys_tick_ms;
+        warn_logged = 1;  // 标记已检查，本轮重连不再重复检查
+        NETWORK_LOG("[INFO] Starting reconnection process (step=%d)...\r\n", g_reconnect_step);
     }
     
-    warn_logged = 0;  // ✅ 重置标志，允许下次输出
+    // ✅ 重置标志：当重连完成或失败后，允许下一轮重连
+    if (g_reconnect_step == 0 && g_net_state == NET_CONNECTED) {
+        warn_logged = 0;  // 重连成功，重置标志
+    }
     
     switch (g_reconnect_step) {
         case 0:  // 诊断阶段：检查TCP连接状态
             {
-                NETWORK_LOG("[DIAG] Checking TCP status...\r\n");
+                static uint8_t diag_logged = 0;  // ✅ 防止重复输出诊断日志
+                
+                // ✅ 仅在首次进入时输出日志
+                if (!diag_logged) {
+                    NETWORK_LOG("[DIAG] Checking TCP status...\r\n");
+                    diag_logged = 1;
+                }
                 
                 // 使用AT+CIPSTATUS诊断
                 result = AT_Execute_NonBlocking("AT+CIPSTATUS\r\n", "STATUS:", 2000);
+                
+                // ✅ 新增：输出AT返回结果，方便诊断
+                NETWORK_LOG("[DBG] AT_Execute returned: %d (0=OK, 1=IN_PROGRESS, 2=TIMEOUT, 3=BUSY, 4=ERROR)\r\n", result);
                 
                 // ✅ 关键修复：如果正在等待响应，立即返回，不要重置状态机
                 if (result == AT_RESULT_IN_PROGRESS) {
                     return;  // 等待下次调度
                 }
                 
+                // ✅ 处理忙状态：AT执行器正忙，等待下次调度
+                if (result == AT_RESULT_BUSY) {
+                    // ✅ P1修复：每2秒输出一次，避免日志风暴
+                    static uint32_t last_busy_log_time = 0;
+                    if (sys_tick_ms - last_busy_log_time > 2000) {
+                        NETWORK_LOG("[WARN] AT executor busy, will retry\r\n");
+                        last_busy_log_time = sys_tick_ms;
+                    }
+                    return;  // 等待AT执行器空闲
+                }
+                
                 if (result == AT_RESULT_OK) {
+                    diag_logged = 0;  // ✅ 重置标志，允许下次诊断
+                    
                     // 检查响应中是否包含"STATUS:2"或"STATUS:3"（已连接）
                     if (strstr((char *)ESP8266_RecvBuf, "STATUS:2") != NULL ||
                         strstr((char *)ESP8266_RecvBuf, "STATUS:3") != NULL) {
@@ -356,14 +391,21 @@ static void Reconnect_StateMachine(void) {
                         g_net_state = NET_CONNECTED;
                         g_send_fail_count = 0;
                         g_reconnect_step = 0;
+                        warn_logged = 0;  // ✅ 重置标志，允许下次重连
                         return;
                     } else {
                         NETWORK_LOG("[ERR] TCP disconnected\r\n");
                         g_reconnect_step = 1;  // 进入TCP重连
                     }
                 } else if (result == AT_RESULT_TIMEOUT) {
+                    diag_logged = 0;  // ✅ 重置标志，允许下次诊断
                     NETWORK_LOG("[ERR] Diagnosis timeout\r\n");
                     g_reconnect_step = 4;  // 直接进入WiFi检测
+                } else {
+                    // ✅ 处理错误状态（AT_RESULT_ERROR等）
+                    diag_logged = 0;  // 重置标志
+                    NETWORK_LOG("[ERR] AT executor error, resetting...\r\n");
+                    g_reconnect_step = 7;  // 进入模块复位步骤
                 }
             }
             break;

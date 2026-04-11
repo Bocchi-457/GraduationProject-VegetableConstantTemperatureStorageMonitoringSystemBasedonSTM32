@@ -209,4 +209,11 @@ AT_State_t AT_GetState(void);
  */
 void AT_Reset(void);
 
+/**
+ * @brief 获取AT执行器忙标志
+ * @return 1=忙（正在执行AT指令），0=空闲
+ * @note 用于防止并发调用AT指令导致状态机冲突
+ */
+uint8_t AT_IsBusy(void);
+
 #endif // _ESP8266_H_

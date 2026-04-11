@@ -147,18 +147,17 @@ uint8_t Read_DHT22(DHT22_Data_TypeDef *data) {
   if (DHT22_Check() != 0)
     return ERROR;
 
-  // 关中断，保护微秒级时序
-  __disable_irq();
-
+  // ✅ 优化：仅在关键时序段关中断（缩短至约0.8ms/字节）
+  // 策略：在读取每个字节时临时关中断，读完立即恢复
   for (i = 0; i < 5; i++) {
+    __disable_irq();  // 关中断保护单字节读取
     buf[i] = DHT22_Read_Byte();
+    __enable_irq();   // 立即恢复中断
+    
     if (buf[i] == 0xFF) {
-      __enable_irq(); // 失败退出前务必恢复中断
       return ERROR;
     }
   }
-
-  __enable_irq(); // 读取完毕，恢复中断
   // ----------------------------------------
 
   // 强制转为8位，防止隐式整数提升导致校验失败

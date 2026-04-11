@@ -272,17 +272,28 @@ void Serial_SendNumber(uint32_t Number, uint8_t Length) {
 }
 
 /**
- * @brief 格式化发送函数
+ * @brief 格式化发送函数（带时间戳）
  * @param format: 格式化字符串
  * @param ...: 可变参数
  * @return 无
+ * @note 自动在每条日志前添加 [T:xxxms] 时间戳，方便调试时序问题
  */
 void Serial_Printf(char *format, ...) {
-  char String[100];
+  char String[200];  // ✅ 增大缓冲区以容纳时间戳
+  char TimeStamp[20];
   va_list arg;
+  
+  // ✅ 添加时间戳前缀
+  extern uint32_t sys_tick_ms;  // 声明外部变量
+  sprintf(TimeStamp, "[T:%lu] ", sys_tick_ms);
+  
   va_start(arg, format);
-  vsprintf(String, format, arg);
+  vsprintf(String + strlen(TimeStamp), format, arg);  // 从时间戳后开始写入
   va_end(arg);
+  
+  // 将时间戳复制到字符串开头
+  memcpy(String, TimeStamp, strlen(TimeStamp));
+  
   Serial_SendString(String);
 }
 
