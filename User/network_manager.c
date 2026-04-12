@@ -46,11 +46,23 @@ static char g_synced_time[32] = {0};       // 同步后的时间字符串
 static uint8_t g_reconnect_retry_count = 0;  // 当前重连重试次数
 static uint32_t g_reconnect_start_time = 0;  // 重连开始时间戳
 
+// ✅ 新增：数据上传状态跟踪（非阻塞）
+typedef enum {
+    UPLOAD_STATE_IDLE = 0,      // 空闲
+    UPLOAD_STATE_SENDING,       // 发送中
+    UPLOAD_STATE_SUCCESS,       // 发送成功
+    UPLOAD_STATE_FAILED         // 发送失败
+} UploadState_t;
+
+static UploadState_t g_upload_state = UPLOAD_STATE_IDLE;
+static uint32_t g_upload_start_time = 0;  // 上传开始时间戳
+
 /**
  * 内部辅助函数声明
  */
 static void Reconnect_StateMachine(void);
 static void Parse_Cloud_Command(void);
+static uint8_t Poll_Upload_Result(void);  // ✅ 新增：上传结果轮询
 
 /**
  * @brief 初始化网络管理模块
@@ -80,78 +92,39 @@ void Network_Manager_Init(void) {
 
 /**
  * @brief 发送心跳包（保持在线）
- * @note 每60秒调用一次，由应用层控制调用时机
+ * @note 根据巴法云协议，每次成功的数据上传即视为心跳，无需单独发送
+ *       此函数保留仅为API兼容，实际不做任何操作
  */
 void Network_SendHeartbeat(void) {
-    if (!g_module_initialized) {
-        return;
-    }
-    
-    if (g_net_state != NET_CONNECTED) {
-        return;
-    }
-    
-    char data[128];
-    sprintf(data, "cmd=2&uid=%s&topic=online&msg=Keep online\r\n", BEMFA_ID);
-    
-    // 心跳包发送失败不触发重连（避免误判），但记录日志
-    if (ESP8266_SendData((unsigned char *)data) != 0) {
-        NETWORK_LOG("[WARN] Heartbeat send failed\r\n");
-    }
+    // ✅ 空实现：数据上传已作为心跳，无需额外发送
+    // 如果确实需要独立心跳，可在此处添加非阻塞发送逻辑
 }
 
 /**
- * @brief 网络任务调度
- * @note 此函数被调度器调用，返回类型为void
+ * @brief 网络任务调度（非阻塞，每50ms执行一次）
+ * @note 此函数被调度器调用，负责处理重连状态机、上传结果轮询和指令解析
  */
 void Network_Task(void) {
-    static uint32_t last_task_time = 0;
+    static uint32_t last_call_time = 0;
     
-    // 限流：每50ms执行一次
-    if (sys_tick_ms - last_task_time < 50) {
+    // 仅在联网模式下执行
+    extern uint8_t g_network_enabled;
+    if (!g_network_enabled) {
         return;
     }
-    last_task_time = sys_tick_ms;
     
-    // ✅ 修复：移除AT忙检查，允许重连状态机持续运行以检测超时
-    // AT执行器内部已有超时机制和忙标志位保护，无需在此重复检查
+    // ✅ 轮询上传结果（优先级最高）
+    Poll_Upload_Result();
     
-    switch (g_net_state) {
-        case NET_CONNECTING:
-        case NET_RECONNECTING:
-            // 执行非阻塞重连状态机
-            Reconnect_StateMachine();
-            break;
-            
-        case NET_CONNECTED:
-            // 解析云端指令
-            Parse_Cloud_Command();
-            
-            // 处理时间同步超时（自动重试）
-            if (g_time_sync_state == 1) {
-                if (sys_tick_ms - g_time_sync_timer > 6000) {
-                    NETWORK_LOG("[WARN] Time sync timeout, will retry\r\n");
-                    
-                    // 重置状态，下次调用Network_RequestTimeSync可重新发送
-                    g_time_sync_state = 0;
-                    
-                    // 清空AT响应缓冲区，避免旧数据干扰
-                    memset(ESP8266_RecvBuf, 0, buf_len);
-                    ESP8266_RecvLen = 0;
-                }
-            }
-            break;
-            
-        case NET_OFFLINE:
-            // 每30秒尝试重连
-            if (sys_tick_ms - g_last_reconnect_time > 30000) {
-                g_net_state = NET_RECONNECTING;
-                g_reconnect_step = 0;
-            }
-            break;
-            
-        default:
-            break;
+    // ✅ P0修复：如果正在重连，调用重连状态机
+    if (g_send_fail_count >= 3 || g_net_state != NET_CONNECTED) {
+        Reconnect_StateMachine();
+    }
+    
+    // ✅ 定期解析云端指令（每100ms）
+    if (sys_tick_ms - last_call_time > 100) {
+        Parse_Cloud_Command();
+        last_call_time = sys_tick_ms;
     }
 }
 
@@ -163,7 +136,8 @@ NetworkState_t Network_GetState(void) {
 }
 
 /**
- * @brief 上传传感器数据
+ * @brief 上传传感器数据（非阻塞版本）
+ * @note 调用此函数启动上传，需在Network_Task中轮询结果
  */
 uint8_t Network_UploadSensorData(int16_t temp_x10, int16_t hum_x10, 
                                   uint8_t mode,
@@ -183,43 +157,115 @@ uint8_t Network_UploadSensorData(int16_t temp_x10, int16_t hum_x10,
         return 1;
     }
     
-    char data[256];
+    // ✅ 如果上次上传还在进行中，跳过本次上传
+    if (g_upload_state == UPLOAD_STATE_SENDING) {
+        return 1;  // 忙，跳过
+    }
     
-    // 构建巴法云数据包（与旧代码格式完全兼容）
-    // ✅ 关键修复：阈值需要除以10，因为内部存储是放大10倍的值
-    sprintf(data, 
+    // ✅ 构建数据包（使用static避免栈溢出）
+    static char data[256];
+    int n = snprintf(data, sizeof(data), 
         "cmd=2&uid=%s&topic=data&msg=Mode:%d th:%d tl:%d hh:%d hl:%d "
         "jr:%d zl:%d cs:%d js:%d temp:%d.%d humi:%d.%d\r\n",
         BEMFA_ID,
         mode,
-        wendu_high / 10,    // ✅ 修复：250 → 25
-        wendu_low / 10,     // ✅ 修复：200 → 20
-        shidu_high / 10,    // ✅ 修复：650 → 65
-        shidu_low / 10,     // ✅ 修复：500 → 50
+        wendu_high / 10,
+        wendu_low / 10,
+        shidu_high / 10,
+        shidu_low / 10,
         jiare, zhileng, chushi, jiashi,
-        temp_x10 / 10,           // ✅ 自动处理负号
-        abs(temp_x10) % 10,      // 取绝对值的个位
+        temp_x10 / 10,
+        abs(temp_x10) % 10,
         hum_x10 / 10, 
-        hum_x10 % 10
-    );
+        abs(hum_x10) % 10);
     
-    // 发送数据（TODO: 阶段2改为非阻塞异步发送）
-    if (ESP8266_SendData((unsigned char *)data) == 0) {
-        g_send_fail_count = 0;
-        return 0;  // 成功
+    if (n < 0 || n >= (int)sizeof(data)) {
+        NETWORK_LOG("[ERR] Payload too large (%d bytes)\r\n", n);
+        return 1;
+    }
+    
+    // ✅ 启动非阻塞上传（无需清空esp8266_buf，AT响应与云端指令内容天然隔离）
+    AT_Result_t result = AT_SendData_NonBlocking((uint8_t *)data, strlen(data), 3000);
+    
+    if (result == AT_RESULT_IN_PROGRESS) {
+        g_upload_state = UPLOAD_STATE_SENDING;
+        g_upload_start_time = sys_tick_ms;
+        NETWORK_LOG("[INFO] Upload started (non-blocking)\r\n");
+        return 0;  // 上传已启动
+    } else if (result == AT_RESULT_BUSY) {
+        NETWORK_LOG("[WARN] AT executor busy, skip upload\r\n");
+        return 1;
     } else {
+        // 立即失败（参数错误等）
+        NETWORK_LOG("[ERR] Upload start failed: %d\r\n", result);
         g_send_fail_count++;
-        NETWORK_LOG("[ERR] Upload failed, count=%d\r\n", g_send_fail_count);
         
-        // 连续3次失败，启动重连
-        if (g_send_fail_count >= 3) {
-            NETWORK_LOG("[WARN] 3 consecutive failures, triggering reconnect\r\n");
+        // ✅ 第1次失败即触发重连
+        if (g_send_fail_count >= 1 && g_net_state == NET_CONNECTED) {
+            g_net_state = NET_RECONNECTING;
+            g_reconnect_step = 0;
+            NETWORK_LOG("[INFO] Triggering reconnect after upload failure\r\n");
+        }
+        
+        return 1;
+    }
+}
+
+/**
+ * @brief 轮询上传结果（在Network_Task中调用）
+ * @return 0=空闲或成功, 1=仍在发送中, 2=失败
+ */
+static uint8_t Poll_Upload_Result(void) {
+    if (g_upload_state != UPLOAD_STATE_SENDING) {
+        return 0;  // 空闲或已完成
+    }
+    
+    // 检查超时（5秒）
+    if (sys_tick_ms - g_upload_start_time > 5000) {
+        NETWORK_LOG("[ERR] Upload timeout (5s)\r\n");
+        g_upload_state = UPLOAD_STATE_FAILED;
+        g_send_fail_count++;
+        
+        if (g_send_fail_count >= 1 && g_net_state == NET_CONNECTED) {
             g_net_state = NET_RECONNECTING;
             g_reconnect_step = 0;
         }
         
-        return 1;  // 失败
+        return 2;  // 失败
     }
+    
+    // 检查AT执行器状态
+    AT_State_t at_state = AT_GetState();
+    
+    if (at_state == AT_STATE_DONE) {
+        // 上传成功
+        NETWORK_LOG("[OK] Upload completed successfully\r\n");
+        g_upload_state = UPLOAD_STATE_SUCCESS;
+        g_send_fail_count = 0;  // 重置失败计数
+        
+        // 重置AT执行器状态，准备下次上传
+        AT_Reset();
+        
+        return 0;  // 成功
+    } else if (at_state == AT_STATE_TIMEOUT || at_state == AT_STATE_ERROR) {
+        // 上传失败
+        NETWORK_LOG("[ERR] Upload failed: AT state=%d\r\n", at_state);
+        g_upload_state = UPLOAD_STATE_FAILED;
+        g_send_fail_count++;
+        
+        if (g_send_fail_count >= 1 && g_net_state == NET_CONNECTED) {
+            g_net_state = NET_RECONNECTING;
+            g_reconnect_step = 0;
+        }
+        
+        // 重置AT执行器
+        AT_Reset();
+        
+        return 2;  // 失败
+    }
+    
+    // 仍在进行中
+    return 1;
 }
 
 /**
@@ -352,35 +398,76 @@ static void Reconnect_StateMachine(void) {
         case 0:  // 诊断阶段：检查TCP连接状态
             {
                 static uint8_t diag_logged = 0;  // ✅ 防止重复输出诊断日志
+                static uint32_t busy_start_time = 0; // ✅ 记录AT忙碌开始时间
                 
-                // ✅ 仅在首次进入时输出日志
-                if (!diag_logged) {
-                    NETWORK_LOG("[DIAG] Checking TCP status...\r\n");
-                    diag_logged = 1;
-                }
+                // ✅ P0修复：如果AT执行器处于错误状态，先重置
+                extern uint8_t AT_IsBusy(void);
+                extern void AT_Reset(void);
                 
-                // 使用AT+CIPSTATUS诊断
-                result = AT_Execute_NonBlocking("AT+CIPSTATUS\r\n", "STATUS:", 2000);
-                
-                // ✅ 新增：输出AT返回结果，方便诊断
-                NETWORK_LOG("[DBG] AT_Execute returned: %d (0=OK, 1=IN_PROGRESS, 2=TIMEOUT, 3=BUSY, 4=ERROR)\r\n", result);
-                
-                // ✅ 关键修复：如果正在等待响应，立即返回，不要重置状态机
-                if (result == AT_RESULT_IN_PROGRESS) {
-                    return;  // 等待下次调度
-                }
-                
-                // ✅ 处理忙状态：AT执行器正忙，等待下次调度
-                if (result == AT_RESULT_BUSY) {
+                if (AT_IsBusy()) {
+                    // 记录开始忙碌的时间
+                    if (busy_start_time == 0) {
+                        busy_start_time = sys_tick_ms;
+                    }
+                    
+                    // ✅ P0修复：如果已经超过5秒，强制重置
+                    if (sys_tick_ms - busy_start_time > 5000) {
+                        NETWORK_LOG("[ERR] AT executor stuck for %lu ms, forcing reset\r\n", 
+                                   sys_tick_ms - busy_start_time);
+                        AT_Reset();
+                        busy_start_time = 0;
+                        diag_logged = 0;
+                        return;
+                    }
+                    
                     // ✅ P1修复：每2秒输出一次，避免日志风暴
                     static uint32_t last_busy_log_time = 0;
                     if (sys_tick_ms - last_busy_log_time > 2000) {
-                        NETWORK_LOG("[WARN] AT executor busy, will retry\r\n");
+                        NETWORK_LOG("[WARN] AT executor busy, waiting...\r\n");
                         last_busy_log_time = sys_tick_ms;
                     }
-                    return;  // 等待AT执行器空闲
+                    
+                    // ✅ 关键修复：轮询状态机（依赖AT_Execute_NonBlocking的幂等性）
+                    result = AT_Execute_NonBlocking("AT+CIPSTATUS\r\n", "STATUS:", 2000);
+                    
+                    // ✅ 处理进行中状态：继续等待
+                    if (result == AT_RESULT_IN_PROGRESS) {
+                        return;
+                    }
+                    
+                    // ✅ 处理忙状态：理论上不应出现，但作为防御
+                    if (result == AT_RESULT_BUSY) {
+                        return;
+                    }
+                    
+                    // 如果返回OK/TIMEOUT/ERROR，跳出if分支，继续下面的结果处理
+                } else {
+                    // AT不忙时，重置计时器并启动新指令
+                    busy_start_time = 0;
+                    
+                    // ✅ 仅在首次进入时输出日志
+                    if (!diag_logged) {
+                        NETWORK_LOG("[DIAG] Checking TCP status...\r\n");
+                        diag_logged = 1;
+                    }
+                    
+                    // 启动AT指令
+                    result = AT_Execute_NonBlocking("AT+CIPSTATUS\r\n", "STATUS:", 2000);
+                    
+                    // 如果立即返回IN_PROGRESS，等待下次调度
+                    if (result == AT_RESULT_IN_PROGRESS) {
+                        return;
+                    }
+                    
+                    // 如果返回BUSY，等待下次调度
+                    if (result == AT_RESULT_BUSY) {
+                        return;
+                    }
+                    
+                    // 如果立即返回OK/TIMEOUT/ERROR（极少见），继续下面的结果处理
                 }
                 
+                // ✅ 统一处理最终结果（OK/TIMEOUT/ERROR）
                 if (result == AT_RESULT_OK) {
                     diag_logged = 0;  // ✅ 重置标志，允许下次诊断
                     
@@ -392,6 +479,10 @@ static void Reconnect_StateMachine(void) {
                         g_send_fail_count = 0;
                         g_reconnect_step = 0;
                         warn_logged = 0;  // ✅ 重置标志，允许下次重连
+                        
+                        // ✅ P1修复：重置所有静态变量，防止状态污染
+                        AT_Reset();  // 重置AT执行器
+                        
                         return;
                     } else {
                         NETWORK_LOG("[ERR] TCP disconnected\r\n");
@@ -403,8 +494,12 @@ static void Reconnect_StateMachine(void) {
                     g_reconnect_step = 4;  // 直接进入WiFi检测
                 } else {
                     // ✅ 处理错误状态（AT_RESULT_ERROR等）
-                    diag_logged = 0;  // 重置标志
+                    diag_logged = 0;  // ✅ 重置标志
                     NETWORK_LOG("[ERR] AT executor error, resetting...\r\n");
+                    
+                    // ✅ P0修复：强制重置AT执行器
+                    AT_Reset();
+                    
                     g_reconnect_step = 7;  // 进入模块复位步骤
                 }
             }
@@ -1115,3 +1210,4 @@ static void Parse_Cloud_Command(void) {
     memset(esp8266_buf, 0, esp8266_cnt);
     esp8266_cnt = 0;
 }
+

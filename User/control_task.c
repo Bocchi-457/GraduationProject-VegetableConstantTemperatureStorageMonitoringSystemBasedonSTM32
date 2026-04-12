@@ -119,11 +119,6 @@ void Control_Task_Run(void) {
     }
     g_last_control_time = sys_tick_ms;
     
-    // 仅在自动模式下执行控制
-    if (g_work_mode != 1) {
-        return;
-    }
-    
     // 检查DHT22数据有效性
     if (!g_dht22_data_valid) {
         CONTROL_LOG("DHT22 data invalid, skip control\r\n");
@@ -132,6 +127,44 @@ void Control_Task_Run(void) {
     
     int16_t temp = DHT22_Data.temperature;
     int16_t humid = DHT22_Data.humidity;
+    
+    // 超范围报警逻辑（自动/手动模式均生效）
+    float current_temp = temp / 10.0f;
+    float current_humi = humid / 10.0f;
+    float temp_high_f = g_temp_high / 10.0f;
+    float temp_low_f = g_temp_low / 10.0f;
+    float humi_high_f = g_humid_high / 10.0f;
+    float humi_low_f = g_humid_low / 10.0f;
+    
+    float temp_diff = 0;
+    if (current_temp > temp_high_f)
+        temp_diff = current_temp - temp_high_f;
+    else if (current_temp < temp_low_f)
+        temp_diff = temp_low_f - current_temp;
+    
+    float humi_diff = 0;
+    if (current_humi > humi_high_f)
+        humi_diff = current_humi - humi_high_f;
+    else if (current_humi < humi_low_f)
+        humi_diff = humi_low_f - current_humi;
+    
+    if (temp_diff >= 2.0f || humi_diff >= 5.0f) {
+        s_beep_count++;
+        if (s_beep_count >= 1) {
+            s_beep_count = 0;
+            s_beep_state = !s_beep_state;
+            beep = s_beep_state ? 0 : 1;
+        }
+    } else {
+        beep = 1;
+        s_beep_state = 0;
+        s_beep_count = 0;
+    }
+    
+    // 仅在自动模式下执行控制
+    if (g_work_mode != 1) {
+        return;
+    }
     
     // 温度控制逻辑（滞回比较防止抖动）
     if (temp > g_temp_high) {
@@ -185,44 +218,6 @@ void Control_Task_Run(void) {
         jiashi = 0;   // ✅ 低电平关闭
         g_dehumid_state = 0;
         g_humidifier_state = 0;
-    }
-    
-    // ✅ 新增：温湿度超范围报警逻辑
-    // 将内部值转换为浮点数便于计算
-    float current_temp = temp / 10.0f;
-    float current_humi = humid / 10.0f;
-    float temp_high_f = g_temp_high / 10.0f;
-    float temp_low_f = g_temp_low / 10.0f;
-    float humi_high_f = g_humid_high / 10.0f;
-    float humi_low_f = g_humid_low / 10.0f;
-    
-    // 计算偏差
-    float temp_diff = 0;
-    if (current_temp > temp_high_f)
-        temp_diff = current_temp - temp_high_f;
-    else if (current_temp < temp_low_f)
-        temp_diff = temp_low_f - current_temp;
-    
-    float humi_diff = 0;
-    if (current_humi > humi_high_f)
-        humi_diff = current_humi - humi_high_f;
-    else if (current_humi < humi_low_f)
-        humi_diff = humi_low_f - current_humi;
-    
-    // 当温度超过范围2度或湿度超过范围5%时报警
-    if (temp_diff >= 2.0f || humi_diff >= 5.0f) {
-        // ✅ 优化：提高报警频率至约1Hz（每0.5秒切换一次状态）
-        s_beep_count++;
-        if (s_beep_count >= 1) {  // 修改：5 → 1，从2.5秒周期改为0.5秒周期
-            s_beep_count = 0;
-            s_beep_state = !s_beep_state;
-            beep = s_beep_state ? 0 : 1;  // 低电平触发
-        }
-    } else {
-        // 正常状态，关闭蜂鸣器（高电平）
-        beep = 1;
-        s_beep_state = 0;
-        s_beep_count = 0;
     }
 }
 

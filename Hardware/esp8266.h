@@ -216,4 +216,10 @@ void AT_Reset(void);
  */
 uint8_t AT_IsBusy(void);
 
+/**
+ * @brief 获取AT执行器调用计数器（用于诊断日志时序）
+ * @return 当前调用次数
+ */
+uint32_t AT_GetCallCount(void);
+
 #endif // _ESP8266_H_
