@@ -7,14 +7,15 @@
 
 #include "stm32f10x.h"
 #include "scheduler.h"
-#include "network_manager.h"
+#include "network_core.h"        // 【重构】新的网络核心模块
+#include "cloud_protocol.h"      // 【重构】云端协议模块
 #include "dht22_task.h"
 #include "control_task.h"
-#include "key_task.h"              // ✅ 添加按键任务
-#include "oled_display_task.h"     // ✅ 添加OLED显示任务
-#include "DS1302.h"                // ✅ 新增：DS1302 RTC驱动
-#include "dht22.h"                 // DHT22数据结构定义
-#include "control.h"               // 执行器GPIO定义（jiare/zhileng等）
+#include "key_task.h"
+#include "oled_display_task.h"
+#include "DS1302.h"
+#include "dht22.h"
+#include "control.h"
 #include "OLED.h"
 #include "Key.h"
 #include "Timer.h"
@@ -116,10 +117,10 @@ void System_Init(void) {
     
     // ✅ 根据用户选择决定是否初始化网络模块
     if (key_choice == 1) {
-        // 用户选择"是"，初始化网络模块
+        // 用户选择“是”，初始化网络模块
         g_network_enabled = 1;
         Serial_Printf("Initializing network module...\r\n");
-        Network_Manager_Init();
+        Network_Core_Init();  // 【重构】使用新的网络核心模块
     } else {
         // 用户选择"否"，跳过网络初始化
         g_network_enabled = 0;
@@ -142,7 +143,7 @@ void Network_Upload_Task(void) {
     last_upload = sys_tick_ms;
     
     // 仅在联网模式下上传
-    if (Network_GetState() != NET_CONNECTED) {
+    if (Network_Core_Get_State() != NET_STATE_CONNECTED) {
         return;
     }
     
@@ -151,17 +152,17 @@ void Network_Upload_Task(void) {
         return;
     }
     
-    // 上传传感器数据
-    Network_UploadSensorData(
-        DHT22_Data.temperature,      // 温度（放大10倍）
-        DHT22_Data.humidity,         // 湿度（放大10倍）
-        g_work_mode,                 // 工作模式
-        g_temp_high, g_temp_low,     // 温度阈值
-        g_humid_high, g_humid_low,   // 湿度阈值
-        g_heater_state,              // 加热状态
-        g_cooler_state,              // 制冷状态
-        g_dehumid_state,             // 除湿状态
-        g_humidifier_state           // 加湿状态
+    // 【重构】使用新的网络核心模块上传数据
+    Network_Core_Upload(
+        g_work_mode,
+        g_temp_high, g_temp_low,
+        g_humid_high, g_humid_low,
+        g_heater_state,
+        g_cooler_state,
+        g_dehumid_state,
+        g_humidifier_state,
+        DHT22_Data.temperature,
+        DHT22_Data.humidity
     );
 }
 
@@ -171,7 +172,8 @@ void Network_Upload_Task(void) {
 void Handle_Cloud_Command(void) {
     CloudCommand_t cmd;
     
-    if (Network_ProcessCloudCommand(&cmd) != 0) {
+    // 【重构】使用新的网络核心模块获取指令
+    if (!Network_Core_Get_Command(&cmd)) {
         return;  // 无指令
     }
     
@@ -189,44 +191,63 @@ void Handle_Cloud_Command(void) {
             }
             break;
             
-        case CMD_HEATER:
+        case CMD_HEATER_ON:
             if (g_work_mode == 2) {  // 仅手动模式允许
-                Control_Task_ManualControl(CTRL_HEATER, cmd.value);
+                Control_Task_ManualControl(CTRL_HEATER, 1);
             }
             break;
             
-        case CMD_COOLER:
+        case CMD_HEATER_OFF:
             if (g_work_mode == 2) {
-                Control_Task_ManualControl(CTRL_COOLER, cmd.value);
+                Control_Task_ManualControl(CTRL_HEATER, 0);
             }
             break;
             
-        case CMD_DEHUMIDIFIER:
+        case CMD_COOLER_ON:
             if (g_work_mode == 2) {
-                Control_Task_ManualControl(CTRL_DEHUMID, cmd.value);
+                Control_Task_ManualControl(CTRL_COOLER, 1);
             }
             break;
             
-        case CMD_HUMIDIFIER:
+        case CMD_COOLER_OFF:
             if (g_work_mode == 2) {
-                Control_Task_ManualControl(CTRL_HUMIDIFIER, cmd.value);
+                Control_Task_ManualControl(CTRL_COOLER, 0);
             }
             break;
             
-        case CMD_TEMP_HIGH:
-            Control_Task_SetTempThreshold(cmd.value, g_temp_low);
+        case CMD_DEHUMIDIFIER_ON:
+            if (g_work_mode == 2) {
+                Control_Task_ManualControl(CTRL_DEHUMID, 1);
+            }
             break;
             
-        case CMD_TEMP_LOW:
-            Control_Task_SetTempThreshold(g_temp_high, cmd.value);
+        case CMD_DEHUMIDIFIER_OFF:
+            if (g_work_mode == 2) {
+                Control_Task_ManualControl(CTRL_DEHUMID, 0);
+            }
             break;
             
-        case CMD_HUM_HIGH:
-            Control_Task_SetHumidThreshold(cmd.value, g_humid_low);
+        case CMD_HUMIDIFIER_ON:
+            if (g_work_mode == 2) {
+                Control_Task_ManualControl(CTRL_HUMIDIFIER, 1);
+            }
             break;
             
-        case CMD_HUM_LOW:
-            Control_Task_SetHumidThreshold(g_humid_high, cmd.value);
+        case CMD_HUMIDIFIER_OFF:
+            if (g_work_mode == 2) {
+                Control_Task_ManualControl(CTRL_HUMIDIFIER, 0);
+            }
+            break;
+            
+        case CMD_THRESHOLD:
+            // 设置温度阈值
+            if (cmd.temp_high != 0 && cmd.temp_low != 0) {
+                Control_Task_SetTempThreshold(cmd.temp_high, cmd.temp_low);
+            }
+            // 设置湿度阈值
+            if (cmd.humid_high != 0 && cmd.humid_low != 0) {
+                Control_Task_SetHumidThreshold(cmd.humid_high, cmd.humid_low);
+            }
             break;
             
         default:
@@ -252,8 +273,9 @@ int main(void) {
     
     // ✅ 根据联网模式决定是否注册网络任务
     if (g_network_enabled) {
-        Scheduler_Register(Network_Task, 50);             // 网络任务：50ms（处理重连+指令解析）
-        Scheduler_Register(Network_Upload_Task, 2000);    // 数据上传：2s
+        Scheduler_Register(Network_Core_Task, 50);             // 【重构】网络任务：50ms
+        // Scheduler_Register(Network_Upload_Task, 2000);      // 数据上传已移至DHT22任务中
+        Scheduler_Register(Handle_Cloud_Command, 100);         // 【重构】云端指令处理：100ms
         Serial_Printf("Network tasks registered\r\n");
     } else {
         Serial_Printf("Running in offline mode\r\n");

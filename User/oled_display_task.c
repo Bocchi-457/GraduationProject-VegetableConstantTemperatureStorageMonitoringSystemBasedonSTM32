@@ -13,6 +13,7 @@
 #include "control.h"
 #include "control_task.h"
 #include "key_task.h"
+#include "network_core.h"        // 检查OLED锁定状态
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -95,6 +96,11 @@ void Display_ShowTime(void) {
  * @brief OLED显示任务（非阻塞，每100ms执行一次）
  */
 void OLED_Display_Task_Run(void) {
+    // 如果OLED被锁定（联网初始化期间），禁止刷新
+    if (Network_Core_Is_OLED_Locked()) {
+        return;
+    }
+    
     // 限流：每100ms执行一次
     if (sys_tick_ms - s_last_display_time < 100) {
         return;

@@ -4,6 +4,7 @@ OBJ/
 参考资料/
 .lingma/
 DebugConfig/
+backup_refactor_20260412/
 
 # 二进制文件
 *.hex

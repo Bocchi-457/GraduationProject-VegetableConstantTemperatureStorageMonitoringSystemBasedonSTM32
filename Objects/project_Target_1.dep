@@ -749,7 +749,7 @@ I (.\Library\stm32f10x_tim.h)(0x69D4702C)
 I (.\Library\stm32f10x_usart.h)(0x69D4702C)
 I (.\Library\stm32f10x_wwdg.h)(0x69D4702C)
 F (.\Library\stm32f10x_wwdg.h)(0x69D4702C)()
-F (.\User\main.c)(0x69DB092E)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\main.o --omf_browse .\objects\main.crf --depend .\objects\main.d)
+F (.\User\main.c)(0x69DBBE75)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\main.o --omf_browse .\objects\main.crf --depend .\objects\main.d)
 I (.\Start\stm32f10x.h)(0x69D4702C)
 I (.\Start\core_cm3.h)(0x69D4702C)
 I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdint.h)(0x5E8E3CC2)
@@ -779,8 +779,10 @@ I (.\Library\stm32f10x_tim.h)(0x69D4702C)
 I (.\Library\stm32f10x_usart.h)(0x69D4702C)
 I (.\Library\stm32f10x_wwdg.h)(0x69D4702C)
 I (.\System\scheduler.h)(0x69D764BD)
-I (User\network_manager.h)(0x69D9E35D)
-I (.\Hardware\esp8266.h)(0x69D9FF53)
+I (User\network_core.h)(0x69DC9DA4)
+I (User\cloud_protocol.h)(0x69DB906D)
+I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\string.h)(0x5E8E3CC2)
+I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdio.h)(0x5E8E3CC2)
 I (User\dht22_task.h)(0x69D7BA52)
 I (User\control_task.h)(0x69D7F1DA)
 I (User\key_task.h)(0x69D7F1DA)
@@ -795,8 +797,6 @@ I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdlib.h)(
 I (.\Hardware\Key.h)(0x69D5CD20)
 I (.\Hardware\Timer.h)(0x69D8F8C4)
 I (.\Hardware\Usart.h)(0x69D8F8C4)
-I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdio.h)(0x5E8E3CC2)
-I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\string.h)(0x5E8E3CC2)
 F (.\User\stm32f10x_conf.h)(0x69D5CD20)()
 F (.\User\stm32f10x_it.c)(0x69D5CD20)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\stm32f10x_it.o --omf_browse .\objects\stm32f10x_it.crf --depend .\objects\stm32f10x_it.d)
 I (User\stm32f10x_it.h)(0x69D5CD20)
@@ -829,45 +829,6 @@ I (.\Library\stm32f10x_tim.h)(0x69D4702C)
 I (.\Library\stm32f10x_usart.h)(0x69D4702C)
 I (.\Library\stm32f10x_wwdg.h)(0x69D4702C)
 F (.\User\stm32f10x_it.h)(0x69D5CD20)()
-F (.\User\network_manager.c)(0x69DB5877)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\network_manager.o --omf_browse .\objects\network_manager.crf --depend .\objects\network_manager.d)
-I (User\network_manager.h)(0x69D9E35D)
-I (.\Hardware\esp8266.h)(0x69D9FF53)
-I (.\Start\stm32f10x.h)(0x69D4702C)
-I (.\Start\core_cm3.h)(0x69D4702C)
-I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdint.h)(0x5E8E3CC2)
-I (.\Start\system_stm32f10x.h)(0x69D4702C)
-I (.\User\stm32f10x_conf.h)(0x69D5CD20)
-I (.\Library\misc.h)(0x69D4702C)
-I (.\Library\stm32f10x_adc.h)(0x69D4702C)
-I (.\Library\stm32f10x_bkp.h)(0x69D4702C)
-I (.\Library\stm32f10x_can.h)(0x69D4702C)
-I (.\Library\stm32f10x_cec.h)(0x69D4702C)
-I (.\Library\stm32f10x_crc.h)(0x69D4702C)
-I (.\Library\stm32f10x_dac.h)(0x69D4702C)
-I (.\Library\stm32f10x_dbgmcu.h)(0x69D4702C)
-I (.\Library\stm32f10x_dma.h)(0x69D4702C)
-I (.\Library\stm32f10x_exti.h)(0x69D4702C)
-I (.\Library\stm32f10x_flash.h)(0x69D4702C)
-I (.\Library\stm32f10x_fsmc.h)(0x69D4702C)
-I (.\Library\stm32f10x_gpio.h)(0x69D4702C)
-I (.\Library\stm32f10x_i2c.h)(0x69D4702C)
-I (.\Library\stm32f10x_iwdg.h)(0x69D4702C)
-I (.\Library\stm32f10x_pwr.h)(0x69D4702C)
-I (.\Library\stm32f10x_rcc.h)(0x69D4702C)
-I (.\Library\stm32f10x_rtc.h)(0x69D4702C)
-I (.\Library\stm32f10x_sdio.h)(0x69D4702C)
-I (.\Library\stm32f10x_spi.h)(0x69D4702C)
-I (.\Library\stm32f10x_tim.h)(0x69D4702C)
-I (.\Library\stm32f10x_usart.h)(0x69D4702C)
-I (.\Library\stm32f10x_wwdg.h)(0x69D4702C)
-I (User\control_task.h)(0x69D7F1DA)
-I (.\Hardware\Timer.h)(0x69D8F8C4)
-I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\string.h)(0x5E8E3CC2)
-I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdio.h)(0x5E8E3CC2)
-I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdlib.h)(0x5E8E3CC2)
-I (.\Hardware\Usart.h)(0x69D8F8C4)
-I (.\System\sys.h)(0x69D4702C)
-F (.\User\network_manager.h)(0x69D9E35D)()
 F (.\User\control_task.c)(0x69DB63AB)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\control_task.o --omf_browse .\objects\control_task.crf --depend .\objects\control_task.d)
 I (User\control_task.h)(0x69D7F1DA)
 I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdint.h)(0x5E8E3CC2)
@@ -908,9 +869,14 @@ I (.\Hardware\Timer.h)(0x69D8F8C4)
 I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdio.h)(0x5E8E3CC2)
 I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdlib.h)(0x5E8E3CC2)
 F (.\User\control_task.h)(0x69D7F1DA)()
-F (.\User\dht22_task.c)(0x69D7CC6D)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\dht22_task.o --omf_browse .\objects\dht22_task.crf --depend .\objects\dht22_task.d)
+F (.\User\dht22_task.c)(0x69DBCDD2)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\dht22_task.o --omf_browse .\objects\dht22_task.crf --depend .\objects\dht22_task.d)
 I (User\dht22_task.h)(0x69D7BA52)
 I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdint.h)(0x5E8E3CC2)
+I (User\network_core.h)(0x69DC9DA4)
+I (User\cloud_protocol.h)(0x69DB906D)
+I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\string.h)(0x5E8E3CC2)
+I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdio.h)(0x5E8E3CC2)
+I (User\control_task.h)(0x69D7F1DA)
 I (.\Hardware\dht22.h)(0x69D7D4AD)
 I (.\System\delay.h)(0x69D8F8C4)
 I (.\Start\stm32f10x.h)(0x69D4702C)
@@ -942,11 +908,10 @@ I (.\Library\stm32f10x_usart.h)(0x69D4702C)
 I (.\Library\stm32f10x_wwdg.h)(0x69D4702C)
 I (.\System\sys.h)(0x69D4702C)
 I (.\Hardware\Timer.h)(0x69D8F8C4)
-I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdio.h)(0x5E8E3CC2)
 I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdlib.h)(0x5E8E3CC2)
 I (.\Hardware\Usart.h)(0x69D8F8C4)
 F (.\User\dht22_task.h)(0x69D7BA52)()
-F (.\User\key_task.c)(0x69D92C63)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\key_task.o --omf_browse .\objects\key_task.crf --depend .\objects\key_task.d)
+F (.\User\key_task.c)(0x69DB6709)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\key_task.o --omf_browse .\objects\key_task.crf --depend .\objects\key_task.d)
 I (User\key_task.h)(0x69D7F1DA)
 I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdint.h)(0x5E8E3CC2)
 I (.\Hardware\Key.h)(0x69D5CD20)
@@ -983,7 +948,7 @@ I (User\control_task.h)(0x69D7F1DA)
 I (User\oled_display_task.h)(0x69D910C5)
 I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdio.h)(0x5E8E3CC2)
 F (.\User\key_task.h)(0x69D7F1DA)()
-F (.\User\oled_display_task.c)(0x69D9C696)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\oled_display_task.o --omf_browse .\objects\oled_display_task.crf --depend .\objects\oled_display_task.d)
+F (.\User\oled_display_task.c)(0x69DBC2F9)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\oled_display_task.o --omf_browse .\objects\oled_display_task.crf --depend .\objects\oled_display_task.d)
 I (User\oled_display_task.h)(0x69D910C5)
 I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdint.h)(0x5E8E3CC2)
 I (.\Hardware\OLED.h)(0x69D8F8C4)
@@ -1024,6 +989,9 @@ I (.\System\delay.h)(0x69D8F8C4)
 I (.\Hardware\control.h)(0x69D8F802)
 I (User\control_task.h)(0x69D7F1DA)
 I (User\key_task.h)(0x69D7F1DA)
+I (User\network_core.h)(0x69DC9DA4)
+I (User\cloud_protocol.h)(0x69DB906D)
+I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\string.h)(0x5E8E3CC2)
 I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdio.h)(0x5E8E3CC2)
 F (.\User\oled_display_task.h)(0x69D910C5)()
 F (.\User\flash_config.h)(0x69D91CF9)()
@@ -1061,6 +1029,81 @@ I (.\Hardware\stmflash.h)(0x69D5CD20)
 I (.\System\sys.h)(0x69D4702C)
 I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdio.h)(0x5E8E3CC2)
 I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdlib.h)(0x5E8E3CC2)
+F (.\User\cloud_protocol.c)(0x69DBA78E)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\cloud_protocol.o --omf_browse .\objects\cloud_protocol.crf --depend .\objects\cloud_protocol.d)
+I (User\cloud_protocol.h)(0x69DB906D)
+I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdint.h)(0x5E8E3CC2)
+I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\string.h)(0x5E8E3CC2)
+I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdio.h)(0x5E8E3CC2)
+I (.\Hardware\wifi_driver.h)(0x69DBBA31)
+I (.\Start\stm32f10x.h)(0x69D4702C)
+I (.\Start\core_cm3.h)(0x69D4702C)
+I (.\Start\system_stm32f10x.h)(0x69D4702C)
+I (.\User\stm32f10x_conf.h)(0x69D5CD20)
+I (.\Library\misc.h)(0x69D4702C)
+I (.\Library\stm32f10x_adc.h)(0x69D4702C)
+I (.\Library\stm32f10x_bkp.h)(0x69D4702C)
+I (.\Library\stm32f10x_can.h)(0x69D4702C)
+I (.\Library\stm32f10x_cec.h)(0x69D4702C)
+I (.\Library\stm32f10x_crc.h)(0x69D4702C)
+I (.\Library\stm32f10x_dac.h)(0x69D4702C)
+I (.\Library\stm32f10x_dbgmcu.h)(0x69D4702C)
+I (.\Library\stm32f10x_dma.h)(0x69D4702C)
+I (.\Library\stm32f10x_exti.h)(0x69D4702C)
+I (.\Library\stm32f10x_flash.h)(0x69D4702C)
+I (.\Library\stm32f10x_fsmc.h)(0x69D4702C)
+I (.\Library\stm32f10x_gpio.h)(0x69D4702C)
+I (.\Library\stm32f10x_i2c.h)(0x69D4702C)
+I (.\Library\stm32f10x_iwdg.h)(0x69D4702C)
+I (.\Library\stm32f10x_pwr.h)(0x69D4702C)
+I (.\Library\stm32f10x_rcc.h)(0x69D4702C)
+I (.\Library\stm32f10x_rtc.h)(0x69D4702C)
+I (.\Library\stm32f10x_sdio.h)(0x69D4702C)
+I (.\Library\stm32f10x_spi.h)(0x69D4702C)
+I (.\Library\stm32f10x_tim.h)(0x69D4702C)
+I (.\Library\stm32f10x_usart.h)(0x69D4702C)
+I (.\Library\stm32f10x_wwdg.h)(0x69D4702C)
+I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdlib.h)(0x5E8E3CC2)
+F (.\User\cloud_protocol.h)(0x69DB906D)()
+F (.\User\network_core.c)(0x69DCBB6E)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\network_core.o --omf_browse .\objects\network_core.crf --depend .\objects\network_core.d)
+I (User\network_core.h)(0x69DC9DA4)
+I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdint.h)(0x5E8E3CC2)
+I (User\cloud_protocol.h)(0x69DB906D)
+I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\string.h)(0x5E8E3CC2)
+I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdio.h)(0x5E8E3CC2)
+I (.\Hardware\wifi_driver.h)(0x69DBBA31)
+I (.\Start\stm32f10x.h)(0x69D4702C)
+I (.\Start\core_cm3.h)(0x69D4702C)
+I (.\Start\system_stm32f10x.h)(0x69D4702C)
+I (.\User\stm32f10x_conf.h)(0x69D5CD20)
+I (.\Library\misc.h)(0x69D4702C)
+I (.\Library\stm32f10x_adc.h)(0x69D4702C)
+I (.\Library\stm32f10x_bkp.h)(0x69D4702C)
+I (.\Library\stm32f10x_can.h)(0x69D4702C)
+I (.\Library\stm32f10x_cec.h)(0x69D4702C)
+I (.\Library\stm32f10x_crc.h)(0x69D4702C)
+I (.\Library\stm32f10x_dac.h)(0x69D4702C)
+I (.\Library\stm32f10x_dbgmcu.h)(0x69D4702C)
+I (.\Library\stm32f10x_dma.h)(0x69D4702C)
+I (.\Library\stm32f10x_exti.h)(0x69D4702C)
+I (.\Library\stm32f10x_flash.h)(0x69D4702C)
+I (.\Library\stm32f10x_fsmc.h)(0x69D4702C)
+I (.\Library\stm32f10x_gpio.h)(0x69D4702C)
+I (.\Library\stm32f10x_i2c.h)(0x69D4702C)
+I (.\Library\stm32f10x_iwdg.h)(0x69D4702C)
+I (.\Library\stm32f10x_pwr.h)(0x69D4702C)
+I (.\Library\stm32f10x_rcc.h)(0x69D4702C)
+I (.\Library\stm32f10x_rtc.h)(0x69D4702C)
+I (.\Library\stm32f10x_sdio.h)(0x69D4702C)
+I (.\Library\stm32f10x_spi.h)(0x69D4702C)
+I (.\Library\stm32f10x_tim.h)(0x69D4702C)
+I (.\Library\stm32f10x_usart.h)(0x69D4702C)
+I (.\Library\stm32f10x_wwdg.h)(0x69D4702C)
+I (.\System\delay.h)(0x69D8F8C4)
+I (.\Hardware\oled.h)(0x69D8F8C4)
+I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdlib.h)(0x5E8E3CC2)
+I (.\System\sys.h)(0x69D4702C)
+I (.\Hardware\Usart.h)(0x69D8F8C4)
+F (.\User\network_core.h)(0x69DC9DA4)()
 F (.\System\adcx.c)(0x69D8F8C4)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\adcx.o --omf_browse .\objects\adcx.crf --depend .\objects\adcx.d)
 I (System\adcx.h)(0x69D8F8C4)
 I (.\Start\stm32f10x.h)(0x69D4702C)
@@ -1288,43 +1331,6 @@ I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdlib.h)(
 I (.\System\delay.h)(0x69D8F8C4)
 I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdio.h)(0x5E8E3CC2)
 F (.\Hardware\DS1302.h)(0x69D6777E)()
-F (.\Hardware\esp8266.c)(0x69D9F3F4)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\esp8266.o --omf_browse .\objects\esp8266.crf --depend .\objects\esp8266.d)
-I (Hardware\esp8266.h)(0x69D9FF53)
-I (.\Start\stm32f10x.h)(0x69D4702C)
-I (.\Start\core_cm3.h)(0x69D4702C)
-I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdint.h)(0x5E8E3CC2)
-I (.\Start\system_stm32f10x.h)(0x69D4702C)
-I (.\User\stm32f10x_conf.h)(0x69D5CD20)
-I (.\Library\misc.h)(0x69D4702C)
-I (.\Library\stm32f10x_adc.h)(0x69D4702C)
-I (.\Library\stm32f10x_bkp.h)(0x69D4702C)
-I (.\Library\stm32f10x_can.h)(0x69D4702C)
-I (.\Library\stm32f10x_cec.h)(0x69D4702C)
-I (.\Library\stm32f10x_crc.h)(0x69D4702C)
-I (.\Library\stm32f10x_dac.h)(0x69D4702C)
-I (.\Library\stm32f10x_dbgmcu.h)(0x69D4702C)
-I (.\Library\stm32f10x_dma.h)(0x69D4702C)
-I (.\Library\stm32f10x_exti.h)(0x69D4702C)
-I (.\Library\stm32f10x_flash.h)(0x69D4702C)
-I (.\Library\stm32f10x_fsmc.h)(0x69D4702C)
-I (.\Library\stm32f10x_gpio.h)(0x69D4702C)
-I (.\Library\stm32f10x_i2c.h)(0x69D4702C)
-I (.\Library\stm32f10x_iwdg.h)(0x69D4702C)
-I (.\Library\stm32f10x_pwr.h)(0x69D4702C)
-I (.\Library\stm32f10x_rcc.h)(0x69D4702C)
-I (.\Library\stm32f10x_rtc.h)(0x69D4702C)
-I (.\Library\stm32f10x_sdio.h)(0x69D4702C)
-I (.\Library\stm32f10x_spi.h)(0x69D4702C)
-I (.\Library\stm32f10x_tim.h)(0x69D4702C)
-I (.\Library\stm32f10x_usart.h)(0x69D4702C)
-I (.\Library\stm32f10x_wwdg.h)(0x69D4702C)
-I (Hardware\OLED.h)(0x69D8F8C4)
-I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdlib.h)(0x5E8E3CC2)
-I (.\System\sys.h)(0x69D4702C)
-I (.\System\delay.h)(0x69D8F8C4)
-I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdio.h)(0x5E8E3CC2)
-I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\string.h)(0x5E8E3CC2)
-F (.\Hardware\esp8266.h)(0x69D9FF53)()
 F (.\Hardware\Key.c)(0x69D8F8C4)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\key.o --omf_browse .\objects\key.crf --depend .\objects\key.d)
 I (Hardware\Key.h)(0x69D5CD20)
 I (.\System\sys.h)(0x69D4702C)
@@ -1427,7 +1433,7 @@ I (.\Library\stm32f10x_usart.h)(0x69D4702C)
 I (.\Library\stm32f10x_wwdg.h)(0x69D4702C)
 I (.\System\delay.h)(0x69D8F8C4)
 F (.\Hardware\stmflash.h)(0x69D5CD20)()
-F (.\Hardware\Timer.c)(0x69D8F8C4)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\timer.o --omf_browse .\objects\timer.crf --depend .\objects\timer.d)
+F (.\Hardware\Timer.c)(0x69DBC5ED)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\timer.o --omf_browse .\objects\timer.crf --depend .\objects\timer.d)
 I (Hardware\timer.h)(0x69D8F8C4)
 I (.\Library\stm32f10x_rcc.h)(0x69D4702C)
 I (.\Start\stm32f10x.h)(0x69D4702C)
@@ -1458,7 +1464,7 @@ I (.\Library\stm32f10x_tim.h)(0x69D4702C)
 I (.\Library\stm32f10x_usart.h)(0x69D4702C)
 I (.\Library\stm32f10x_wwdg.h)(0x69D4702C)
 F (.\Hardware\Timer.h)(0x69D8F8C4)()
-F (.\Hardware\Usart.c)(0x69D9E67E)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\usart.o --omf_browse .\objects\usart.crf --depend .\objects\usart.d)
+F (.\Hardware\Usart.c)(0x69DBC5ED)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\usart.o --omf_browse .\objects\usart.crf --depend .\objects\usart.d)
 I (Hardware\Usart.h)(0x69D8F8C4)
 I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdio.h)(0x5E8E3CC2)
 I (.\System\sys.h)(0x69D4702C)
@@ -1495,8 +1501,8 @@ I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdlib.h)(
 I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdarg.h)(0x5E8E3CC2)
 I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\string.h)(0x5E8E3CC2)
 F (.\Hardware\Usart.h)(0x69D8F8C4)()
-F (.\Hardware\at_executor.c)(0x69DB51E0)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\at_executor.o --omf_browse .\objects\at_executor.crf --depend .\objects\at_executor.d)
-I (Hardware\esp8266.h)(0x69D9FF53)
+F (.\Hardware\wifi_driver.c)(0x69DCBB55)(--c99 -c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I .\Start -I .\User -I .\Library -I .\System -I .\Hardware-ID:\Study\EmbeddedSystem\Arm\PacksMDK\Keil\STM32F1xx_DFP\2.4.1\Device\Include-D__UVISION_VERSION="541" -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\wifi_driver.o --omf_browse .\objects\wifi_driver.crf --depend .\objects\wifi_driver.d)
+I (Hardware\wifi_driver.h)(0x69DBBA31)
 I (.\Start\stm32f10x.h)(0x69D4702C)
 I (.\Start\core_cm3.h)(0x69D4702C)
 I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdint.h)(0x5E8E3CC2)
@@ -1525,8 +1531,7 @@ I (.\Library\stm32f10x_spi.h)(0x69D4702C)
 I (.\Library\stm32f10x_tim.h)(0x69D4702C)
 I (.\Library\stm32f10x_usart.h)(0x69D4702C)
 I (.\Library\stm32f10x_wwdg.h)(0x69D4702C)
-I (Hardware\Timer.h)(0x69D8F8C4)
-I (Hardware\Usart.h)(0x69D8F8C4)
-I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdio.h)(0x5E8E3CC2)
-I (.\System\sys.h)(0x69D4702C)
 I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\string.h)(0x5E8E3CC2)
+I (.\System\delay.h)(0x69D8F8C4)
+I (D:\Study\EmbeddedSystem\Keil_v5MDK\ARM\ARM_Compiler_5.06u7\include\stdio.h)(0x5E8E3CC2)
+F (.\Hardware\wifi_driver.h)(0x69DBBA31)()

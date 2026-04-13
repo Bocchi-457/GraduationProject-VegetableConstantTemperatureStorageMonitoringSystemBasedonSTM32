@@ -5,6 +5,8 @@
  */
 
 #include "dht22_task.h"
+#include "network_core.h"    // 网络核心模块
+#include "control_task.h"    // 控制任务（获取工作状态）
 #include "dht22.h"
 #include "Timer.h"
 #include <stdio.h>
@@ -66,6 +68,29 @@ void DHT22_Task_Run(void) {
         DHT22_LOG("T=%d.%d, H=%d.%d\r\n", 
                  DHT22_Data.temperature / 10, abs(DHT22_Data.temperature % 10),
                  DHT22_Data.humidity / 10, abs(DHT22_Data.humidity % 10));
+        
+        // 读取成功后立即上传数据到云端
+        extern uint8_t g_network_enabled;  // 网络启用标志（在main.c中定义）
+        extern uint8_t g_work_mode;
+        extern int16_t g_temp_high, g_temp_low;
+        extern int16_t g_humid_high, g_humid_low;
+        extern uint8_t g_heater_state, g_cooler_state;
+        extern uint8_t g_dehumid_state, g_humidifier_state;
+        
+        // 仅在联网模式下且网络已连接时才上传
+        if (g_network_enabled && Network_Core_Get_State() == NET_STATE_CONNECTED) {
+            Network_Core_Upload(
+                g_work_mode,
+                g_temp_high, g_temp_low,
+                g_humid_high, g_humid_low,
+                g_heater_state,
+                g_cooler_state,
+                g_dehumid_state,
+                g_humidifier_state,
+                DHT22_Data.temperature,
+                DHT22_Data.humidity
+            );
+        }
     } else {
         g_dht22_data_valid = 0;
         DHT22_LOG("Read error\r\n");
