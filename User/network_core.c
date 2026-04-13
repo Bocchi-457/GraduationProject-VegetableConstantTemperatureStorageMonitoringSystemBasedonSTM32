@@ -102,11 +102,17 @@ static uint8_t g_recv_buffer[512];
 /* 外部函数声明（wifi_driver.c中的静态函数）*/
 extern void RingBuffer_AT_Clear(void);
 
-/* 上传监控状态（第一阶段：仅检测和记录）*/
+/* 上传监控状态（第二阶段：支持重连）*/
 typedef struct {
     uint8_t upload_fail_count;      // 连续上传失败计数
     uint8_t tcp_disconnected;       // TCP是否断开标志
     uint8_t upload_paused;          // 上传是否暂停（TCP断开后暂停）
+    
+    /* 重连状态 */
+    uint8_t is_reconnecting;        // 是否正在重连
+    uint8_t reconnect_attempts;     // 当前重连尝试次数
+    uint32_t reconnect_start_time;  // 重连开始时间
+    uint32_t next_retry_time;       // 下次重试时间
 } UploadMonitor_t;
 
 static UploadMonitor_t g_upload_monitor = {0};
@@ -131,6 +137,118 @@ static uint8_t Check_TCP_Connection(void) {
         // 3. 超时或无响应
         Serial_Printf("[NET] TCP status: DISCONNECTED (no STATUS:3 received)\r\n");
         return 0;  // 默认认为已断开
+    }
+}
+
+/**
+ * @brief 执行TCP重连
+ * @return 1=成功, 0=失败
+ */
+static uint8_t TCP_Reconnect(void) {
+    char cmd_buf[128];
+    char subscribe_cmd[128];
+    char cipsend_cmd[32];
+    uint16_t data_len;
+    
+    Serial_Printf("[NET] === Starting TCP Reconnection ===\r\n");
+    
+    // Step 1: 建立TCP连接
+    Serial_Printf("[NET] Step 1: Connecting to Bemfa Cloud...\r\n");
+    sprintf(cmd_buf, "AT+CIPSTART=\"TCP\",\"%s\",%s\r\n", BEMFA_SERVER_IP, BEMFA_SERVER_PORT);
+    
+    // 尝试CONNECT或OK响应
+    if (WiFi_Send_AT_Command(cmd_buf, "CONNECT", 15000)) {
+        Serial_Printf("[NET] TCP connected (response: CONNECT)\r\n");
+    } else if (WiFi_Send_AT_Command(cmd_buf, "OK", 15000)) {
+        Serial_Printf("[NET] TCP connected (response: OK)\r\n");
+    } else {
+        Serial_Printf("[NET] TCP connection FAILED\r\n");
+        return 0;
+    }
+    
+    // Step 2: 订阅主题
+    Serial_Printf("[NET] Step 2: Subscribing topic...\r\n");
+    data_len = sprintf(subscribe_cmd, "cmd=1&uid=%s&topic=%s", BEMFA_UID, BEMFA_TOPIC_CONTROL);
+    
+    // 发送CIPSEND指令
+    sprintf(cipsend_cmd, "AT+CIPSEND=%d\r\n", data_len);
+    
+    if (!WiFi_Send_AT_Command(cipsend_cmd, ">", 1000)) {
+        Serial_Printf("[NET] CIPSEND failed\r\n");
+        return 0;
+    }
+    
+    // 发送订阅数据
+    WiFi_Send_Data((uint8_t *)subscribe_cmd, data_len);
+    
+    // 等待SEND OK
+    if (!WiFi_Send_AT_Command("", "SEND OK", 2000)) {
+        Serial_Printf("[NET] Subscribe SEND OK not received\r\n");
+        return 0;
+    }
+    
+    Serial_Printf("[NET] Topic subscribed successfully\r\n");
+    Serial_Printf("[NET] === TCP Reconnection COMPLETE ===\r\n");
+    
+    return 1;
+}
+
+/**
+ * @brief 处理TCP重连逻辑（非阻塞状态机）
+ */
+static void Handle_TCP_Reconnection(void) {
+    extern volatile uint32_t sys_tick_ms;
+    uint32_t remaining;
+    static uint32_t last_display = 0;
+    
+    if (!g_upload_monitor.is_reconnecting) {
+        return;  // 不在重连状态
+    }
+    
+    // 检查是否到达重试时间
+    if (sys_tick_ms < g_upload_monitor.next_retry_time) {
+        // 还未到重试时间，显示倒计时
+        remaining = (g_upload_monitor.next_retry_time - sys_tick_ms) / 1000;
+        if (sys_tick_ms - last_display >= 1000) {  // 每秒更新一次
+            Serial_Printf("[NET] Reconnect retry in %lu seconds... (attempt %d/3)\r\n", 
+                         remaining, g_upload_monitor.reconnect_attempts + 1);
+            last_display = sys_tick_ms;
+        }
+        return;
+    }
+    
+    // 到达重试时间，执行重连
+    Serial_Printf("[NET] Attempting reconnection #%d...\r\n", g_upload_monitor.reconnect_attempts + 1);
+    
+    if (TCP_Reconnect()) {
+        // 重连成功
+        Serial_Printf("[NET] Reconnection SUCCESS! Resuming uploads.\r\n");
+        
+        // 重置监控状态
+        g_upload_monitor.upload_fail_count = 0;
+        g_upload_monitor.tcp_disconnected = 0;
+        g_upload_monitor.upload_paused = 0;
+        g_upload_monitor.is_reconnecting = 0;
+        g_upload_monitor.reconnect_attempts = 0;
+        
+        // 恢复网络状态
+        g_net_state = NET_STATE_CONNECTED;
+    } else {
+        // 重连失败
+        g_upload_monitor.reconnect_attempts++;
+        
+        if (g_upload_monitor.reconnect_attempts >= 3) {
+            // 3次都失败，进入离线状态
+            Serial_Printf("[NET] Reconnection FAILED after 3 attempts. Going OFFLINE.\r\n");
+            g_upload_monitor.is_reconnecting = 0;
+            g_upload_monitor.reconnect_attempts = 0;
+            g_net_state = NET_STATE_OFFLINE;
+        } else {
+            // 还有重试机会，计算下次重试时间（指数退避）
+            uint32_t delays[] = {15000, 20000, 40000};  // 15s, 20s, 40s
+            g_upload_monitor.next_retry_time = sys_tick_ms + delays[g_upload_monitor.reconnect_attempts];
+            Serial_Printf("[NET] Will retry in %lu seconds...\r\n", delays[g_upload_monitor.reconnect_attempts] / 1000);
+        }
     }
 }
 
@@ -436,11 +554,12 @@ void Network_Core_Task(void) {
         return;
     }
     
+    // 处理TCP重连逻辑（非阻塞）
+    Handle_TCP_Reconnection();
+    
     // 如果已连接，检查云端指令
     if (g_net_state == NET_STATE_CONNECTED) {
         Check_Cloud_Command();
-        
-        // TODO: 检测TCP连接状态，断开时重连
     }
     
     // 离线状态
@@ -552,9 +671,9 @@ check_tcp_status:
             Serial_Printf("[NET] Testing ESP8266 health with AT...\r\n");
             uint8_t at_responding = 0;
             
-            // 尝试3次，每次增加超时时间
+            // 尝试3次，每次给足超时时间（ESP-01S响应可能很慢）
             for (uint8_t retry = 0; retry < 3; retry++) {
-                uint32_t timeout = 2000 + (retry * 1000);  // 2s, 3s, 4s
+                uint32_t timeout = 3000 + (retry * 1000);  // 3s, 4s, 5s
                 Serial_Printf("[NET] AT test #%d (timeout=%lums)...\r\n", retry + 1, timeout);
                 
                 if (WiFi_Send_AT_Command("AT\r\n", "OK", timeout)) {
@@ -575,11 +694,15 @@ check_tcp_status:
             Serial_Printf("[NET] ESP8266 responding, checking TCP status...\r\n");
             
             if (!Check_TCP_Connection()) {
-                // TCP已断开
-                Serial_Printf("[NET] TCP disconnected! Pausing uploads.\r\n");
+                // TCP已断开，启动重连流程
+                Serial_Printf("[NET] TCP disconnected! Starting reconnection process...\r\n");
                 g_upload_monitor.tcp_disconnected = 1;
                 g_upload_monitor.upload_paused = 1;
-                // TODO: 第二阶段将在此处触发TCP重连
+                g_upload_monitor.is_reconnecting = 1;
+                g_upload_monitor.reconnect_attempts = 0;
+                g_upload_monitor.next_retry_time = sys_tick_ms + 15000;  // 第一次等待15秒
+                
+                Serial_Printf("[NET] Will attempt reconnection in 15 seconds...\r\n");
             } else {
                 Serial_Printf("[NET] TCP still connected, will continue monitoring.\r\n");
             }
