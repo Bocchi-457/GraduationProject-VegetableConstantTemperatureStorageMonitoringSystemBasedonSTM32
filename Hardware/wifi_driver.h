@@ -17,10 +17,14 @@
 #define ESP8266_RST_PORT           GPIOA
 #define ESP8266_RST_CLK            RCC_APB2Periph_GPIOA
 
-/* DMA配置 */
+/* DMA配置（保留但不再使用）*/
 #define ESP8266_DMA_CHANNEL        DMA1_Channel6
 #define ESP8266_DMA_CLK            RCC_AHBPeriph_DMA1
 #define DMA_BUFFER_SIZE            512
+
+/* 双缓冲区配置 */
+#define AT_RING_BUFFER_SIZE        256   // AT响应缓冲区
+#define CLOUD_RING_BUFFER_SIZE     512   // 云端数据缓冲区
 
 /* WiFi配置 */
 #define WIFI_SSID                  "TheWorld"
@@ -35,7 +39,7 @@
 #define BEMFA_TOPIC_CONTROL        "control"
 
 /**
- * @brief 初始化WiFi模块（DMA+IDLE中断）
+ * @brief 初始化WiFi模块（双缓冲区架构）
  */
 void WiFi_Driver_Init(uint32_t baudrate);
 
@@ -45,7 +49,7 @@ void WiFi_Driver_Init(uint32_t baudrate);
 void WiFi_Module_Reset(void);
 
 /**
- * @brief 发送AT指令（阻塞方式，用于初始化阶段）
+ * @brief 发送AT指令（阻塞方式，响应确认后清空缓冲区）
  * @param cmd AT指令字符串
  * @param expected_ack 期望的响应关键字
  * @param timeout_ms 超时时间（毫秒）
@@ -54,26 +58,42 @@ void WiFi_Module_Reset(void);
 uint8_t WiFi_Send_AT_Command(const char *cmd, const char *expected_ack, uint32_t timeout_ms);
 
 /**
- * @brief 从DMA缓冲区读取数据
+ * @brief 清空AT缓冲区（供初始化阶段使用）
+ */
+void RingBuffer_AT_Clear(void);
+
+/**
+ * @brief 从AT缓冲区读取数据（供外部调用）
  * @param data 输出缓冲区
  * @param max_len 最大读取长度
  * @return 实际读取的字节数
  */
-uint16_t WiFi_Read_Data(uint8_t *data, uint16_t max_len);
+uint16_t RingBuffer_AT_Read(uint8_t *data, uint16_t max_len);
 
 /**
- * @brief 清空接收缓冲区
+ * @brief 从云端缓冲区读取完整帧（基于\r\n判断）
+ * @param data 输出缓冲区
+ * @param max_len 最大长度
+ * @return 完整帧长度，0表示没有完整帧
  */
-void WiFi_Clear_Buffer(void);
+uint16_t WiFi_Read_Cloud_Complete_Frame(uint8_t *data, uint16_t max_len);
 
 /**
- * @brief 获取接收缓冲区中的数据长度
+ * @brief 获取云端缓冲区数据量
  * @return 数据长度
  */
-uint16_t WiFi_Get_Data_Length(void);
+uint16_t WiFi_Get_Cloud_Data_Length(void);
 
 /**
- * @brief 发送原始数据（非阻塞）
+ * @brief 预览云端缓冲区内容（不移除数据）
+ * @param data 输出缓冲区
+ * @param max_len 最大读取长度
+ * @return 实际读取的字节数
+ */
+uint16_t WiFi_Peek_Cloud_Data(uint8_t *data, uint16_t max_len);
+
+/**
+ * @brief 发送原始数据（用于AT+CIPSEND第二阶段）
  * @param data 数据指针
  * @param len 数据长度
  */

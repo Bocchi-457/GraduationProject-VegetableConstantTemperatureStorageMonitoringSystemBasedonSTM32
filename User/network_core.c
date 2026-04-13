@@ -3,6 +3,7 @@
 #include "delay.h"
 #include "oled.h"
 #include "Usart.h"  // 用于Serial_Printf调试输出
+#include "stm32f10x_usart.h"  // 用于USART_SendData等
 #include <stdio.h>
 #include <string.h>
 
@@ -98,6 +99,9 @@ static uint8_t g_cmd_available = 0;
 /* 接收缓冲区 */
 static uint8_t g_recv_buffer[512];
 
+/* 外部函数声明（wifi_driver.c中的静态函数）*/
+extern void RingBuffer_AT_Clear(void);
+
 /* 上传监控状态（第一阶段：仅检测和记录）*/
 typedef struct {
     uint8_t upload_fail_count;      // 连续上传失败计数
@@ -112,44 +116,22 @@ static UploadMonitor_t g_upload_monitor = {0};
  * @return 1=已连接, 0=已断开
  */
 static uint8_t Check_TCP_Connection(void) {
-    char recv_buf[128];
-    
-    // 注意：不清空缓冲区，避免丢失云端指令
-    // AT+CIPSTATUS的响应以"STATUS:"开头，可以与其他数据区分
-    
     Serial_Printf("[NET] Sending AT+CIPSTATUS...\r\n");
     
-    // 发送AT+CIPSTATUS查询连接状态（增加超时到5秒，应对ESP-01S响应慢的情况）
-    if (WiFi_Send_AT_Command("AT+CIPSTATUS\r\n", "STATUS:", 5000)) {
-        // 读取完整响应
-        uint16_t len = WiFi_Read_Data((uint8_t *)recv_buf, sizeof(recv_buf) - 1);
-        if (len > 0) {
-            recv_buf[len] = '\0';
-            Serial_Printf("[NET] CIPSTATUS response: %s\r\n", recv_buf);
-            
-            // 检查是否包含 STATUS:3 （已建立TCP连接）
-            if (strstr(recv_buf, "STATUS:3") != NULL) {
-                Serial_Printf("[NET] TCP status: CONNECTED (STATUS:3)\r\n");
-                return 1;  // TCP已连接
-            } else if (strstr(recv_buf, "STATUS:2") != NULL) {
-                Serial_Printf("[NET] TCP status: GOT IP but NO TCP connection (STATUS:2)\r\n");
-                return 0;  // 已获取IP但未建立TCP
-            } else if (strstr(recv_buf, "STATUS:4") != NULL) {
-                Serial_Printf("[NET] TCP status: DISCONNECTED (STATUS:4)\r\n");
-                return 0;  // TCP已断开
-            } else {
-                Serial_Printf("[NET] TCP status: UNKNOWN format\r\n");
-                return 0;
-            }
-        } else {
-            Serial_Printf("[NET] CIPSTATUS: No data received\r\n");
-        }
+    // 使用WiFi_Send_AT_Command查询TCP状态
+    // 只有收到"STATUS:3"才认为TCP已连接
+    if (WiFi_Send_AT_Command("AT+CIPSTATUS\r\n", "STATUS:3", 5000)) {
+        // 收到STATUS:3，TCP已连接
+        Serial_Printf("[NET] TCP status: CONNECTED (STATUS:3)\r\n");
+        return 1;
     } else {
-        Serial_Printf("[NET] CIPSTATUS: Command failed or timeout\r\n");
+        // 未收到STATUS:3，可能是：
+        // 1. STATUS:2 - 已获取IP但未建立TCP
+        // 2. STATUS:4 - TCP已断开
+        // 3. 超时或无响应
+        Serial_Printf("[NET] TCP status: DISCONNECTED (no STATUS:3 received)\r\n");
+        return 0;  // 默认认为已断开
     }
-    
-    // 默认认为已断开（保守策略）
-    return 0;
 }
 
 /**
@@ -189,7 +171,9 @@ static void Init_Step_Execute(void) {
             Serial_Printf("[NET] Step 2: Testing AT...\r\n");
             
             // 先清空缓冲区，确保没有残留数据
-            WiFi_Clear_Buffer();
+            // 清空AT缓冲区（初始化阶段，确保干净环境）
+            RingBuffer_AT_Clear();
+            
             Serial_Printf("[NET] Buffer cleared, sending AT...\r\n");
             
             if (WiFi_Send_AT_Command("AT\r\n", "OK", 1000)) {
@@ -201,14 +185,7 @@ static void Init_Step_Execute(void) {
                 Show_Network_Failure("AT command failed");
                 
                 // 检查是否有收到任何数据
-                uint8_t debug_buf[64];
-                uint16_t debug_len = WiFi_Read_Data(debug_buf, sizeof(debug_buf) - 1);
-                if (debug_len > 0) {
-                    debug_buf[debug_len] = '\0';
-                    Serial_Printf("[NET] Received %d bytes (but no OK): %s\r\n", debug_len, debug_buf);
-                } else {
-                    Serial_Printf("[NET] No data received at all!\r\n");
-                }
+                // 调试信息已移除（新架构下AT响应在WiFi_Send_AT_Command内部处理）
                 
                 // 重试3次后失败
                 static uint8_t retry = 0;
@@ -245,8 +222,8 @@ static void Init_Step_Execute(void) {
             Serial_Printf("[NET] Step 4: Connecting WiFi...\r\n");
             sprintf(cmd_buf, "AT+CWJAP=\"%s\",\"%s\"\r\n", WIFI_SSID, WIFI_PASSWORD);
             
-            // 先清空缓冲区，然后发送指令
-            WiFi_Clear_Buffer();
+            // 先清空AT缓冲区，然后发送指令
+            RingBuffer_AT_Clear();
             
             if (WiFi_Send_AT_Command(cmd_buf, "WIFI CONNECTED", 10000)) {
                 Serial_Printf("[NET] WiFi connected OK\r\n");
@@ -256,15 +233,7 @@ static void Init_Step_Execute(void) {
                 Serial_Printf("[NET] WiFi connection FAILED\r\n");
                 Show_Network_Failure("WiFi connect failed");
                 
-                // 检查实际收到的响应
-                uint8_t debug_buf[128];
-                uint16_t debug_len = WiFi_Read_Data(debug_buf, sizeof(debug_buf) - 1);
-                if (debug_len > 0) {
-                    debug_buf[debug_len] = '\0';
-                    Serial_Printf("[NET] Received response: %s\r\n", debug_buf);
-                } else {
-                    Serial_Printf("[NET] No response received\r\n");
-                }
+                // 调试信息已移除（新架构下响应在WiFi_Send_AT_Command内部处理）
                 
                 g_net_state = NET_STATE_OFFLINE;
                 g_init_step = INIT_STEP_IDLE;
@@ -276,7 +245,7 @@ static void Init_Step_Execute(void) {
             Serial_Printf("[NET] Step 5: Connecting TCP...\r\n");
             
             // 先清空缓冲区
-            WiFi_Clear_Buffer();
+            RingBuffer_AT_Clear();
             
             // 尝试使用域名连接
             sprintf(cmd_buf, "AT+CIPSTART=\"TCP\",\"%s\",%s\r\n", BEMFA_SERVER_IP, BEMFA_SERVER_PORT);
@@ -292,7 +261,7 @@ static void Init_Step_Execute(void) {
                 g_init_step = INIT_STEP_SUBSCRIBE;
             } else {
                 // 尝试检查是否有OK响应
-                WiFi_Clear_Buffer();
+                RingBuffer_AT_Clear();
                 sprintf(cmd_buf, "AT+CIPSTART=\"TCP\",\"%s\",%s\r\n", BEMFA_SERVER_IP, BEMFA_SERVER_PORT);
                 if (WiFi_Send_AT_Command(cmd_buf, "OK", 10000)) {
                     Serial_Printf("[NET] TCP connected (response: OK)\r\n");
@@ -303,16 +272,9 @@ static void Init_Step_Execute(void) {
                     Serial_Printf("[NET] TCP connection FAILED\r\n");
                     Show_Network_Failure("Bemfa connect failed");
                     
-                    // 检查实际收到的响应
-                    uint8_t debug_buf[128];
-                    uint16_t debug_len = WiFi_Read_Data(debug_buf, sizeof(debug_buf) - 1);
-                    if (debug_len > 0) {
-                        debug_buf[debug_len] = '\0';
-                        Serial_Printf("[NET] Received response: %s\r\n", debug_buf);
-                    } else {
-                        Serial_Printf("[NET] No response received (timeout or DNS failed)\r\n");
-                        Serial_Printf("[NET] Hint: Try using IP address instead of domain\r\n");
-                    }
+                    // 调试信息已移除（新架构下响应在WiFi_Send_AT_Command内部处理）
+                    Serial_Printf("[NET] No response received (timeout or DNS failed)\r\n");
+                    Serial_Printf("[NET] Hint: Try using IP address instead of domain\r\n");
                     
                     g_net_state = NET_STATE_OFFLINE;
                     g_init_step = INIT_STEP_IDLE;
@@ -335,7 +297,7 @@ static void Init_Step_Execute(void) {
             Serial_Printf("[NET] Subscribe cmd: %s", subscribe_cmd);
             
             // 先清空缓冲区
-            WiFi_Clear_Buffer();
+            RingBuffer_AT_Clear();
             
             // 使用AT+CIPSEND两阶段发送（与备份代码一致）
             data_len = strlen(subscribe_cmd);
@@ -367,23 +329,13 @@ static void Init_Step_Execute(void) {
                     Serial_Printf("[NET] === Network initialization COMPLETE ===\r\n");
                 } else {
                     Serial_Printf("[NET] SEND OK not received\r\n");
-                    uint8_t debug_buf[128];
-                    uint16_t debug_len = WiFi_Read_Data(debug_buf, sizeof(debug_buf) - 1);
-                    if (debug_len > 0) {
-                        debug_buf[debug_len] = '\0';
-                        Serial_Printf("[NET] Response: %s\r\n", debug_buf);
-                    }
+                    // 调试信息已移除
                     g_net_state = NET_STATE_OFFLINE;
                     g_init_step = INIT_STEP_IDLE;
                 }
             } else {
                 Serial_Printf("[NET] CIPSEND command failed\r\n");
-                uint8_t debug_buf[128];
-                uint16_t debug_len = WiFi_Read_Data(debug_buf, sizeof(debug_buf) - 1);
-                if (debug_len > 0) {
-                    debug_buf[debug_len] = '\0';
-                    Serial_Printf("[NET] Response: %s\r\n", debug_buf);
-                }
+                // 调试信息已移除
                 g_net_state = NET_STATE_OFFLINE;
                 g_init_step = INIT_STEP_IDLE;
             }
@@ -421,38 +373,57 @@ void Network_Core_Init(void) {
  * @brief 检查并处理云端指令
  */
 static void Check_Cloud_Command(void) {
-    uint16_t recv_len;
+    uint8_t frame_buf[256];
+    uint16_t frame_len;
     static uint16_t recv_count = 0;  // 接收计数器
     
-    // 读取数据
-    recv_len = WiFi_Read_Data(g_recv_buffer, sizeof(g_recv_buffer) - 1);
-    if (recv_len == 0) {
-        return;
+    // 从云端缓冲区读取完整帧（基于\r\n判断）
+    frame_len = WiFi_Read_Cloud_Complete_Frame(frame_buf, sizeof(frame_buf) - 1);
+    if (frame_len == 0) {
+        return;  // 没有完整帧，等待下次
     }
     
-    g_recv_buffer[recv_len] = '\0';
+    frame_buf[frame_len] = '\0';
+    
+    // 调试：打印每次读取的帧内容和缓冲区剩余量
+    Serial_Printf("[DBG] Frame read: len=%d, remaining=%d, content=%.50s\r\n", 
+                 frame_len, WiFi_Get_Cloud_Data_Length(), frame_buf);
     
     // 每10次接收打印一次，避免日志风暴
     if (++recv_count % 10 == 0) {
         // 只打印前256字节，避免过长日志导致性能问题
-        if (recv_len > 256) {
+        if (frame_len > 256) {
             uint8_t temp_buf[257];
-            memcpy(temp_buf, g_recv_buffer, 256);
+            memcpy(temp_buf, frame_buf, 256);
             temp_buf[256] = '\0';
-            Serial_Printf("[NET] Received %d bytes: %s...\r\n", recv_len, temp_buf);
+            Serial_Printf("[NET] Received %d bytes: %s...\r\n", frame_len, temp_buf);
         } else {
-            Serial_Printf("[NET] Received %d bytes: %s\r\n", recv_len, g_recv_buffer);
+            Serial_Printf("[NET] Received %d bytes: %s\r\n", frame_len, frame_buf);
         }
     }
     
     // 解析指令
-    if (Cloud_Parse_Command(g_recv_buffer, recv_len, &g_pending_cmd)) {
+    if (Cloud_Parse_Command((char *)frame_buf, frame_len, &g_pending_cmd)) {
         Serial_Printf("[NET] Command parsed: type=%d\r\n", g_pending_cmd.type);
+        
+        // 调试：打印解析后云端缓冲区的剩余内容
+        uint16_t remaining_len = WiFi_Get_Cloud_Data_Length();
+        if (remaining_len > 0) {
+            uint8_t peek_buf[128];
+            uint16_t peek_len = WiFi_Peek_Cloud_Data(peek_buf, sizeof(peek_buf) - 1);
+            if (peek_len > 0) {
+                peek_buf[peek_len] = '\0';
+                Serial_Printf("[DBG] Cloud buffer after parse: %d bytes, content: %s\r\n", 
+                             remaining_len, peek_buf);
+            }
+        } else {
+            Serial_Printf("[DBG] Cloud buffer after parse: empty\r\n");
+        }
+        
         g_cmd_available = 1;
     }
     
-    // 清空缓冲区
-    WiFi_Clear_Buffer();
+    // 注意：WiFi_Read_Cloud_Complete_Frame已经清空了该帧，无需手动清空
 }
 
 /**
