@@ -60,4 +60,16 @@ uint8_t Network_Core_Is_OLED_Locked(void);
  */
 void Network_Core_Reset_Upload_Monitor(void);
 
+/**
+ * @brief 获取WiFi状态（供OLED显示使用）
+ * @return 0=断开, 1=已连接, 2=重连中
+ */
+uint8_t Get_WiFi_State(void);
+
+/**
+ * @brief 在右上角显示WiFi状态图标（不清屏）
+ * @param state: 0=未连接, 1=已连接, 2=重连中
+ */
+void Show_WiFi_Status_Icon(uint8_t state);
+
 #endif /* __NETWORK_CORE_H__ */

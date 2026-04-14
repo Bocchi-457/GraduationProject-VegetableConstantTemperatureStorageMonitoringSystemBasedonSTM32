@@ -128,6 +128,9 @@ void OLED_Display_Task_Run(void) {
         Display_ShowTime();    // 显示时间（TIME函数使用y=3和y=4，第3-5页）
         Display_ShowWendu();   // 显示温湿度（y=6，第6-7页）
         
+        // 显示WiFi状态图标（右上角，不遮挡其他信息）
+        Show_WiFi_Status_Icon(Get_WiFi_State());
+        
         // ✅ 删除：按键处理已移至key_task.c，此处只负责显示
     }
     

@@ -312,12 +312,13 @@ void OLED_DrawBMP(unsigned char x0, unsigned char y0, unsigned char x1,
                   unsigned char y1, unsigned char BMP[]) {
   unsigned int j = 0;
   unsigned char x, y;
+  unsigned char page_count;
 
   if (y1 % 8 == 0)
-    y = y1 / 8;
+    page_count = y1 / 8;
   else
-    y = y1 / 8 + 1;
-  for (y = y0; y < y1; y++) {
+    page_count = y1 / 8 + 1;
+  for (y = y0; y < page_count; y++) {
     OLED_Set_Pos(x0, y);
     for (x = x0; x < x1; x++) {
       OLED_WR_Byte(BMP[j++], OLED_DATA);

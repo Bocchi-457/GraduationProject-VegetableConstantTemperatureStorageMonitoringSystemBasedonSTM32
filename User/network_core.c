@@ -2,6 +2,7 @@
 #include "wifi_driver.h"  // 包含WIFI_SSID等宏定义
 #include "delay.h"
 #include "oled.h"
+#include "bmp.h"  // WiFi状态图标
 #include "Usart.h"  // 用于Serial_Printf调试输出
 #include "stm32f10x_usart.h"  // 用于USART_SendData等
 #include <stdio.h>
@@ -52,31 +53,90 @@ static void Show_Network_Failure(const char *message) {
 }
 
 /**
- * @brief 显示WiFi断开状态
+ * @brief 显示联网离线状态
+ * @note 初始化失败时调用，显示离线提示后清屏
  */
-static void Show_WiFi_Disconnected(void) {
-    static uint32_t last_update = 0;
-    static uint8_t dot_count = 0;
-    
-    if (sys_tick_ms - last_update < 500) {
-        return;  // 每500ms更新一次
-    }
-    
-    last_update = sys_tick_ms;
-    
+static void Show_Network_Offline(void) {
     OLED_Clear(0);
     
-    OLED_ShowString(0, 0, (uint8_t *)"WiFi", 16);
-    OLED_ShowCHinese(48, 0, 36); // 断
-    OLED_ShowCHinese(66, 0, 37); // 开
+    OLED_ShowCHinese(0, 0, 56);  // 联
+    OLED_ShowCHinese(18, 0, 57); // 网
+    OLED_ShowCHinese(36, 0, 36); // 失  
+    OLED_ShowCHinese(54, 0, 37); // 败
+    OLED_ShowString(0, 3, (uint8_t *)"Offline Mode", 16);
+    OLED_ShowString(0, 6, (uint8_t *)"System running", 16);
     
-    // 动态显示点
-    char dots[] = "...";
-    dots[dot_count % 3 + 1] = '\0';
-    OLED_ShowString(0, 3, (uint8_t *)"Wait recover", 16);
-    OLED_ShowString(96, 3, (uint8_t *)dots, 16);
+    delay_ms(2000);
+    OLED_Clear(0);
+}
+
+/**
+ * @brief 在右上角显示WiFi状态图标（不清屏）
+ * @param state: 0=未连接, 1=已连接, 2=重连中
+ */
+void Show_WiFi_Status_Icon(uint8_t state) {
+    static uint32_t last_update = 0;
+    static uint8_t anim_frame = 0;
+    static uint8_t last_state = 0xFF;
     
-    dot_count++;
+    if (state != last_state) {
+        last_state = state;
+        last_update = 0;
+    }
+    
+    if (sys_tick_ms - last_update < 300) {
+        return;
+    }
+    last_update = sys_tick_ms;
+    
+    switch (state) {
+        case 0:  // WiFi未连接 - 显示断开图标
+            anim_frame = 0;  // 重置动画帧
+            OLED_DrawBMP(112, 0, 128, 16, WIFI_DISCONNECTED);
+            break;
+            
+        case 1:  // WiFi已连接 - 显示连接图标（常亮）
+            anim_frame = 0;  // 重置动画帧
+            OLED_DrawBMP(112, 0, 128, 16, WIFI_CONNECTED);
+            break;
+            
+        case 2:  // WiFi重连中 - 4帧动画循环
+            anim_frame = (anim_frame + 1) % 4;  // 0-3循环
+            switch (anim_frame) {
+                case 0:  // 帧1：只有底部点
+                    OLED_DrawBMP(112, 0, 128, 16, WIFI_ANIM_FRAME1);
+                    break;
+                case 1:  // 帧2：底部点 + 小圆弧
+                    OLED_DrawBMP(112, 0, 128, 16, WIFI_ANIM_FRAME2);
+                    break;
+                case 2:  // 帧3：底部点 + 小圆弧 + 中圆弧
+                    OLED_DrawBMP(112, 0, 128, 16, WIFI_ANIM_FRAME3);
+                    break;
+                case 3:  // 帧4：完整WiFi图标
+                    OLED_DrawBMP(112, 0, 128, 16, WIFI_CONNECTED);
+                    break;
+            }
+            break;
+            
+        default:
+            // 清除图标区域
+            {
+                uint8_t i;
+                OLED_Set_Pos(112, 0);
+                for (i = 0; i < 16; i++) OLED_WR_Byte(0x00, OLED_DATA);
+                OLED_Set_Pos(112, 1);
+                for (i = 0; i < 16; i++) OLED_WR_Byte(0x00, OLED_DATA);
+            }
+            break;
+    }
+}
+
+/**
+ * @brief 显示WiFi断开状态（在右上角显示图标，不清屏）
+ */
+static void Show_WiFi_Disconnected(void) {
+    // 调用通用的WiFi状态图标显示函数
+    Show_WiFi_Status_Icon(0);  // 0=未连接
 }
 
 /**
@@ -178,6 +238,20 @@ typedef struct {
 } UploadMonitor_t;
 
 static UploadMonitor_t g_upload_monitor = {0};
+
+/**
+ * @brief 获取WiFi状态（供OLED显示使用）
+ * @return 0=断开, 1=已连接, 2=重连中
+ */
+uint8_t Get_WiFi_State(void) {
+    if (g_upload_monitor.wifi_connected) {
+        if (g_net_state == NET_STATE_RECONNECTING) {
+            return 2;  // 重连中
+        }
+        return 1;  // 已连接
+    }
+    return 0;  // 断开
+}
 
 /**
  * @brief 检测TCP连接状态
@@ -319,6 +393,8 @@ static uint8_t Reconnect_Step_Execute(void) {
     char cipsend_cmd[32];
     uint16_t recv_len;
     uint8_t recv_buf[64];
+    const char *p;
+    const char *q;
     
     switch (g_upload_monitor.reconnect_state) {
         case RECONNECT_STATE_IDLE:
@@ -333,7 +409,7 @@ static uint8_t Reconnect_Step_Execute(void) {
                    BEMFA_SERVER_IP, BEMFA_SERVER_PORT);
             
             // 发送命令
-            const char *p = g_upload_monitor.reconnect_cmd_buf;
+            p = g_upload_monitor.reconnect_cmd_buf;
             while (*p) {
                 USART_SendData(ESP8266_USART, (uint8_t)*p++);
                 while (USART_GetFlagStatus(ESP8266_USART, USART_FLAG_TXE) == RESET);
@@ -381,7 +457,7 @@ static uint8_t Reconnect_Step_Execute(void) {
             
             // 发送CIPSEND指令
             sprintf(cipsend_cmd, "AT+CIPSEND=%d\r\n", g_upload_monitor.reconnect_data_len);
-            const char *q = cipsend_cmd;
+            q = cipsend_cmd;
             while (*q) {
                 USART_SendData(ESP8266_USART, (uint8_t)*q++);
                 while (USART_GetFlagStatus(ESP8266_USART, USART_FLAG_TXE) == RESET);
@@ -557,9 +633,19 @@ static void Handle_WiFi_Check(void) {
                 
                 Serial_Printf("[NET] Will attempt TCP connection immediately...\r\n");
             } else {
-                // 其他场景（如TCP断开时检测），进入OFFLINE或启动重连
-                Serial_Printf("[NET] WiFi is OK. Checking next step...\r\n");
-                // 这里由调用者决定后续操作
+                // 其他场景（如TCP断开时检测），启动TCP重连
+                Serial_Printf("[NET] WiFi is OK. Starting TCP reconnection...\r\n");
+                
+                // 启动TCP重连流程（立即开始，不等待）
+                g_net_state = NET_STATE_RECONNECTING;
+                g_upload_monitor.is_reconnecting = 1;
+                g_upload_monitor.reconnect_attempts = 0;
+                g_upload_monitor.next_retry_time = sys_tick_ms;  // 立即开始
+                g_upload_monitor.reconnect_state = RECONNECT_STATE_IDLE;
+                g_upload_monitor.tcp_disconnected = 1;
+                g_upload_monitor.upload_paused = 1;
+                
+                Serial_Printf("[NET] Will attempt TCP connection immediately...\r\n");
             }
             
             g_upload_monitor.wifi_check_state = WIFI_CHECK_STATE_IDLE;
@@ -682,9 +768,10 @@ static void Init_Step_Execute(void) {
                     Serial_Printf("[NET] AT test failed after 3 retries, going OFFLINE\r\n");
                     g_net_state = NET_STATE_OFFLINE;
                     g_init_step = INIT_STEP_IDLE;
-                    retry = 0;  // ✅ 重置计数器，以便下次初始化
+                    retry = 0;  // 重置计数器，以便下次初始化
                     
-                    // 最终失败，解锁OLED
+                    // 显示离线提示并清屏
+                    Show_Network_Offline();
                     g_oled_locked = 0;
                 }
             }
@@ -701,6 +788,9 @@ static void Init_Step_Execute(void) {
                 Show_Network_Failure("WiFi mode setting failed");
                 g_net_state = NET_STATE_OFFLINE;
                 g_init_step = INIT_STEP_IDLE;
+                
+                // 显示离线提示并清屏
+                Show_Network_Offline();
                 g_oled_locked = 0;  // 解锁OLED
             }
             break;
@@ -720,7 +810,8 @@ static void Init_Step_Execute(void) {
                 Serial_Printf("[NET] WiFi connection FAILED\r\n");
                 Show_Network_Failure("WiFi connect failed");
                 
-                // 调试信息已移除（新架构下响应在WiFi_Send_AT_Command内部处理）
+                // 显示离线提示并清屏
+                Show_Network_Offline();
                 
                 g_net_state = NET_STATE_OFFLINE;
                 g_init_step = INIT_STEP_IDLE;
@@ -765,6 +856,9 @@ static void Init_Step_Execute(void) {
                     
                     g_net_state = NET_STATE_OFFLINE;
                     g_init_step = INIT_STEP_IDLE;
+                    
+                    // 显示离线提示并清屏
+                    Show_Network_Offline();
                     g_oled_locked = 0;  // 解锁OLED
                 }
             }
@@ -816,15 +910,25 @@ static void Init_Step_Execute(void) {
                     Serial_Printf("[NET] === Network initialization COMPLETE ===\r\n");
                 } else {
                     Serial_Printf("[NET] SEND OK not received\r\n");
-                    // 调试信息已移除
+                    Show_Network_Failure("Subscribe failed");
+                    
+                    // 显示离线提示并清屏
+                    Show_Network_Offline();
+                    
                     g_net_state = NET_STATE_OFFLINE;
                     g_init_step = INIT_STEP_IDLE;
+                    g_oled_locked = 0;  // 解锁OLED
                 }
             } else {
                 Serial_Printf("[NET] CIPSEND command failed\r\n");
-                // 调试信息已移除
+                Show_Network_Failure("Subscribe failed");
+                
+                // 显示离线提示并清屏
+                Show_Network_Offline();
+                
                 g_net_state = NET_STATE_OFFLINE;
                 g_init_step = INIT_STEP_IDLE;
+                g_oled_locked = 0;  // 解锁OLED
             }
             break;
             
@@ -890,7 +994,7 @@ static void Check_Cloud_Command(void) {
     }
     
     // 解析指令
-    if (Cloud_Parse_Command((char *)frame_buf, frame_len, &g_pending_cmd)) {
+    if (Cloud_Parse_Command((const uint8_t *)frame_buf, frame_len, &g_pending_cmd)) {
         Serial_Printf("[NET] Command parsed: type=%d\r\n", g_pending_cmd.type);
         
         // 调试：打印解析后云端缓冲区的剩余内容
