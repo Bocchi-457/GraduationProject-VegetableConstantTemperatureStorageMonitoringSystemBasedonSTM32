@@ -48,7 +48,35 @@ static void Show_Network_Failure(const char *message) {
     OLED_ShowCHinese(18, 6, 5);  // 度
     OLED_ShowCHinese(36, 6, 13); // ：
     
-    // 注意：失败后不解锁OLED，因为会重试初始化
+    g_oled_locked = 0;
+}
+
+/**
+ * @brief 显示WiFi断开状态
+ */
+static void Show_WiFi_Disconnected(void) {
+    static uint32_t last_update = 0;
+    static uint8_t dot_count = 0;
+    
+    if (sys_tick_ms - last_update < 500) {
+        return;  // 每500ms更新一次
+    }
+    
+    last_update = sys_tick_ms;
+    
+    OLED_Clear(0);
+    
+    OLED_ShowString(0, 0, (uint8_t *)"WiFi", 16);
+    OLED_ShowCHinese(48, 0, 36); // 断
+    OLED_ShowCHinese(66, 0, 37); // 开
+    
+    // 动态显示点
+    char dots[] = "...";
+    dots[dot_count % 3 + 1] = '\0';
+    OLED_ShowString(0, 3, (uint8_t *)"Wait recover", 16);
+    OLED_ShowString(96, 3, (uint8_t *)dots, 16);
+    
+    dot_count++;
 }
 
 /**
@@ -115,7 +143,15 @@ typedef enum {
     RECONNECT_STATE_FAILED          // 重连失败
 } ReconnectState_t;
 
-/* 上传监控状态（第二阶段：支持重连）*/
+/* WiFi检测子状态 */
+typedef enum {
+    WIFI_CHECK_STATE_IDLE,          // 空闲
+    WIFI_CHECK_STATE_CHECKING,      // 正在检测
+    WIFI_CHECK_STATE_CONNECTED,     // WiFi已连接
+    WIFI_CHECK_STATE_DISCONNECTED   // WiFi已断开
+} WiFiCheckState_t;
+
+/* 上传监控状态（第三阶段：支持WiFi检测）*/
 typedef struct {
     uint8_t upload_fail_count;      // 连续上传失败计数
     uint8_t tcp_disconnected;       // TCP是否断开标志
@@ -133,6 +169,12 @@ typedef struct {
     char reconnect_cmd_buf[128];                // 重连命令缓冲区
     char reconnect_subscribe_cmd[128];          // 订阅命令缓冲区
     uint16_t reconnect_data_len;                // 订阅数据长度
+    
+    /* WiFi检测状态 */
+    uint8_t wifi_check_enabled;                 // 是否启用WiFi检测
+    uint32_t wifi_check_next_time;              // 下次检测时间
+    uint8_t wifi_connected;                     // WiFi连接状态
+    WiFiCheckState_t wifi_check_state;          // WiFi检测子状态
 } UploadMonitor_t;
 
 static UploadMonitor_t g_upload_monitor = {0};
@@ -158,6 +200,61 @@ static uint8_t Check_TCP_Connection(void) {
         Serial_Printf("[NET] TCP status: DISCONNECTED (no STATUS:3 received)\r\n");
         return 0;  // 默认认为已断开
     }
+}
+
+/**
+ * @brief 检测WiFi连接状态（非阻塞）
+ * @return 1=已连接, 0=已断开, 2=检测中
+ */
+static uint8_t Check_WiFi_Connection(void) {
+    static uint8_t check_state = 0;  // 0=空闲, 1=已发送指令, 2=等待响应
+    static uint32_t check_start_time = 0;
+    uint16_t recv_len;
+    uint8_t recv_buf[64];
+    
+    if (check_state == 0) {
+        // 发送AT+CWJAP?指令
+        const char *cmd = "AT+CWJAP?\r\n";
+        const char *p = cmd;
+        while (*p) {
+            USART_SendData(ESP8266_USART, (uint8_t)*p++);
+            while (USART_GetFlagStatus(ESP8266_USART, USART_FLAG_TXE) == RESET);
+        }
+        
+        check_state = 1;
+        check_start_time = sys_tick_ms;
+        return 2;  // 检测中
+        
+    } else if (check_state == 1) {
+        // 检查是否超时（3秒）
+        if (sys_tick_ms - check_start_time > 3000) {
+            Serial_Printf("[NET] WiFi check timeout\r\n");
+            check_state = 0;
+            return 0;  // 超时，认为断开
+        }
+        
+        // 检查是否有响应
+        recv_len = RingBuffer_AT_Read(recv_buf, sizeof(recv_buf) - 1);
+        if (recv_len > 0) {
+            recv_buf[recv_len] = '\0';
+            
+            if (strstr((char *)recv_buf, "+CWJAP:") != NULL) {
+                // 收到+CWJAP:，WiFi已连接
+                Serial_Printf("[NET] WiFi status: CONNECTED\r\n");
+                check_state = 0;
+                return 1;
+            } else if (strstr((char *)recv_buf, "OK") != NULL || strstr((char *)recv_buf, "ERROR") != NULL) {
+                // 收到OK或ERROR但没有+CWJAP:，WiFi未连接
+                Serial_Printf("[NET] WiFi status: DISCONNECTED\r\n");
+                check_state = 0;
+                return 0;
+            }
+            // 其他响应，继续等待
+        }
+        return 2;  // 还在等待中
+    }
+    
+    return 0;  // 不应该到达这里
 }
 
 /**
@@ -406,11 +503,17 @@ static void Handle_TCP_Reconnection(void) {
             g_upload_monitor.reconnect_state = RECONNECT_STATE_IDLE;
             
             if (g_upload_monitor.reconnect_attempts >= 3) {
-                // 3次都失败，进入离线状态
-                Serial_Printf("[NET] Reconnection FAILED after 3 attempts. Going OFFLINE.\r\n");
+                // 3次都失败，检测WiFi状态
+                Serial_Printf("[NET] TCP reconnection FAILED after 3 attempts. Checking WiFi...\r\n");
                 g_upload_monitor.is_reconnecting = 0;
                 g_upload_monitor.reconnect_attempts = 0;
-                g_net_state = NET_STATE_OFFLINE;
+                
+                // 启动WiFi检测状态机（由Handle_WiFi_Check()周期性执行）
+                if (g_upload_monitor.wifi_check_state == WIFI_CHECK_STATE_IDLE) {
+                    g_upload_monitor.wifi_check_state = WIFI_CHECK_STATE_CHECKING;
+                    Serial_Printf("[NET] WiFi check started...\r\n");
+                }
+                // 不再直接调用Check_WiFi_Connection()，交给Handle_WiFi_Check()处理
             } else {
                 // 还有重试机会，计算下次重试时间（指数退避）
                 uint32_t delays[] = {15000, 20000, 40000};  // 15s, 20s, 40s
@@ -420,6 +523,102 @@ static void Handle_TCP_Reconnection(void) {
         }
         // 其他状态（等待中），继续下次调用
     }
+}
+
+/**
+ * @brief 处理WiFi检测（独立状态机，在Network_Core_Task中周期性调用）
+ */
+static void Handle_WiFi_Check(void) {
+    // 如果正在检测WiFi，继续执行
+    if (g_upload_monitor.wifi_check_state == WIFI_CHECK_STATE_CHECKING) {
+        uint8_t wifi_result = Check_WiFi_Connection();
+        
+        if (wifi_result == 2) {
+            return;  // 还在检测中
+        } else if (wifi_result == 1) {
+            // WiFi正常
+            Serial_Printf("[NET] WiFi check result: CONNECTED\r\n");
+            
+            // 根据当前网络状态决定下一步
+            if (g_net_state == NET_STATE_WIFI_DISCONNECTED) {
+                // WiFi恢复，启动TCP重连
+                Serial_Printf("[NET] WiFi recovered! Starting TCP reconnection...\r\n");
+                g_upload_monitor.wifi_check_enabled = 0;
+                g_upload_monitor.wifi_connected = 1;
+                
+                // 启动TCP重连流程（立即开始，不等待）
+                g_net_state = NET_STATE_RECONNECTING;
+                g_upload_monitor.is_reconnecting = 1;
+                g_upload_monitor.reconnect_attempts = 0;
+                g_upload_monitor.next_retry_time = sys_tick_ms;  // 立即开始
+                g_upload_monitor.reconnect_state = RECONNECT_STATE_IDLE;
+                g_upload_monitor.tcp_disconnected = 1;
+                g_upload_monitor.upload_paused = 1;
+                
+                Serial_Printf("[NET] Will attempt TCP connection immediately...\r\n");
+            } else {
+                // 其他场景（如TCP断开时检测），进入OFFLINE或启动重连
+                Serial_Printf("[NET] WiFi is OK. Checking next step...\r\n");
+                // 这里由调用者决定后续操作
+            }
+            
+            g_upload_monitor.wifi_check_state = WIFI_CHECK_STATE_IDLE;
+            
+        } else {
+            // WiFi断开
+            Serial_Printf("[NET] WiFi check result: DISCONNECTED\r\n");
+            
+            if (g_net_state != NET_STATE_WIFI_DISCONNECTED) {
+                // 首次检测到WiFi断开
+                g_net_state = NET_STATE_WIFI_DISCONNECTED;
+                g_upload_monitor.wifi_check_enabled = 1;
+                g_upload_monitor.wifi_check_next_time = sys_tick_ms + 20000;
+                g_upload_monitor.wifi_connected = 0;
+                Serial_Printf("[NET] Entering WiFi recovery mode...\r\n");
+            } else {
+                // 已经在WiFi断开状态，设置下次检测时间
+                g_upload_monitor.wifi_check_next_time = sys_tick_ms + 20000;
+                Serial_Printf("[NET] WiFi still disconnected. Next check in 20 seconds...\r\n");
+            }
+            
+            g_upload_monitor.wifi_check_state = WIFI_CHECK_STATE_IDLE;
+        }
+    }
+}
+
+/**
+ * @brief 处理WiFi恢复检测（非阻塞状态机）
+ */
+static void Handle_WiFi_Recovery(void) {
+    if (g_net_state != NET_STATE_WIFI_DISCONNECTED) {
+        return;  // 不在WiFi断开状态
+    }
+    
+    // 更新OLED显示
+    Show_WiFi_Disconnected();
+    
+    if (!g_upload_monitor.wifi_check_enabled) {
+        return;  // 未启用WiFi检测
+    }
+    
+    // 检查是否到达检测时间
+    if (sys_tick_ms < g_upload_monitor.wifi_check_next_time) {
+        // 还未到检测时间，显示倒计时
+        uint32_t remaining = (g_upload_monitor.wifi_check_next_time - sys_tick_ms) / 1000;
+        static uint32_t last_display = 0;
+        if (sys_tick_ms - last_display >= 1000) {  // 每秒更新一次
+            Serial_Printf("[NET] WiFi recovery check in %lu seconds...\r\n", remaining);
+            last_display = sys_tick_ms;
+        }
+        return;
+    }
+    
+    // 到达检测时间，启动WiFi检测（由Handle_WiFi_Check()执行）
+    if (g_upload_monitor.wifi_check_state == WIFI_CHECK_STATE_IDLE) {
+        g_upload_monitor.wifi_check_state = WIFI_CHECK_STATE_CHECKING;
+        Serial_Printf("[NET] WiFi check started (recovery mode)...\r\n");
+    }
+    // 不再直接调用Check_WiFi_Connection()，交给Handle_WiFi_Check()处理
 }
 
 /**
@@ -727,6 +926,12 @@ void Network_Core_Task(void) {
     // 处理TCP重连逻辑（非阻塞）
     Handle_TCP_Reconnection();
     
+    // 处理WiFi检测（独立状态机）
+    Handle_WiFi_Check();
+    
+    // 处理WiFi恢复检测（非阻塞）
+    Handle_WiFi_Recovery();
+    
     // 如果已连接，检查云端指令
     if (g_net_state == NET_STATE_CONNECTED) {
         Check_Cloud_Command();
@@ -738,6 +943,15 @@ void Network_Core_Task(void) {
         if (!offline_logged) {
             Serial_Printf("[NET] *** Network is OFFLINE ***\r\n");
             offline_logged = 1;
+        }
+    }
+    
+    // WiFi断开状态
+    if (g_net_state == NET_STATE_WIFI_DISCONNECTED) {
+        static uint8_t wifi_disconnected_logged = 0;
+        if (!wifi_disconnected_logged) {
+            Serial_Printf("[NET] *** WiFi is DISCONNECTED ***\r\n");
+            wifi_disconnected_logged = 1;
         }
     }
 }
@@ -864,15 +1078,18 @@ check_tcp_status:
             Serial_Printf("[NET] ESP8266 responding, checking TCP status...\r\n");
             
             if (!Check_TCP_Connection()) {
-                // TCP已断开，启动重连流程
-                Serial_Printf("[NET] TCP disconnected! Starting reconnection process...\r\n");
+                // TCP已断开，先检测WiFi状态
+                Serial_Printf("[NET] TCP disconnected! Checking WiFi status first...\r\n");
                 g_upload_monitor.tcp_disconnected = 1;
                 g_upload_monitor.upload_paused = 1;
-                g_upload_monitor.is_reconnecting = 1;
-                g_upload_monitor.reconnect_attempts = 0;
-                g_upload_monitor.next_retry_time = sys_tick_ms + 15000;  // 第一次等待15秒
                 
-                Serial_Printf("[NET] Will attempt reconnection in 15 seconds...\r\n");
+                // 启动WiFi检测状态机（由Handle_WiFi_Check()周期性执行）
+                if (g_upload_monitor.wifi_check_state == WIFI_CHECK_STATE_IDLE) {
+                    g_upload_monitor.wifi_check_state = WIFI_CHECK_STATE_CHECKING;
+                    Serial_Printf("[NET] WiFi check started...\r\n");
+                }
+                // 不再直接调用Check_WiFi_Connection()，交给Handle_WiFi_Check()处理
+                return 1;
             } else {
                 Serial_Printf("[NET] TCP still connected, will continue monitoring.\r\n");
             }
