@@ -63,6 +63,17 @@ uint8_t WiFi_Send_AT_Command(const char *cmd, const char *expected_ack, uint32_t
 void RingBuffer_AT_Clear(void);
 
 /**
+ * @brief 清空云端缓冲区
+ */
+void RingBuffer_Cloud_Clear(void);
+
+/**
+ * @brief 重置解析器状态机（强制回到IDLE状态）
+ * @note 用于时间同步前，避免上次遗留的状态影响
+ */
+void WiFi_Reset_Parse_State(void);
+
+/**
  * @brief 从AT缓冲区读取数据（供外部调用）
  * @param data 输出缓冲区
  * @param max_len 最大读取长度
@@ -83,6 +94,15 @@ uint16_t WiFi_Read_Cloud_Complete_Frame(uint8_t *data, uint16_t max_len);
  * @return 数据长度
  */
 uint16_t WiFi_Get_Cloud_Data_Length(void);
+
+/**
+ * @brief 从云端缓冲区读取数据（不依赖\r\n，用于时间同步等特殊场景）
+ * @param data 输出缓冲区
+ * @param max_len 最大读取长度
+ * @return 实际读取的字节数
+ * @note 如果缓冲区中有数据但没有\r\n，也会返回数据
+ */
+uint16_t WiFi_Read_Cloud_Data_NoDelimiter(uint8_t *data, uint16_t max_len);
 
 /**
  * @brief 预览云端缓冲区内容（不移除数据）

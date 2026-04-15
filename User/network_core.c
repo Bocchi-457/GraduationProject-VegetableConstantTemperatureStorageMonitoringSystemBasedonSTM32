@@ -5,6 +5,7 @@
 #include "bmp.h"  // WiFi状态图标
 #include "Usart.h"  // 用于Serial_Printf调试输出
 #include "stm32f10x_usart.h"  // 用于USART_SendData等
+#include "DS1302.h"  // DS1302时间校准
 #include <stdio.h>
 #include <string.h>
 
@@ -282,6 +283,41 @@ static uint32_t g_init_next_retry_time = 0;  // 下次重试时间
 
 /* ✅ 初始化成功提示标志（只显示一次）*/
 static uint8_t g_init_success_shown = 0;
+
+/* 时间同步状态 */
+typedef struct {
+    uint8_t sync_requested;        // 是否请求同步
+    uint8_t sync_in_progress;      // 是否正在同步
+    uint8_t first_sync_done;       // 首次同步是否完成
+    uint32_t last_sync_timestamp;  // 上次同步的系统时间戳(ms)
+    uint8_t retry_count;           // 当前重试次数
+} TimeSyncState_t;
+
+static TimeSyncState_t g_time_sync = {0};
+
+#define TIME_SYNC_INTERVAL_MS 60000 // 2天 = 172800000ms (2UL * 24 * 3600 * 1000)
+#define TIME_SYNC_MAX_RETRY    3                           // 最大重试次数
+#define TIME_SYNC_TIMEOUT_MS   10000                       // 同步超时10秒（巴法云响应较慢）
+
+/* 时间同步状态机 */
+typedef enum {
+    TIME_SYNC_STATE_IDLE = 0,
+    TIME_SYNC_STATE_SEND_CMD,        // 发送cmd=7指令
+    TIME_SYNC_STATE_WAIT_CIPSEND,    // 等待CIPSEND响应
+    TIME_SYNC_STATE_WAIT_RESPONSE,   // 等待服务器响应
+    TIME_SYNC_STATE_PARSE_TIME,      // 解析时间字符串
+    TIME_SYNC_STATE_SET_DS1302,      // 设置DS1302
+    TIME_SYNC_STATE_COMPLETE,        // 同步完成
+    TIME_SYNC_STATE_FAILED           // 同步失败
+} TimeSyncStep_t;
+
+static TimeSyncStep_t g_time_sync_step = TIME_SYNC_STATE_IDLE;
+static uint32_t g_time_sync_start_time = 0;
+static char g_time_response_buf[64]; // 存储时间响应
+
+/* TCP定期检查状态 */
+static uint32_t g_tcp_check_last_time = 0;  // 上次检查时间
+#define TCP_CHECK_INTERVAL_MS  (2UL * 60 * 1000)  // 2分钟 = 120000ms
 
 /**
  * @brief 验证网络状态一致性
@@ -923,6 +959,9 @@ static void Init_Step_Execute(void) {
   char cmd_buf[128];
   uint8_t tcp_result; // TCP连接结果
   uint16_t data_len;  // 数据长度
+  uint32_t current_timeout = 0;      // WiFi超时时间
+  uint32_t current_tcp_timeout = 0;  // TCP超时时间
+  uint32_t current_sub_timeout = 0;  // 订阅超时时间
 
   /* WiFi重试超时配置（5s -> 6s -> 8s）*/
   static const uint32_t wifi_timeout[] = {5000, 6000, 8000};
@@ -1032,7 +1071,7 @@ static void Init_Step_Execute(void) {
     sprintf(cmd_buf, "AT+CWJAP=\"%s\",\"%s\"\r\n", WIFI_SSID, WIFI_PASSWORD);
 
     // 根据重试次数选择超时时间
-    uint32_t current_timeout = wifi_timeout[g_wifi_retry_count < INIT_MAX_RETRY
+    current_timeout = wifi_timeout[g_wifi_retry_count < INIT_MAX_RETRY
                                                 ? g_wifi_retry_count
                                                 : (INIT_MAX_RETRY - 1)];
 
@@ -1119,7 +1158,7 @@ static void Init_Step_Execute(void) {
                   BEMFA_SERVER_PORT);
 
     // 根据重试次数选择超时时间
-    uint32_t current_tcp_timeout =
+    current_tcp_timeout =
         tcp_timeout[g_tcp_retry_count < INIT_MAX_RETRY ? g_tcp_retry_count
                                                        : (INIT_MAX_RETRY - 1)];
 
@@ -1229,7 +1268,7 @@ static void Init_Step_Execute(void) {
     Serial_Printf("[NET] Sending CIPSEND: %s", cipsend_cmd);
 
     // 根据重试次数选择超时时间
-    uint32_t current_sub_timeout =
+    current_sub_timeout =
         subscribe_timeout[g_subscribe_retry_count < INIT_MAX_RETRY
                               ? g_subscribe_retry_count
                               : (INIT_MAX_RETRY - 1)];
@@ -1450,6 +1489,313 @@ static void Check_Cloud_Command(void) {
 }
 
 /**
+ * @brief 检查是否需要时间同步
+ */
+static void Check_Time_Sync_Trigger(void) {
+    // 只在联网成功状态下才考虑时间同步
+    if (g_net_state != NET_STATE_CONNECTED) {
+        return;
+    }
+    
+    // 如果正在同步中，不重复触发
+    if (g_time_sync.sync_in_progress) {
+        return;
+    }
+    
+    // 条件A: 首次联网成功，且未进行过首次同步
+    if (!g_time_sync.first_sync_done) {
+        Serial_Printf("[TIME] First connection success, requesting time sync...\r\n");
+        g_time_sync.sync_requested = 1;
+        return;
+    }
+    
+    // 条件B: 距离上次同步超过2天
+    if (sys_tick_ms - g_time_sync.last_sync_timestamp >= TIME_SYNC_INTERVAL_MS) {
+        Serial_Printf("[TIME] 2 days elapsed, requesting periodic time sync...\r\n");
+        g_time_sync.sync_requested = 1;
+        return;
+    }
+}
+
+/**
+ * @brief 解析时间字符串并设置DS1302
+ * @param time_str: 格式 "2021-06-11 16:39:27"
+ * @return 1=成功, 0=失败
+ */
+static uint8_t Parse_And_Set_Time(const char *time_str) {
+    uint16_t year;
+    uint8_t month, day, hour, min, sec;
+    
+    // 解析格式："2021-06-11 16:39:27"
+    if (sscanf(time_str, "%hu-%hhu-%hhu %hhu:%hhu:%hhu", 
+               &year, &month, &day, &hour, &min, &sec) != 6) {
+        Serial_Printf("[TIME] Failed to parse time string: %s\r\n", time_str);
+        return 0;
+    }
+    
+    // 验证时间合理性
+    if (year < 2020 || year > 2099 || month < 1 || month > 12 || 
+        day < 1 || day > 31 || hour > 23 || min > 59 || sec > 59) {
+        Serial_Printf("[TIME] Invalid time values: %04d-%02d-%02d %02d:%02d:%02d\r\n",
+                      year, month, day, hour, min, sec);
+        return 0;
+    }
+    
+    // 设置DS1302
+    RTC_Set(year, month, day, hour, min, sec);
+    
+    Serial_Printf("[TIME] DS1302 updated: %04d-%02d-%02d %02d:%02d:%02d\r\n",
+                  year, month, day, hour, min, sec);
+    
+    return 1;
+}
+
+/**
+ * @brief 执行时间同步状态机（非阻塞）
+ */
+static void Time_Sync_Execute(void) {
+    uint8_t recv_buf[128];
+    uint16_t recv_len;
+    
+    switch (g_time_sync_step) {
+        case TIME_SYNC_STATE_IDLE:
+            // 检查是否有同步请求
+            if (!g_time_sync.sync_requested) {
+                return;
+            }
+            
+            // ✅ 暂停上传任务，避免数据混乱
+            g_upload_monitor.upload_paused = 1;
+            Serial_Printf("[TIME] Upload paused for time sync\r\n");
+            
+            // 开始同步流程
+            Serial_Printf("[TIME] Starting time synchronization...\r\n");
+            g_time_sync.sync_in_progress = 1;
+            g_time_sync.retry_count = 0;
+            g_time_sync_step = TIME_SYNC_STATE_SEND_CMD;
+            break;
+            
+        case TIME_SYNC_STATE_SEND_CMD:
+            // 发送cmd=7指令获取时间
+            {
+                char time_cmd[128];
+                int len = sprintf(time_cmd, "cmd=7&uid=%s&type=1", BEMFA_UID);
+                
+                // ✅ 重置解析器状态，避免上次遗留的状态影响
+                WiFi_Reset_Parse_State();
+                
+                // ✅ 清空云端缓冲区，避免读取到旧数据
+                RingBuffer_Cloud_Clear();
+                Serial_Printf("[TIME] Parse state reset and cloud buffer cleared\r\n");
+                
+                // 使用AT+CIPSEND两阶段发送
+                char cipsend_cmd[32];
+                sprintf(cipsend_cmd, "AT+CIPSEND=%d\r\n", len);
+                
+                // 清空AT缓冲区
+                RingBuffer_AT_Clear();
+                
+                // 阶段1：发送CIPSEND指令
+                const char *p = cipsend_cmd;
+                while (*p) {
+                    USART_SendData(ESP8266_USART, (uint8_t)*p++);
+                    while (USART_GetFlagStatus(ESP8266_USART, USART_FLAG_TXE) == RESET);
+                }
+                
+                g_time_sync_start_time = sys_tick_ms;
+                g_time_sync_step = TIME_SYNC_STATE_WAIT_CIPSEND;
+            }
+            break;
+            
+        case TIME_SYNC_STATE_WAIT_CIPSEND:
+            // 等待">"提示符
+            if (sys_tick_ms - g_time_sync_start_time > TIME_SYNC_TIMEOUT_MS) {
+                Serial_Printf("[TIME] CIPSEND timeout\r\n");
+                g_time_sync_step = TIME_SYNC_STATE_FAILED;
+                return;
+            }
+            
+            recv_len = RingBuffer_AT_Read(recv_buf, sizeof(recv_buf) - 1);
+            if (recv_len > 0) {
+                recv_buf[recv_len] = '\0';
+                if (strstr((char *)recv_buf, ">") != NULL) {
+                    Serial_Printf("[TIME] Got '>' prompt, sending time request...\r\n");
+                    
+                    // ✅ 再次重置解析器状态，确保干净的环境
+                    WiFi_Reset_Parse_State();
+                    RingBuffer_Cloud_Clear();
+                    
+                    // 阶段2：发送实际的时间请求数据
+                    char time_cmd[128];
+                    sprintf(time_cmd, "cmd=7&uid=%s&type=1", BEMFA_UID);
+                    WiFi_Send_Data((uint8_t *)time_cmd, strlen(time_cmd));
+                    
+                    g_time_sync_start_time = sys_tick_ms;
+                    g_time_sync_step = TIME_SYNC_STATE_WAIT_RESPONSE;
+                }
+            }
+            break;
+            
+        case TIME_SYNC_STATE_WAIT_RESPONSE:
+            // 等待服务器响应
+            if (sys_tick_ms - g_time_sync_start_time > TIME_SYNC_TIMEOUT_MS) {
+                Serial_Printf("[TIME] Time response timeout\r\n");
+                g_time_sync_step = TIME_SYNC_STATE_FAILED;
+                return;
+            }
+            
+            // ✅ 使用不依赖\r\n的读取函数（巴法云时间响应没有\r\n结尾）
+            recv_len = WiFi_Read_Cloud_Data_NoDelimiter((uint8_t *)g_time_response_buf, 
+                                                        sizeof(g_time_response_buf) - 1);
+            if (recv_len > 0) {
+                g_time_response_buf[recv_len] = '\0';
+                Serial_Printf("[TIME] Received time response: %s\r\n", g_time_response_buf);
+                
+                // ✅ 改进：搜索"20XX-"格式的时间字符串（兼容混合数据）
+                char *time_pos = NULL;
+                for (uint16_t i = 0; i <= recv_len - 19; i++) {  // ✅ 使用<=而非<
+                    if (g_time_response_buf[i] == '2' && 
+                        g_time_response_buf[i+1] == '0' &&
+                        g_time_response_buf[i+4] == '-' &&
+                        g_time_response_buf[i+7] == '-' &&
+                        g_time_response_buf[i+10] == ' ' &&
+                        g_time_response_buf[i+13] == ':' &&
+                        g_time_response_buf[i+16] == ':') {
+                        time_pos = &g_time_response_buf[i];
+                        break;
+                    }
+                }
+                
+                if (time_pos != NULL) {
+                    // 复制时间字符串到缓冲区
+                    strncpy(g_time_response_buf, time_pos, 19);
+                    g_time_response_buf[19] = '\0';
+                    Serial_Printf("[TIME] Extracted time string: %s\r\n", g_time_response_buf);
+                    g_time_sync_step = TIME_SYNC_STATE_PARSE_TIME;
+                } else {
+                    Serial_Printf("[TIME] No valid time format found\r\n");
+                    g_time_sync_step = TIME_SYNC_STATE_FAILED;
+                }
+            }
+            break;
+            
+        case TIME_SYNC_STATE_PARSE_TIME:
+            // 解析时间并设置DS1302
+            if (Parse_And_Set_Time(g_time_response_buf)) {
+                // 同步成功，进入COMPLETE状态（在那里恢复上传）
+                g_time_sync.first_sync_done = 1;
+                g_time_sync.last_sync_timestamp = sys_tick_ms;
+                g_time_sync.sync_requested = 0;
+                g_time_sync.sync_in_progress = 0;
+                g_time_sync_step = TIME_SYNC_STATE_COMPLETE;
+                
+                Serial_Printf("[TIME] Time synchronization completed successfully\r\n");
+            } else {
+                g_time_sync_step = TIME_SYNC_STATE_FAILED;
+            }
+            break;
+            
+        case TIME_SYNC_STATE_COMPLETE:
+            // 同步完成，重置状态
+            g_time_sync_step = TIME_SYNC_STATE_IDLE;
+            
+            // ✅ 恢复上传任务
+            g_upload_monitor.upload_paused = 0;
+            Serial_Printf("[TIME] Upload resumed after successful sync\r\n");
+            break;
+            
+        case TIME_SYNC_STATE_FAILED:
+            // 同步失败，重试
+            g_time_sync.retry_count++;
+            Serial_Printf("[TIME] Sync failed (retry %d/%d)\r\n", 
+                         g_time_sync.retry_count, TIME_SYNC_MAX_RETRY);
+            
+            if (g_time_sync.retry_count < TIME_SYNC_MAX_RETRY) {
+                // 重试
+                Serial_Printf("[TIME] Retrying in 3 seconds...\r\n");
+                g_time_sync_start_time = sys_tick_ms + 3000;
+                g_time_sync_step = TIME_SYNC_STATE_SEND_CMD;
+            } else {
+                // 达到最大重试次数
+                Serial_Printf("[TIME] Time sync failed after %d retries\r\n", 
+                             TIME_SYNC_MAX_RETRY);
+                
+                // ✅ 设置first_sync_done和last_sync_timestamp，避免无限重试
+                g_time_sync.first_sync_done = 1;
+                g_time_sync.last_sync_timestamp = sys_tick_ms;
+                g_time_sync.sync_requested = 0;
+                g_time_sync.sync_in_progress = 0;
+                g_time_sync_step = TIME_SYNC_STATE_IDLE;
+                
+                // ✅ 恢复上传任务
+                g_upload_monitor.upload_paused = 0;
+                Serial_Printf("[TIME] Upload resumed after failed sync\r\n");
+                
+                Serial_Printf("[TIME] Will retry periodic sync in 2 days\r\n");
+            }
+            break;
+            
+        default:
+            g_time_sync_step = TIME_SYNC_STATE_IDLE;
+            break;
+    }
+}
+
+/**
+ * @brief 定期检查TCP连接状态
+ * @note 每2分钟执行一次，避开重连过程
+ */
+static void Periodic_TCP_Check(void) {
+    // 只在联网成功状态下才检查
+    if (g_net_state != NET_STATE_CONNECTED) {
+        return;
+    }
+    
+    // 如果正在重连中，跳过检查
+    if (g_upload_monitor.is_reconnecting) {
+        return;
+    }
+    
+    // 如果WiFi检测正在进行，跳过检查
+    if (g_upload_monitor.wifi_check_state != WIFI_CHECK_STATE_IDLE) {
+        return;
+    }
+    
+    // ✅ 如果时间同步正在进行，跳过检查
+    if (g_time_sync.sync_in_progress) {
+        return;
+    }
+    
+    // 检查是否到达检查间隔
+    if (sys_tick_ms - g_tcp_check_last_time < TCP_CHECK_INTERVAL_MS) {
+        return;
+    }
+    
+    // 执行TCP状态检查
+    Serial_Printf("[NET] Periodic TCP status check...\r\n");
+    
+    if (!Check_TCP_Connection()) {
+        Serial_Printf("[NET] TCP disconnected detected! Entering reconnect state...\r\n");
+        
+        // 进入TCP重连状态
+        g_net_state = NET_STATE_RECONNECTING;
+        g_upload_monitor.is_reconnecting = 1;
+        g_upload_monitor.reconnect_attempts = 0;
+        g_upload_monitor.next_retry_time = sys_tick_ms;  // 立即开始
+        g_upload_monitor.reconnect_state = RECONNECT_STATE_IDLE;
+        g_upload_monitor.tcp_disconnected = 1;
+        g_upload_monitor.upload_paused = 1;
+        
+        Serial_Printf("[NET] TCP reconnection initiated by periodic check\r\n");
+    } else {
+        Serial_Printf("[NET] TCP connection OK\r\n");
+    }
+    
+    // 更新检查时间
+    g_tcp_check_last_time = sys_tick_ms;
+}
+
+/**
  * @brief 网络任务
  */
 void Network_Core_Task(void) {
@@ -1467,8 +1813,20 @@ void Network_Core_Task(void) {
     
     // 如果已连接，检查云端指令
     if (g_net_state == NET_STATE_CONNECTED) {
-        Check_Cloud_Command();
+        // ✅ 时间同步期间禁用云端指令检查，避免数据竞争
+        if (!g_time_sync.sync_in_progress) {
+            Check_Cloud_Command();
+        }
     }
+    
+    // ✅ 检查时间同步触发条件
+    Check_Time_Sync_Trigger();
+    
+    // ✅ 执行时间同步状态机
+    Time_Sync_Execute();
+    
+    // ✅ 定期检查TCP连接状态（每2分钟）
+    Periodic_TCP_Check();
     
     // WiFi断开状态
     if (g_net_state == NET_STATE_WIFI_DISCONNECTED) {
@@ -1584,7 +1942,7 @@ check_tcp_status:
             
             // 尝试3次，每次给足超时时间（ESP-01S响应可能很慢）
             for (uint8_t retry = 0; retry < 3; retry++) {
-                uint32_t timeout = 4000 + (retry * 1000);  // 4s, 5s, 6s
+                uint32_t timeout = 5000 + (retry * 1500);  // 5s, 6.5s, 8s
                 Serial_Printf("[NET] AT test #%d (timeout=%lums)...\r\n", retry + 1, timeout);
                 
                 if (WiFi_Send_AT_Command("AT\r\n", "OK", timeout)) {
@@ -1595,10 +1953,41 @@ check_tcp_status:
             }
             
             if (!at_responding) {
-                Serial_Printf("[NET] ESP8266 NOT responding after 3 attempts! Module may be frozen.\r\n");
-                // TODO: 第二阶段将在此处触发模块重置
+                Serial_Printf("[NET] ESP8266 NOT responding after 3 attempts! Module frozen.\r\n");
+                Serial_Printf("[NET] Triggering ESP8266 module reset...\r\n");
+                
+                // 重置ESP-01S模块
+                WiFi_Module_Reset();
+                
+                // 等待模块启动（给足时间）
+                delay_ms(2000);
+                
+                Serial_Printf("[NET] Module reset complete, entering reconnection state...\r\n");
+                
+                // 进入重连状态（从初始化开始）
+                g_net_state = NET_STATE_INITIALIZING;
+                g_init_step = INIT_STEP_AT_TEST;  // 从AT测试开始
+                g_wifi_retry_count = 0;
+                g_tcp_retry_count = 0;
+                g_subscribe_retry_count = 0;
+                
+                // ✅ 重置时间同步状态
+                g_time_sync.sync_requested = 0;
+                g_time_sync.sync_in_progress = 0;
+                g_time_sync_step = TIME_SYNC_STATE_IDLE;
+                
+                // 设置重连标志
+                g_upload_monitor.is_reconnecting = 1;
+                g_upload_monitor.reconnect_attempts = 0;
+                g_upload_monitor.next_retry_time = sys_tick_ms;
+                g_upload_monitor.reconnect_state = RECONNECT_STATE_IDLE;
                 g_upload_monitor.tcp_disconnected = 1;
                 g_upload_monitor.upload_paused = 1;
+                
+                // 锁定OLED（如果需要显示进度）
+                g_oled_locked = 1;
+                
+                Serial_Printf("[NET] Reinitialization started after module reset\r\n");
                 return 1;
             }
             

@@ -82,6 +82,24 @@ void RingBuffer_AT_Clear(void) {
 }
 
 /**
+ * @brief 清空云端缓冲区
+ */
+void RingBuffer_Cloud_Clear(void) {
+    g_cloud_ring_buffer.head = 0;
+    g_cloud_ring_buffer.tail = 0;
+    g_cloud_ring_buffer.count = 0;
+}
+
+/**
+ * @brief 重置解析器状态机（强制回到IDLE状态）
+ * @note 用于时间同步前，避免上次遗留的状态影响
+ */
+void WiFi_Reset_Parse_State(void) {
+    g_parse_state = PARSE_STATE_IDLE;
+    g_last_cloud_byte = 0;
+}
+
+/**
  * @brief USART2中断服务函数（RXNE中断）- 双缓冲区架构
  */
 void USART2_IRQHandler(void) {
@@ -330,6 +348,33 @@ uint16_t WiFi_Read_Cloud_Complete_Frame(uint8_t *data, uint16_t max_len) {
  */
 uint16_t WiFi_Get_Cloud_Data_Length(void) {
     return g_cloud_ring_buffer.count;
+}
+
+/**
+ * @brief 从云端缓冲区读取数据（不依赖\r\n，用于时间同步等特殊场景）
+ * @param data 输出缓冲区
+ * @param max_len 最大读取长度
+ * @return 实际读取的字节数
+ * @note 如果缓冲区中有数据但没有\r\n，也会返回数据
+ */
+uint16_t WiFi_Read_Cloud_Data_NoDelimiter(uint8_t *data, uint16_t max_len) {
+    if (g_cloud_ring_buffer.count == 0) {
+        return 0;
+    }
+    
+    // 读取所有可用数据（最多max_len字节）
+    uint16_t read_len = (g_cloud_ring_buffer.count < max_len) ? 
+                        g_cloud_ring_buffer.count : max_len;
+    
+    for (uint16_t i = 0; i < read_len; i++) {
+        data[i] = g_cloud_ring_buffer.buffer[(g_cloud_ring_buffer.tail + i) % CLOUD_RING_BUFFER_SIZE];
+    }
+    
+    // 从缓冲区移除已读数据
+    g_cloud_ring_buffer.tail = (g_cloud_ring_buffer.tail + read_len) % CLOUD_RING_BUFFER_SIZE;
+    g_cloud_ring_buffer.count -= read_len;
+    
+    return read_len;
 }
 
 /**
