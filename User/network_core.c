@@ -291,6 +291,9 @@ static uint8_t g_subscribed = 0;             // 是否已订阅主题
 /* WiFi连续断开计数器（用于触发WiFi重连）*/
 static uint8_t g_wifi_consecutive_disconnect_count = 0;
 
+/* WiFi检测统一状态管理（所有函数共享）*/
+static uint32_t g_wifi_check_start_time = 0;  // WiFi检测开始时间，0表示空闲
+
 /* 初始化重试控制 */
 static uint8_t g_init_retry_enabled = 0;     // 是否启用初始化重试
 static uint32_t g_init_next_retry_time = 0;  // 下次重试时间
@@ -341,17 +344,17 @@ static uint8_t Check_TCP_Connection(void) {
 }
 
 /**
- * @brief 检测WiFi连接状态（非阻塞）
+ * @brief 检测WiFi连接状态（非阻塞，无内部状态机）
  * @return 1=已连接, 0=已断开, 2=检测中
- * @note 仅由Handle_WiFi_Check()调用，使用静态变量保存状态
+ * @note 由Handle_WiFi_Check()调用，依赖外层的wifi_check_state管理时序
+ *       使用全局变量g_wifi_check_start_time记录检测开始时间
  */
 static uint8_t Check_WiFi_Connection(void) {
-    static uint8_t check_state = 0;  // 0=空闲, 1=已发送指令, 2=等待响应
-    static uint32_t check_start_time = 0;
     uint16_t recv_len;
     uint8_t recv_buf[64];
     
-    if (check_state == 0) {
+    // 首次调用，记录开始时间并发送指令
+    if (g_wifi_check_start_time == 0) {
         // 发送AT+CWJAP?指令
         const char *cmd = "AT+CWJAP?\r\n";
         const char *p = cmd;
@@ -360,56 +363,54 @@ static uint8_t Check_WiFi_Connection(void) {
             while (USART_GetFlagStatus(ESP8266_USART, USART_FLAG_TXE) == RESET);
         }
         
-        check_state = 1;
-        check_start_time = sys_tick_ms;
-        return 2;  // 检测中
-        
-    } else if (check_state == 1) {
-        // 检查是否超时（3秒）
-        if (sys_tick_ms - check_start_time > 3000) {
-            Serial_Printf("[NET] WiFi check timeout\r\n");
-            check_state = 0;
-            return 0;  // 超时，认为断开
-        }
-        
-        // 检查是否有响应
-        recv_len = RingBuffer_AT_Read(recv_buf, sizeof(recv_buf) - 1);
-        if (recv_len > 0) {
-            recv_buf[recv_len] = '\0';
-            
-            // ⭐ 优先检查+CWJAP:，避免OK先到达导致误判
-            if (strstr((char *)recv_buf, "+CWJAP:") != NULL) {
-                // 收到+CWJAP:，WiFi已连接
-                Serial_Printf("[NET] WiFi status: CONNECTED\r\n");
-                check_state = 0;
-                return 1;
-            }
-            
-            // 如果只收到OK或ERROR，再等待一小段时间看是否有+CWJAP:
-            if ((strstr((char *)recv_buf, "OK") != NULL || strstr((char *)recv_buf, "ERROR") != NULL) &&
-                strstr((char *)recv_buf, "+CWJAP:") == NULL) {
-                // 等待额外500ms，看是否有+CWJAP:到达
-                delay_ms(500);
-                recv_len = RingBuffer_AT_Read(recv_buf, sizeof(recv_buf) - 1);
-                if (recv_len > 0) {
-                    recv_buf[recv_len] = '\0';
-                    if (strstr((char *)recv_buf, "+CWJAP:") != NULL) {
-                        Serial_Printf("[NET] WiFi status: CONNECTED\r\n");
-                        check_state = 0;
-                        return 1;
-                    }
-                }
-                // 仍然没有+CWJAP:，判断为未连接
-                Serial_Printf("[NET] WiFi status: DISCONNECTED\r\n");
-                check_state = 0;
-                return 0;
-            }
-            // 其他响应，继续等待
-        }
-        return 2;  // 还在等待中
+        g_wifi_check_start_time = sys_tick_ms;
+        return 2;  // 刚发送，需要等待
     }
     
-    return 0;  // 不应该到达这里
+    // 检查是否超时（3秒）
+    if (sys_tick_ms - g_wifi_check_start_time > 3000) {
+        Serial_Printf("[NET] WiFi check timeout\r\n");
+        g_wifi_check_start_time = 0;  // 重置
+        return 0;  // 超时，认为断开
+    }
+    
+    // 检查是否有响应
+    recv_len = RingBuffer_AT_Read(recv_buf, sizeof(recv_buf) - 1);
+    if (recv_len > 0) {
+        recv_buf[recv_len] = '\0';
+        
+        // ⭐ 优先检查+CWJAP:，避免OK先到达导致误判
+        if (strstr((char *)recv_buf, "+CWJAP:") != NULL) {
+            // 收到+CWJAP:，WiFi已连接
+            Serial_Printf("[NET] WiFi status: CONNECTED\r\n");
+            g_wifi_check_start_time = 0;  // 重置
+            return 1;
+        }
+        
+        // 如果只收到OK或ERROR，再等待一小段时间看是否有+CWJAP:
+        if ((strstr((char *)recv_buf, "OK") != NULL || strstr((char *)recv_buf, "ERROR") != NULL) &&
+            strstr((char *)recv_buf, "+CWJAP:") == NULL) {
+            // 等待额外500ms，看是否有+CWJAP:到达
+            delay_ms(500);
+            recv_len = RingBuffer_AT_Read(recv_buf, sizeof(recv_buf) - 1);
+            if (recv_len > 0) {
+                recv_buf[recv_len] = '\0';
+                if (strstr((char *)recv_buf, "+CWJAP:") != NULL) {
+                    Serial_Printf("[NET] WiFi status: CONNECTED\r\n");
+                    g_wifi_check_start_time = 0;  // 重置
+                    return 1;
+                }
+            }
+            // 仍然没有+CWJAP:，判断为未连接
+            Serial_Printf("[NET] WiFi status: DISCONNECTED\r\n");
+            g_wifi_check_start_time = 0;  // 重置
+            return 0;
+        }
+        // 其他响应，继续等待
+        return 2;
+    }
+    
+    return 2;  // 还没收到响应，继续等待
 }
 
 /**
@@ -634,6 +635,12 @@ static void Handle_TCP_Reconnection(void) {
         
         // 首次重连前检查WiFi状态
         if (!g_upload_monitor.wifi_connected) {
+            // ⭐ 检查是否已有WiFi检测在进行中
+            if (g_wifi_check_start_time != 0) {
+                // WiFi检测正在进行，等待完成
+                return;
+            }
+            
             Serial_Printf("[NET] Reconnect: WiFi not connected, starting WiFi check...\r\n");
             // 启动WiFi检测
             if (g_upload_monitor.wifi_check_state == WIFI_CHECK_STATE_IDLE) {
@@ -665,6 +672,10 @@ static void Handle_TCP_Reconnection(void) {
             g_upload_monitor.is_reconnecting = 0;
             g_upload_monitor.reconnect_attempts = 0;
             g_upload_monitor.reconnect_state = RECONNECT_STATE_IDLE;
+            
+            // ⭐ 重置WiFi检测状态
+            g_wifi_check_start_time = 0;
+            g_upload_monitor.wifi_check_state = WIFI_CHECK_STATE_IDLE;
             
             // 恢复网络状态
             g_net_state = NET_STATE_CONNECTED;
@@ -816,6 +827,12 @@ static void Handle_WiFi_Recovery(void) {
     
     // 到达检测时间，启动WiFi检测（由Handle_WiFi_Check()执行）
     if (g_upload_monitor.wifi_check_state == WIFI_CHECK_STATE_IDLE) {
+        // ⭐ 检查是否已有WiFi检测在进行中
+        if (g_wifi_check_start_time != 0) {
+            // WiFi检测正在进行，等待完成
+            return;
+        }
+        
         g_upload_monitor.wifi_check_state = WIFI_CHECK_STATE_CHECKING;
         Serial_Printf("[NET] WiFi check started (recovery mode)...\r\n");
     }
@@ -1273,6 +1290,10 @@ static void Init_Step_Execute(void) {
     g_upload_monitor.is_reconnecting = 0;
     g_upload_monitor.reconnect_attempts = 0;
     g_upload_monitor.reconnect_state = RECONNECT_STATE_IDLE;
+    
+    // ⭐ 重置WiFi检测状态
+    g_wifi_check_start_time = 0;
+    g_upload_monitor.wifi_check_state = WIFI_CHECK_STATE_IDLE;
     
     // 解锁OLED
     g_oled_locked = 0;
