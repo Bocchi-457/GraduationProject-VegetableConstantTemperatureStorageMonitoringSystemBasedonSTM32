@@ -71,6 +71,35 @@ static void Show_Network_Offline(void) {
 }
 
 /**
+ * @brief 显示初始化失败信息（带3秒倒计时）
+ * @param message: 失败原因（英文）
+ */
+static void Show_Network_Init_Failure(const char *message) {
+    int i;
+    char countdown_str[30];
+    
+    OLED_Clear(0);
+    
+    // 第一行：联网失败（大字）
+    OLED_ShowCHinese(0, 0, 56);   // 联
+    OLED_ShowCHinese(18, 0, 57);  // 网
+    OLED_ShowCHinese(36, 0, 36);  // 失
+    OLED_ShowCHinese(54, 0, 37);  // 败
+    
+    // 第二行：失败原因（小字英文，12号字体）
+    OLED_ShowString(0, 3, (uint8_t *)message, 12);
+    
+    // 第三行：稍后重试提示 + 倒计时
+    for (i = 3; i > 0; i--) {
+        sprintf(countdown_str, "Will retry in %ds", i);
+        OLED_ShowString(0, 6, (uint8_t *)countdown_str, 12);
+        delay_ms(1000);
+    }
+    
+    OLED_Clear(0);
+}
+
+/**
  * @brief 在右上角显示WiFi状态图标（不清屏）
  * @param state: 0=未连接, 1=已连接, 2=重连中
  */
@@ -179,7 +208,15 @@ static uint8_t g_subscribe_retry_count = 0;
 /* 初始化重试最大次数 */
 #define INIT_MAX_RETRY 3
 
-/* 上次重试时间（用于2秒延迟）*/
+/* 重试间隔常量 */
+#define RETRY_INTERVAL_SHORT    2000    // 短重试间隔（初始化阶段，单位：ms）
+#define RETRY_INTERVAL_LONG_1   10000   // 长重试间隔1（重连第1次，单位：ms）
+#define RETRY_INTERVAL_LONG_2   20000   // 长重试间隔2（重连第2次，单位：ms）
+#define RETRY_INTERVAL_LONG_3   30000   // 长重试间隔3（重连第3次，单位：ms）
+#define WIFI_CHECK_INTERVAL     20000   // WiFi检测间隔（单位：ms）
+
+/* 上次重试时间（用于2秒延迟）
+ * @note 由于初始化步骤是顺序执行的（WiFi→TCP→订阅），此变量可安全复用 */
 static uint32_t g_last_retry_time = 0;
 
 /* TCP连接状态 */
@@ -193,9 +230,6 @@ static uint32_t g_upload_start_time = 0;
 /* 云端指令缓冲区 */
 static CloudCommand_t g_pending_cmd;
 static uint8_t g_cmd_available = 0;
-
-/* 接收缓冲区 */
-static uint8_t g_recv_buffer[512];
 
 /* 外部函数声明（wifi_driver.c中的静态函数）*/
 extern void RingBuffer_AT_Clear(void);
@@ -249,17 +283,37 @@ typedef struct {
 
 static UploadMonitor_t g_upload_monitor = {0};
 
+/* 网络连接状态标志（用于初始化失败后的重试）*/
+static uint8_t g_wifi_init_connected = 0;    // WiFi是否已连接（初始化阶段）
+static uint8_t g_tcp_init_connected = 0;     // TCP是否已连接（初始化阶段）
+static uint8_t g_subscribed = 0;             // 是否已订阅主题
+
+/* WiFi连续断开计数器（用于触发WiFi重连）*/
+static uint8_t g_wifi_consecutive_disconnect_count = 0;
+
+/* 初始化重试控制 */
+static uint8_t g_init_retry_enabled = 0;     // 是否启用初始化重试
+static uint32_t g_init_next_retry_time = 0;  // 下次重试时间
+#define INIT_RETRY_INTERVAL 30000            // 30秒重试间隔
+
 /**
  * @brief 获取WiFi状态（供OLED显示使用）
  * @return 0=断开, 1=已连接, 2=重连中
  */
 uint8_t Get_WiFi_State(void) {
+    // 优先检查运行时状态
     if (g_upload_monitor.wifi_connected) {
         if (g_net_state == NET_STATE_RECONNECTING) {
             return 2;  // 重连中
         }
         return 1;  // 已连接
     }
+    
+    // 检查初始化阶段的状态
+    if (g_wifi_init_connected) {
+        return 1;  // WiFi已连接（即使初始化未完成）
+    }
+    
     return 0;  // 断开
 }
 
@@ -289,6 +343,7 @@ static uint8_t Check_TCP_Connection(void) {
 /**
  * @brief 检测WiFi连接状态（非阻塞）
  * @return 1=已连接, 0=已断开, 2=检测中
+ * @note 仅由Handle_WiFi_Check()调用，使用静态变量保存状态
  */
 static uint8_t Check_WiFi_Connection(void) {
     static uint8_t check_state = 0;  // 0=空闲, 1=已发送指令, 2=等待响应
@@ -322,13 +377,29 @@ static uint8_t Check_WiFi_Connection(void) {
         if (recv_len > 0) {
             recv_buf[recv_len] = '\0';
             
+            // ⭐ 优先检查+CWJAP:，避免OK先到达导致误判
             if (strstr((char *)recv_buf, "+CWJAP:") != NULL) {
                 // 收到+CWJAP:，WiFi已连接
                 Serial_Printf("[NET] WiFi status: CONNECTED\r\n");
                 check_state = 0;
                 return 1;
-            } else if (strstr((char *)recv_buf, "OK") != NULL || strstr((char *)recv_buf, "ERROR") != NULL) {
-                // 收到OK或ERROR但没有+CWJAP:，WiFi未连接
+            }
+            
+            // 如果只收到OK或ERROR，再等待一小段时间看是否有+CWJAP:
+            if ((strstr((char *)recv_buf, "OK") != NULL || strstr((char *)recv_buf, "ERROR") != NULL) &&
+                strstr((char *)recv_buf, "+CWJAP:") == NULL) {
+                // 等待额外500ms，看是否有+CWJAP:到达
+                delay_ms(500);
+                recv_len = RingBuffer_AT_Read(recv_buf, sizeof(recv_buf) - 1);
+                if (recv_len > 0) {
+                    recv_buf[recv_len] = '\0';
+                    if (strstr((char *)recv_buf, "+CWJAP:") != NULL) {
+                        Serial_Printf("[NET] WiFi status: CONNECTED\r\n");
+                        check_state = 0;
+                        return 1;
+                    }
+                }
+                // 仍然没有+CWJAP:，判断为未连接
                 Serial_Printf("[NET] WiFi status: DISCONNECTED\r\n");
                 check_state = 0;
                 return 0;
@@ -374,7 +445,7 @@ static uint8_t TCP_Reconnect(void) {
     // 发送CIPSEND指令
     sprintf(cipsend_cmd, "AT+CIPSEND=%d\r\n", data_len);
     
-    if (!WiFi_Send_AT_Command(cipsend_cmd, ">", 1000)) {
+    if (!WiFi_Send_AT_Command(cipsend_cmd, ">", 2000)) {
         Serial_Printf("[NET] CIPSEND failed\r\n");
         return 0;
     }
@@ -383,7 +454,7 @@ static uint8_t TCP_Reconnect(void) {
     WiFi_Send_Data((uint8_t *)subscribe_cmd, data_len);
     
     // 等待SEND OK
-    if (!WiFi_Send_AT_Command("", "SEND OK", 2000)) {
+    if (!WiFi_Send_AT_Command("", "SEND OK", 3000)) {
         Serial_Printf("[NET] Subscribe SEND OK not received\r\n");
         return 0;
     }
@@ -478,8 +549,8 @@ static uint8_t Reconnect_Step_Execute(void) {
             return 1;
             
         case RECONNECT_STATE_WAIT_CIPSEND:
-            // 检查是否超时（1秒）
-            if (sys_tick_ms - g_upload_monitor.reconnect_step_start_time > 1000) {
+            // 检查是否超时（3秒）
+            if (sys_tick_ms - g_upload_monitor.reconnect_step_start_time > 3000) {
                 Serial_Printf("[NET] CIPSEND timeout\r\n");
                 g_upload_monitor.reconnect_state = RECONNECT_STATE_FAILED;
                 return 1;
@@ -501,8 +572,8 @@ static uint8_t Reconnect_Step_Execute(void) {
             return 0;  // 还在等待中
             
         case RECONNECT_STATE_WAIT_SENDOK:
-            // 检查是否超时（2秒）
-            if (sys_tick_ms - g_upload_monitor.reconnect_step_start_time > 2000) {
+            // 检查是否超时（5秒）
+            if (sys_tick_ms - g_upload_monitor.reconnect_step_start_time > 5000) {
                 Serial_Printf("[NET] Subscribe SEND OK timeout\r\n");
                 g_upload_monitor.reconnect_state = RECONNECT_STATE_FAILED;
                 return 1;
@@ -555,7 +626,23 @@ static void Handle_TCP_Reconnection(void) {
     
     // 到达重试时间，执行重连步骤
     if (g_upload_monitor.reconnect_state == RECONNECT_STATE_IDLE) {
-        // 第一次进入，初始化状态
+        // ⭐ 新增：如果已经在WiFi恢复模式，不要重复启动检测
+        if (g_net_state == NET_STATE_WIFI_DISCONNECTED) {
+            // WiFi恢复模式正在运行，等待它完成
+            return;
+        }
+        
+        // 首次重连前检查WiFi状态
+        if (!g_upload_monitor.wifi_connected) {
+            Serial_Printf("[NET] Reconnect: WiFi not connected, starting WiFi check...\r\n");
+            // 启动WiFi检测
+            if (g_upload_monitor.wifi_check_state == WIFI_CHECK_STATE_IDLE) {
+                g_upload_monitor.wifi_check_state = WIFI_CHECK_STATE_CHECKING;
+            }
+            return;  // 等待WiFi检测结果
+        }
+        
+        // WiFi已连接，开始TCP重连
         Serial_Printf("[NET] Attempting reconnection #%d...\r\n", g_upload_monitor.reconnect_attempts + 1);
         Serial_Printf("[NET] === Starting TCP Reconnection ===\r\n");
         g_upload_monitor.reconnect_state = RECONNECT_STATE_CONNECTING;
@@ -602,7 +689,7 @@ static void Handle_TCP_Reconnection(void) {
                 // 不再直接调用Check_WiFi_Connection()，交给Handle_WiFi_Check()处理
             } else {
                 // 还有重试机会，计算下次重试时间（指数退避）
-                uint32_t delays[] = {15000, 20000, 40000};  // 15s, 20s, 40s
+                uint32_t delays[] = {RETRY_INTERVAL_LONG_1, RETRY_INTERVAL_LONG_2, RETRY_INTERVAL_LONG_3};
                 g_upload_monitor.next_retry_time = sys_tick_ms + delays[g_upload_monitor.reconnect_attempts];
                 Serial_Printf("[NET] Will retry in %lu seconds...\r\n", delays[g_upload_monitor.reconnect_attempts] / 1000);
             }
@@ -664,17 +751,35 @@ static void Handle_WiFi_Check(void) {
             // WiFi断开
             Serial_Printf("[NET] WiFi check result: DISCONNECTED\r\n");
             
+            // ⭐ 新增：跟踪连续断开次数（使用全局变量）
+            g_wifi_consecutive_disconnect_count++;
+            
             if (g_net_state != NET_STATE_WIFI_DISCONNECTED) {
                 // 首次检测到WiFi断开
                 g_net_state = NET_STATE_WIFI_DISCONNECTED;
                 g_upload_monitor.wifi_check_enabled = 1;
-                g_upload_monitor.wifi_check_next_time = sys_tick_ms + 20000;
+                g_upload_monitor.wifi_check_next_time = sys_tick_ms + WIFI_CHECK_INTERVAL;
                 g_upload_monitor.wifi_connected = 0;
                 Serial_Printf("[NET] Entering WiFi recovery mode...\r\n");
             } else {
                 // 已经在WiFi断开状态，设置下次检测时间
-                g_upload_monitor.wifi_check_next_time = sys_tick_ms + 20000;
+                g_upload_monitor.wifi_check_next_time = sys_tick_ms + WIFI_CHECK_INTERVAL;
                 Serial_Printf("[NET] WiFi still disconnected. Next check in 20 seconds...\r\n");
+                
+                // ⭐ 新增：连续3次检测断开，触发WiFi重连（不复位模块）
+                if (g_wifi_consecutive_disconnect_count >= 3) {
+                    Serial_Printf("[NET] WiFi disconnected for 3 consecutive checks. Triggering WiFi reconnection...\r\n");
+                    g_wifi_consecutive_disconnect_count = 0;  // 重置计数器
+                    
+                    // 启动WiFi重连（复用初始化中的WiFi连接逻辑）
+                    g_net_state = NET_STATE_INITIALIZING;  // 临时切换到初始化状态
+                    g_init_step = INIT_STEP_CONNECT_WIFI;  // 直接跳到WiFi连接步骤
+                    g_wifi_retry_count = 0;
+                    g_oled_locked = 1;  // 锁定OLED
+                    
+                    Serial_Printf("[NET] Starting WiFi reconnection without reset...\r\n");
+                    return;  // 退出WiFi检测，让Network_Core_Task处理初始化
+                }
             }
             
             g_upload_monitor.wifi_check_state = WIFI_CHECK_STATE_IDLE;
@@ -734,12 +839,11 @@ static uint8_t PreCheck_WiFi_Connection(void) {
         while (USART_GetFlagStatus(ESP8266_USART, USART_FLAG_TXE) == RESET);
     }
     
-    // 等待响应（最多3秒）
+    // 等待响应（最多8秒，给模块足够时间响应）
     uint32_t start_time = sys_tick_ms;
     uint8_t recv_buf[128];
     
-    while (sys_tick_ms - start_time < 3000) {
-        delay_ms(10);
+    while (sys_tick_ms - start_time < 8000) {
         
         uint16_t recv_len = RingBuffer_AT_Read(recv_buf, sizeof(recv_buf) - 1);
         if (recv_len > 0) {
@@ -770,344 +874,413 @@ static uint8_t PreCheck_WiFi_Connection(void) {
  * @brief 执行初始化步骤
  */
 static void Init_Step_Execute(void) {
-    char cmd_buf[128];
-    uint8_t tcp_result;      // TCP连接结果
-    uint16_t data_len;       // 数据长度
-    
-    /* WiFi重试超时配置（10s -> 15s -> 20s）*/
-    static const uint32_t wifi_timeout[] = {10000, 15000, 20000};
-    
-    /* TCP重试超时配置（10s -> 15s -> 20s）*/
-    static const uint32_t tcp_timeout[] = {10000, 15000, 20000};
-    
-    /* 订阅重试超时配置（2s -> 3s -> 4s）*/
-    static const uint32_t subscribe_timeout[] = {2000, 3000, 4000};
-    
-    switch (g_init_step) {
-        case INIT_STEP_RESET:
-            Serial_Printf("[NET] Step 1: Resetting module...\r\n");
-            
-            // 锁定OLED，禁止其他任务刷新
-            g_oled_locked = 1;
-            
-            // 显示OLED
-            OLED_ShowCHinese(0, 3, 21);  // 正
-            OLED_ShowCHinese(18, 3, 22); // 在
-            OLED_ShowCHinese(36, 3, 23); // 连
-            OLED_ShowCHinese(54, 3, 24); // 接
-            OLED_ShowString(72, 3, "WIFI", 16);
-            OLED_ShowString(108, 3, "..", 16);
-            OLED_ShowCHinese(0, 6, 4);   // 进
-            OLED_ShowCHinese(18, 6, 5);  // 度
-            OLED_ShowCHinese(36, 6, 13); // ：
-            OLED_ShowString(60, 6, "10%", 16);
-            
-            // 复位模块
-            WiFi_Module_Reset();
-            Serial_Printf("[NET] Module reset complete\r\n");
-            g_init_step = INIT_STEP_AT_TEST;
-            break;
-            
-        case INIT_STEP_AT_TEST:
-            Serial_Printf("[NET] Step 2: Testing AT...\r\n");
-            
-            // 先清空缓冲区，确保没有残留数据
-            // 清空AT缓冲区（初始化阶段，确保干净环境）
-            RingBuffer_AT_Clear();
-            
-            Serial_Printf("[NET] Buffer cleared, sending AT...\r\n");
-            
-            if (WiFi_Send_AT_Command("AT\r\n", "OK", 1000)) {
-                Serial_Printf("[NET] AT test OK\r\n");
-                OLED_ShowString(60, 6, "30%", 16);
-                g_init_step = INIT_STEP_SET_STA;
-            } else {
-                Serial_Printf("[NET] AT test FAILED\r\n");
-                Show_Network_Failure("AT command failed");
-                
-                // 检查是否有收到任何数据
-                // 调试信息已移除（新架构下AT响应在WiFi_Send_AT_Command内部处理）
-                
-                // 重试3次后失败
-                static uint8_t retry = 0;
-                retry++;
-                Serial_Printf("[NET] AT retry count: %d\r\n", retry);
-                if (retry >= 3) {
-                    Serial_Printf("[NET] AT test failed after 3 retries, going OFFLINE\r\n");
-                    g_net_state = NET_STATE_OFFLINE;
-                    g_init_step = INIT_STEP_IDLE;
-                    retry = 0;  // 重置计数器，以便下次初始化
-                    
-                    // 显示离线提示并清屏
-                    Show_Network_Offline();
-                    g_oled_locked = 0;
-                }
-            }
-            break;
-            
-        case INIT_STEP_SET_STA:
-            Serial_Printf("[NET] Step 3: Setting STA mode...\r\n");
-            if (WiFi_Send_AT_Command("AT+CWMODE=1\r\n", "OK", 1000)) {
-                Serial_Printf("[NET] STA mode set OK\r\n");
-                OLED_ShowString(60, 6, "50%", 16);
-                
-                // STA模式设置完成后，预检WiFi是否已连接
-                if (PreCheck_WiFi_Connection()) {
-                    // WiFi已连接，跳过连接步骤直接进入TCP连接
-                    Serial_Printf("[NET] WiFi already connected, skipping connect step\r\n");
-                    g_wifi_retry_count = 0;  // 重置计数器
-                    OLED_ShowString(60, 6, "70%", 16);
-                    g_init_step = INIT_STEP_CONNECT_TCP;
-                } else {
-                    // WiFi未连接，需要执行连接步骤
-                    Serial_Printf("[NET] WiFi not connected, will connect...\r\n");
-                    g_wifi_retry_count = 0;  // 初始化计数器
-                    g_init_step = INIT_STEP_CONNECT_WIFI;
-                }
-            } else {
-                Serial_Printf("[NET] STA mode FAILED\r\n");
-                Show_Network_Failure("WiFi mode setting failed");
-                g_net_state = NET_STATE_OFFLINE;
-                g_init_step = INIT_STEP_IDLE;
-                
-                // 显示离线提示并清屏
-                Show_Network_Offline();
-                g_oled_locked = 0;  // 解锁OLED
-            }
-            break;
-            
-        case INIT_STEP_CONNECT_WIFI:
-            // 检查是否需要等待2秒重试间隔
-            if (g_wifi_retry_count > 0 && sys_tick_ms - g_last_retry_time < 2000) {
-                // 还在等待2秒间隔
-                return;
-            }
-            
-            Serial_Printf("[NET] Step 4: Connecting WiFi (attempt %d/%d)...\r\n", 
-                         g_wifi_retry_count + 1, INIT_MAX_RETRY);
-            sprintf(cmd_buf, "AT+CWJAP=\"%s\",\"%s\"\r\n", WIFI_SSID, WIFI_PASSWORD);
-            
-            // 根据重试次数选择超时时间
-            uint32_t current_timeout = wifi_timeout[g_wifi_retry_count < INIT_MAX_RETRY ? g_wifi_retry_count : (INIT_MAX_RETRY - 1)];
-            
-            Serial_Printf("[NET] WiFi timeout: %lums\r\n", current_timeout);
-            
-            // 先清空AT缓冲区，然后发送指令
-            RingBuffer_AT_Clear();
-            
-            if (WiFi_Send_AT_Command(cmd_buf, "WIFI CONNECTED", current_timeout)) {
-                Serial_Printf("[NET] WiFi connected OK\r\n");
-                g_wifi_retry_count = 0;  // 重置计数器
-                OLED_ShowString(60, 6, "70%", 16);
-                g_init_step = INIT_STEP_CONNECT_TCP;
-            } else {
-                Serial_Printf("[NET] WiFi connection FAILED (attempt %d)\r\n", g_wifi_retry_count + 1);
-                g_wifi_retry_count++;
-                
-                if (g_wifi_retry_count >= INIT_MAX_RETRY) {
-                    // 3次重试都失败，进入离线状态
-                    Serial_Printf("[NET] WiFi connection failed after %d attempts, going OFFLINE\r\n", INIT_MAX_RETRY);
-                    Show_Network_Failure("WiFi connect failed");
-                    
-                    // 显示离线提示并清屏
-                    Show_Network_Offline();
-                    
-                    g_net_state = NET_STATE_OFFLINE;
-                    g_init_step = INIT_STEP_IDLE;
-                    g_wifi_retry_count = 0;  // 重置计数器
-                    g_oled_locked = 0;  // 解锁OLED
-                } else {
-                    // 还有重试机会，记录时间并等待2秒后重试
-                    Serial_Printf("[NET] Will retry WiFi connection in 2 seconds...\r\n");
-                    g_last_retry_time = sys_tick_ms;
-                    // 保持当前状态，下次调用时检查时间
-                }
-            }
-            break;
-            
-        case INIT_STEP_CONNECT_TCP:
-            // 检查是否需要等待2秒重试间隔
-            if (g_tcp_retry_count > 0 && sys_tick_ms - g_last_retry_time < 2000) {
-                // 还在等待2秒间隔
-                return;
-            }
-            
-            Serial_Printf("[NET] Step 5: Connecting TCP (attempt %d/%d)...\r\n", 
-                         g_tcp_retry_count + 1, INIT_MAX_RETRY);
-            
-            // 先清空缓冲区
-            RingBuffer_AT_Clear();
-            
-            // 尝试使用域名连接
-            sprintf(cmd_buf, "AT+CIPSTART=\"TCP\",\"%s\",%s\r\n", BEMFA_SERVER_IP, BEMFA_SERVER_PORT);
-            Serial_Printf("[NET] Connecting to %s:%s...\r\n", BEMFA_SERVER_IP, BEMFA_SERVER_PORT);
-            
-            // 根据重试次数选择超时时间
-            uint32_t current_tcp_timeout = tcp_timeout[g_tcp_retry_count < INIT_MAX_RETRY ? g_tcp_retry_count : (INIT_MAX_RETRY - 1)];
-            
-            Serial_Printf("[NET] TCP timeout: %lums\r\n", current_tcp_timeout);
-            
-            // 尝试CONNECT或OK响应
-            tcp_result = WiFi_Send_AT_Command(cmd_buf, "CONNECT", current_tcp_timeout);
-            
-            if (tcp_result) {
-                Serial_Printf("[NET] TCP connected (response: CONNECT)\r\n");
-                g_tcp_retry_count = 0;  // 重置计数器
-                OLED_ShowString(60, 6, "90%", 16);
-                g_tcp_connected = 1;
-                g_init_step = INIT_STEP_SUBSCRIBE;
-            } else {
-                // 尝试检查是否有OK响应
-                RingBuffer_AT_Clear();
-                sprintf(cmd_buf, "AT+CIPSTART=\"TCP\",\"%s\",%s\r\n", BEMFA_SERVER_IP, BEMFA_SERVER_PORT);
-                if (WiFi_Send_AT_Command(cmd_buf, "OK", current_tcp_timeout)) {
-                    Serial_Printf("[NET] TCP connected (response: OK)\r\n");
-                    g_tcp_retry_count = 0;  // 重置计数器
-                    OLED_ShowString(60, 6, "90%", 16);
-                    g_tcp_connected = 1;
-                    g_init_step = INIT_STEP_SUBSCRIBE;
-                } else {
-                    Serial_Printf("[NET] TCP connection FAILED (attempt %d)\r\n", g_tcp_retry_count + 1);
-                    g_tcp_retry_count++;
-                    
-                    if (g_tcp_retry_count >= INIT_MAX_RETRY) {
-                        // 3次重试都失败，进入离线状态
-                        Serial_Printf("[NET] TCP connection failed after %d attempts, going OFFLINE\r\n", INIT_MAX_RETRY);
-                        Show_Network_Failure("Bemfa connect failed");
-                        
-                        Serial_Printf("[NET] No response received (timeout or DNS failed)\r\n");
-                        Serial_Printf("[NET] Hint: Try using IP address instead of domain\r\n");
-                        
-                        g_net_state = NET_STATE_OFFLINE;
-                        g_init_step = INIT_STEP_IDLE;
-                        g_tcp_retry_count = 0;  // 重置计数器
-                        
-                        // 显示离线提示并清屏
-                        Show_Network_Offline();
-                        g_oled_locked = 0;  // 解锁OLED
-                    } else {
-                        // 还有重试机会，记录时间并等待2秒后重试
-                        Serial_Printf("[NET] Will retry TCP connection in 2 seconds...\r\n");
-                        g_last_retry_time = sys_tick_ms;
-                        // 保持当前状态，下次调用时检查时间
-                    }
-                }
-            }
-            break;
-            
-        case INIT_STEP_SUBSCRIBE:
-            // 检查是否需要等待2秒重试间隔
-            if (g_subscribe_retry_count > 0 && sys_tick_ms - g_last_retry_time < 2000) {
-                // 还在等待2秒间隔
-                return;
-            }
-            
-            Serial_Printf("[NET] Step 6: Subscribing topic (attempt %d/%d)...\r\n", 
-                         g_subscribe_retry_count + 1, INIT_MAX_RETRY);
-            
-            // 只订阅control主题（接收控制指令）
-            // data主题用于上传，不需要订阅（避免收到自己上传的数据回显）
-            // online主题对硬件系统无用，不订阅
-            char subscribe_cmd[128];
-            sprintf(subscribe_cmd, "cmd=1&uid=%s&topic=%s\r\n", 
-                    BEMFA_UID, 
-                    BEMFA_TOPIC_CONTROL);   // 只订阅control主题
-            
-            Serial_Printf("[NET] Subscribe cmd: %s", subscribe_cmd);
-            
-            // 先清空缓冲区
-            RingBuffer_AT_Clear();
-            
-            // 使用AT+CIPSEND两阶段发送（与备份代码一致）
-            data_len = strlen(subscribe_cmd);
-            char cipsend_cmd[32];
-            sprintf(cipsend_cmd, "AT+CIPSEND=%d\r\n", data_len);
-            
-            Serial_Printf("[NET] Sending CIPSEND: %s", cipsend_cmd);
-            
-            // 根据重试次数选择超时时间
-            uint32_t current_sub_timeout = subscribe_timeout[g_subscribe_retry_count < INIT_MAX_RETRY ? g_subscribe_retry_count : (INIT_MAX_RETRY - 1)];
-            
-            // 阶段1：发送CIPSEND指令，等待 ">"
-            if (WiFi_Send_AT_Command(cipsend_cmd, ">", current_sub_timeout)) {
-                Serial_Printf("[NET] Got '>' prompt, sending subscription data...\r\n");
-                
-                // 阶段2：发送实际的订阅数据
-                WiFi_Send_Data((uint8_t *)subscribe_cmd, data_len);
-                
-                // 阶段3：等待 "SEND OK"
-                if (WiFi_Send_AT_Command("", "SEND OK", current_sub_timeout)) {
-                    Serial_Printf("[NET] Data sent OK\r\n");
-                    
-                    // 订阅指令发送成功，不等待服务器响应（与备份代码一致）
-                    // 服务器可能会异步返回 cmd=1&res=1，但我们不阻塞等待
-                    Serial_Printf("[NET] Topic subscribed (async response expected)\r\n");
-                    
-                    // 标记WiFi已连接（供OLED显示使用）
-                    g_upload_monitor.wifi_connected = 1;
-                    
-                    // 显示联网成功
-                    Show_Network_Success();
-                    
-                    g_init_step = INIT_STEP_COMPLETE;
-                    g_net_state = NET_STATE_CONNECTED;
-                    g_subscribe_retry_count = 0;  // 重置计数器
-                    Serial_Printf("[NET] === Network initialization COMPLETE ===\r\n");
-                } else {
-                    Serial_Printf("[NET] SEND OK not received (attempt %d)\r\n", g_subscribe_retry_count + 1);
-                    g_subscribe_retry_count++;
-                    
-                    if (g_subscribe_retry_count >= INIT_MAX_RETRY) {
-                        // 3次重试都失败，进入离线状态
-                        Serial_Printf("[NET] Subscribe failed after %d attempts, going OFFLINE\r\n", INIT_MAX_RETRY);
-                        Show_Network_Failure("Subscribe failed");
-                        
-                        // 显示离线提示并清屏
-                        Show_Network_Offline();
-                        
-                        g_net_state = NET_STATE_OFFLINE;
-                        g_init_step = INIT_STEP_IDLE;
-                        g_subscribe_retry_count = 0;  // 重置计数器
-                        g_oled_locked = 0;  // 解锁OLED
-                    } else {
-                        // 还有重试机会，记录时间并等待2秒后重试
-                        Serial_Printf("[NET] Will retry subscription in 2 seconds...\r\n");
-                        g_last_retry_time = sys_tick_ms;
-                        // 保持当前状态，下次调用时检查时间
-                    }
-                }
-            } else {
-                Serial_Printf("[NET] CIPSEND command failed (attempt %d)\r\n", g_subscribe_retry_count + 1);
-                g_subscribe_retry_count++;
-                
-                if (g_subscribe_retry_count >= INIT_MAX_RETRY) {
-                    // 3次重试都失败，进入离线状态
-                    Serial_Printf("[NET] Subscribe failed after %d attempts, going OFFLINE\r\n", INIT_MAX_RETRY);
-                    Show_Network_Failure("Subscribe failed");
-                    
-                    // 显示离线提示并清屏
-                    Show_Network_Offline();
-                    
-                    g_net_state = NET_STATE_OFFLINE;
-                    g_init_step = INIT_STEP_IDLE;
-                    g_subscribe_retry_count = 0;  // 重置计数器
-                    g_oled_locked = 0;  // 解锁OLED
-                } else {
-                    // 还有重试机会，记录时间并等待2秒后重试
-                    Serial_Printf("[NET] Will retry subscription in 2 seconds...\r\n");
-                    g_last_retry_time = sys_tick_ms;
-                    // 保持当前状态，下次调用时检查时间
-                }
-            }
-            break;
-            
-        case INIT_STEP_COMPLETE:
-            // 初始化完成
-            break;
-            
-        default:
-            break;
+  // 锁定OLED，禁止其他任务刷新
+  g_oled_locked = 1;
+
+  // 显示OLED
+  OLED_ShowCHinese(0, 3, 21);  // 正
+  OLED_ShowCHinese(18, 3, 22); // 在
+  OLED_ShowCHinese(36, 3, 23); // 连
+  OLED_ShowCHinese(54, 3, 24); // 接
+  OLED_ShowString(72, 3, "WIFI", 16);
+  OLED_ShowString(108, 3, "..", 16);
+  OLED_ShowCHinese(0, 6, 4);   // 进
+  OLED_ShowCHinese(18, 6, 5);  // 度
+  OLED_ShowCHinese(36, 6, 13); // ：
+  OLED_ShowString(60, 6, "10%", 16);
+  
+  char cmd_buf[128];
+  uint8_t tcp_result; // TCP连接结果
+  uint16_t data_len;  // 数据长度
+
+  /* WiFi重试超时配置（5s -> 6s -> 8s）*/
+  static const uint32_t wifi_timeout[] = {5000, 6000, 8000};
+
+  /* TCP重试超时配置（10s -> 15s -> 20s）*/
+  static const uint32_t tcp_timeout[] = {10000, 15000, 20000};
+
+  /* 订阅重试超时配置（3s -> 4s -> 5s）*/
+  static const uint32_t subscribe_timeout[] = {3000, 4000, 5000};
+
+  switch (g_init_step) {
+  case INIT_STEP_RESET:
+    Serial_Printf("[NET] Step 1: Resetting module...\r\n");
+
+    // 复位模块
+    WiFi_Module_Reset();
+    Serial_Printf("[NET] Module reset complete\r\n");
+    g_init_step = INIT_STEP_AT_TEST;
+    break;
+
+  case INIT_STEP_AT_TEST:
+    Serial_Printf("[NET] Step 2: Testing AT...\r\n");
+
+    // 先清空缓冲区，确保没有残留数据
+    // 清空AT缓冲区（初始化阶段，确保干净环境）
+    RingBuffer_AT_Clear();
+
+    Serial_Printf("[NET] Buffer cleared, sending AT...\r\n");
+
+    if (WiFi_Send_AT_Command("AT\r\n", "OK", 1000)) {
+      Serial_Printf("[NET] AT test OK\r\n");
+      OLED_ShowString(60, 6, "30%", 16);
+      g_init_step = INIT_STEP_SET_STA;
+    } else {
+      Serial_Printf("[NET] AT test FAILED\r\n");
+      Show_Network_Failure("AT command failed");
+
+      // 检查是否有收到任何数据
+      // 调试信息已移除（新架构下AT响应在WiFi_Send_AT_Command内部处理）
+
+      // 重试3次后失败
+      static uint8_t retry = 0;
+      retry++;
+      Serial_Printf("[NET] AT retry count: %d\r\n", retry);
+      if (retry >= 3) {
+        Serial_Printf(
+            "[NET] AT test failed after 3 retries, going OFFLINE\r\n");
+        g_net_state = NET_STATE_OFFLINE;
+        g_init_step = INIT_STEP_IDLE;
+        retry = 0; // 重置计数器，以便下次初始化
+
+        // 显示离线提示并清屏
+        Show_Network_Offline();
+        g_oled_locked = 0;
+      }
     }
+    break;
+
+  case INIT_STEP_SET_STA:
+    Serial_Printf("[NET] Step 3: Setting STA mode...\r\n");
+    if (WiFi_Send_AT_Command("AT+CWMODE=1\r\n", "OK", 1000)) {
+      Serial_Printf("[NET] STA mode set OK\r\n");
+      OLED_ShowString(60, 6, "50%", 16);
+
+      // STA模式设置完成后，直接进入WiFi连接步骤
+      g_wifi_retry_count = 0; // 初始化计数器
+      g_init_step = INIT_STEP_CONNECT_WIFI;
+    } else {
+      Serial_Printf("[NET] STA mode FAILED\r\n");
+      Show_Network_Failure("WiFi mode setting failed");
+      g_net_state = NET_STATE_OFFLINE;
+      g_init_step = INIT_STEP_IDLE;
+
+      // 显示离线提示并清屏
+      Show_Network_Offline();
+      g_oled_locked = 0; // 解锁OLED
+    }
+    break;
+
+  case INIT_STEP_CONNECT_WIFI:
+    // 检查是否需要等待2秒重试间隔
+    if (g_wifi_retry_count > 0 && sys_tick_ms - g_last_retry_time < RETRY_INTERVAL_SHORT) {
+      // 还在等待2秒间隔
+      return;
+    }
+
+    Serial_Printf("[NET] Step 4: Connecting WiFi (attempt %d/%d)...\r\n",
+                  g_wifi_retry_count + 1, INIT_MAX_RETRY);
+    sprintf(cmd_buf, "AT+CWJAP=\"%s\",\"%s\"\r\n", WIFI_SSID, WIFI_PASSWORD);
+
+    // 根据重试次数选择超时时间
+    uint32_t current_timeout = wifi_timeout[g_wifi_retry_count < INIT_MAX_RETRY
+                                                ? g_wifi_retry_count
+                                                : (INIT_MAX_RETRY - 1)];
+
+    Serial_Printf("[NET] WiFi timeout: %lums\r\n", current_timeout);
+
+    // 先清空AT缓冲区，然后发送指令
+    RingBuffer_AT_Clear();
+
+    if (WiFi_Send_AT_Command(cmd_buf, "WIFI CONNECTED", current_timeout)) {
+      Serial_Printf("[NET] WiFi connected OK\r\n");
+      g_wifi_retry_count = 0; // 重置计数器
+      
+      // ⭐ 新增：重置所有相关计数器，避免显示异常
+      g_tcp_retry_count = 0;
+      g_subscribe_retry_count = 0;
+      
+      // ⭐ 新增：重置WiFi连续断开计数器
+      g_wifi_consecutive_disconnect_count = 0;
+      
+      OLED_ShowString(60, 6, "70%", 16);
+
+      g_init_step = INIT_STEP_CONNECT_TCP;
+    } else {
+      Serial_Printf("[NET] WiFi connection FAILED (attempt %d)\r\n",
+                    g_wifi_retry_count + 1);
+      g_wifi_retry_count++;
+
+      if (g_wifi_retry_count >= INIT_MAX_RETRY) {
+        // 3次重试都失败，进入重连状态
+        Serial_Printf("[NET] WiFi connection failed after %d attempts\r\n",
+                      INIT_MAX_RETRY);
+
+        // 标记所有状态为未连接
+        g_wifi_init_connected = 0;
+        g_tcp_init_connected = 0;
+        g_subscribed = 0;
+
+        // 显示失败信息（3秒倒计时）
+        Show_Network_Init_Failure("WiFi connect failed");
+
+        // 进入重连状态（与运行时重连相同）
+        g_net_state = NET_STATE_RECONNECTING;
+        g_upload_monitor.is_reconnecting = 1;
+        g_upload_monitor.reconnect_attempts = 0;
+        g_upload_monitor.next_retry_time = sys_tick_ms + RETRY_INTERVAL_LONG_1; // 10秒后开始重连
+        g_upload_monitor.reconnect_state = RECONNECT_STATE_IDLE;
+
+        // 解锁OLED
+        g_oled_locked = 0;
+      } else {
+        // 还有重试机会，记录时间并等待2秒后重试
+        Serial_Printf("[NET] Will retry WiFi connection in 2 seconds...\r\n");
+        g_last_retry_time = sys_tick_ms;
+        // 保持当前状态，下次调用时检查时间
+      }
+    }
+    break;
+
+  case INIT_STEP_CONNECT_TCP:
+    // 检查是否需要等待2秒重试间隔
+    if (g_tcp_retry_count > 0 && sys_tick_ms - g_last_retry_time < RETRY_INTERVAL_SHORT) {
+      // 还在等待2秒间隔
+      return;
+    }
+
+    Serial_Printf("[NET] Step 5: Connecting TCP (attempt %d/%d)...\r\n",
+                  g_tcp_retry_count + 1, INIT_MAX_RETRY);
+
+    // 先清空缓冲区
+    RingBuffer_AT_Clear();
+
+    // 尝试使用域名连接
+    sprintf(cmd_buf, "AT+CIPSTART=\"TCP\",\"%s\",%s\r\n", BEMFA_SERVER_IP,
+            BEMFA_SERVER_PORT);
+    Serial_Printf("[NET] Connecting to %s:%s...\r\n", BEMFA_SERVER_IP,
+                  BEMFA_SERVER_PORT);
+
+    // 根据重试次数选择超时时间
+    uint32_t current_tcp_timeout =
+        tcp_timeout[g_tcp_retry_count < INIT_MAX_RETRY ? g_tcp_retry_count
+                                                       : (INIT_MAX_RETRY - 1)];
+
+    Serial_Printf("[NET] TCP timeout: %lums\r\n", current_tcp_timeout);
+
+    // 尝试CONNECT或OK响应
+    tcp_result = WiFi_Send_AT_Command(cmd_buf, "CONNECT", current_tcp_timeout);
+
+    if (tcp_result) {
+      Serial_Printf("[NET] TCP connected (response: CONNECT)\r\n");
+      g_tcp_retry_count = 0; // 重置计数器
+      OLED_ShowString(60, 6, "90%", 16);
+      g_tcp_connected = 1;
+      g_init_step = INIT_STEP_SUBSCRIBE;
+    } else {
+      // 尝试检查是否有OK响应
+      RingBuffer_AT_Clear();
+      sprintf(cmd_buf, "AT+CIPSTART=\"TCP\",\"%s\",%s\r\n", BEMFA_SERVER_IP,
+              BEMFA_SERVER_PORT);
+      if (WiFi_Send_AT_Command(cmd_buf, "OK", current_tcp_timeout)) {
+        Serial_Printf("[NET] TCP connected (response: OK)\r\n");
+        g_tcp_retry_count = 0; // 重置计数器
+        OLED_ShowString(60, 6, "90%", 16);
+        g_tcp_connected = 1;
+        g_init_step = INIT_STEP_SUBSCRIBE;
+      } else {
+        Serial_Printf("[NET] TCP connection FAILED (attempt %d)\r\n",
+                      g_tcp_retry_count + 1);
+        g_tcp_retry_count++;
+
+        if (g_tcp_retry_count >= INIT_MAX_RETRY) {
+          // 3次重试都失败，进入重连状态
+          Serial_Printf("[NET] TCP connection failed after %d attempts\r\n",
+                        INIT_MAX_RETRY);
+
+          // WiFi已连接，但TCP未连接
+          g_wifi_init_connected = 1; // 保持WiFi连接状态
+          g_tcp_init_connected = 0;
+          g_subscribed = 0;
+
+          // 显示失败信息（3秒倒计时）
+          Show_Network_Init_Failure("Bemfa connect failed");
+
+          // 进入重连状态
+          g_net_state = NET_STATE_RECONNECTING;
+          g_upload_monitor.is_reconnecting = 1;
+          g_upload_monitor.reconnect_attempts = 0;
+          g_upload_monitor.next_retry_time = sys_tick_ms + RETRY_INTERVAL_LONG_1;
+          g_upload_monitor.reconnect_state = RECONNECT_STATE_IDLE;
+
+          g_oled_locked = 0; // 解锁OLED
+
+          Serial_Printf(
+              "[NET] No response received (timeout or DNS failed)\r\n");
+          Serial_Printf(
+              "[NET] Hint: Try using IP address instead of domain\r\n");
+        } else {
+          // 还有重试机会，记录时间并等待2秒后重试
+          Serial_Printf("[NET] Will retry TCP connection in 2 seconds...\r\n");
+          g_last_retry_time = sys_tick_ms;
+          // 保持当前状态，下次调用时检查时间
+        }
+      }
+    }
+    break;
+
+  case INIT_STEP_SUBSCRIBE:
+    // 检查是否需要等待2秒重试间隔
+    if (g_subscribe_retry_count > 0 && sys_tick_ms - g_last_retry_time < RETRY_INTERVAL_SHORT) {
+      // 还在等待2秒间隔
+      return;
+    }
+
+    Serial_Printf("[NET] Step 6: Subscribing topic (attempt %d/%d)...\r\n",
+                  g_subscribe_retry_count + 1, INIT_MAX_RETRY);
+
+    // 只订阅control主题（接收控制指令）
+    // data主题用于上传，不需要订阅（避免收到自己上传的数据回显）
+    // online主题对硬件系统无用，不订阅
+    char subscribe_cmd[128];
+    sprintf(subscribe_cmd, "cmd=1&uid=%s&topic=%s\r\n", BEMFA_UID,
+            BEMFA_TOPIC_CONTROL); // 只订阅control主题
+
+    Serial_Printf("[NET] Subscribe cmd: %s", subscribe_cmd);
+
+    // 先清空缓冲区
+    RingBuffer_AT_Clear();
+
+    // 使用AT+CIPSEND两阶段发送（与备份代码一致）
+    data_len = strlen(subscribe_cmd);
+    char cipsend_cmd[32];
+    sprintf(cipsend_cmd, "AT+CIPSEND=%d\r\n", data_len);
+
+    Serial_Printf("[NET] Sending CIPSEND: %s", cipsend_cmd);
+
+    // 根据重试次数选择超时时间
+    uint32_t current_sub_timeout =
+        subscribe_timeout[g_subscribe_retry_count < INIT_MAX_RETRY
+                              ? g_subscribe_retry_count
+                              : (INIT_MAX_RETRY - 1)];
+
+    // 阶段1：发送CIPSEND指令，等待 ">"
+    if (WiFi_Send_AT_Command(cipsend_cmd, ">", current_sub_timeout)) {
+      Serial_Printf("[NET] Got '>' prompt, sending subscription data...\r\n");
+
+      // 阶段2：发送实际的订阅数据
+      WiFi_Send_Data((uint8_t *)subscribe_cmd, data_len);
+
+      // 阶段3：等待 "SEND OK"
+      if (WiFi_Send_AT_Command("", "SEND OK", current_sub_timeout)) {
+        Serial_Printf("[NET] Data sent OK\r\n");
+
+        // 订阅指令发送成功，不等待服务器响应（与备份代码一致）
+        // 服务器可能会异步返回 cmd=1&res=1，但我们不阻塞等待
+        Serial_Printf("[NET] Topic subscribed (async response expected)\r\n");
+
+        // 标记WiFi已连接（供OLED显示使用）
+        g_upload_monitor.wifi_connected = 1;
+
+        // 同步初始化状态变量
+        g_wifi_init_connected = 1;
+        g_tcp_init_connected = 1;
+        g_subscribed = 1;
+        g_init_retry_enabled = 0; // 禁用重试
+
+        // 显示联网成功
+        Show_Network_Success();
+
+        g_init_step = INIT_STEP_COMPLETE;
+        g_net_state = NET_STATE_CONNECTED;
+        g_subscribe_retry_count = 0; // 重置计数器
+      } else {
+        Serial_Printf("[NET] SEND OK not received (attempt %d)\r\n",
+                      g_subscribe_retry_count + 1);
+        g_subscribe_retry_count++;
+
+        if (g_subscribe_retry_count >= INIT_MAX_RETRY) {
+          // 3次重试都失败，进入重连状态
+          Serial_Printf("[NET] Subscribe failed after %d attempts\r\n",
+                        INIT_MAX_RETRY);
+
+          // WiFi和TCP都正常，只是订阅失败
+          g_wifi_init_connected = 1;
+          g_tcp_init_connected = 1;
+          g_subscribed = 0;
+
+          // 显示失败信息（3秒倒计时）
+          Show_Network_Init_Failure("Subscribe failed");
+
+          // 进入重连状态
+          g_net_state = NET_STATE_RECONNECTING;
+          g_upload_monitor.is_reconnecting = 1;
+          g_upload_monitor.reconnect_attempts = 0;
+          g_upload_monitor.next_retry_time = sys_tick_ms + RETRY_INTERVAL_LONG_1;
+          g_upload_monitor.reconnect_state = RECONNECT_STATE_IDLE;
+
+          g_oled_locked = 0; // 解锁OLED
+        } else {
+          // 还有重试机会，记录时间并等待2秒后重试
+          Serial_Printf("[NET] Will retry subscription in 2 seconds...\r\n");
+          g_last_retry_time = sys_tick_ms;
+          // 保持当前状态，下次调用时检查时间
+        }
+      }
+    } else {
+      Serial_Printf("[NET] CIPSEND command failed (attempt %d)\r\n",
+                    g_subscribe_retry_count + 1);
+      g_subscribe_retry_count++;
+
+      if (g_subscribe_retry_count >= INIT_MAX_RETRY) {
+        // 3次重试都失败，进入重连状态
+        Serial_Printf("[NET] Subscribe failed after %d attempts\r\n",
+                      INIT_MAX_RETRY);
+
+        // WiFi和TCP都正常，只是订阅失败
+        g_wifi_init_connected = 1;
+        g_tcp_init_connected = 1;
+        g_subscribed = 0;
+
+        // 显示失败信息（3秒倒计时）
+        Show_Network_Init_Failure("Subscribe failed");
+
+        // 进入重连状态
+        g_net_state = NET_STATE_RECONNECTING;
+        g_upload_monitor.is_reconnecting = 1;
+        g_upload_monitor.reconnect_attempts = 0;
+        g_upload_monitor.next_retry_time = sys_tick_ms + 10000;
+        g_upload_monitor.reconnect_state = RECONNECT_STATE_IDLE;
+
+        g_oled_locked = 0; // 解锁OLED
+      } else {
+        // 还有重试机会，记录时间并等待2秒后重试
+        Serial_Printf("[NET] Will retry subscription in 2 seconds...\r\n");
+        g_last_retry_time = sys_tick_ms;
+        // 保持当前状态，下次调用时检查时间
+      }
+    }
+    break;
+
+  case INIT_STEP_COMPLETE:
+    // ⭐ 初始化完成，设置正确状态
+    Serial_Printf("[NET] === Network initialization COMPLETE ===\r\n");
+    
+    // 设置网络状态为已连接
+    g_net_state = NET_STATE_CONNECTED;
+    
+    // ⭐ 重置重连标志（避免WiFi重连后立即进入重连流程）
+    g_upload_monitor.is_reconnecting = 0;
+    g_upload_monitor.reconnect_attempts = 0;
+    g_upload_monitor.reconnect_state = RECONNECT_STATE_IDLE;
+    
+    // 解锁OLED
+    g_oled_locked = 0;
+    break;
+
+  default:
+    break;
+  }
 }
 
 /**
@@ -1125,7 +1298,24 @@ void Network_Core_Init(void) {
     
     // 开始初始化流程
     g_net_state = NET_STATE_INITIALIZING;
-    g_init_step = INIT_STEP_RESET;
+    
+    // ⭐ 在复位前先预检WiFi是否已连接
+    Serial_Printf("[NET] Pre-checking WiFi before reset...\r\n");
+    if (PreCheck_WiFi_Connection()) {
+        Serial_Printf("[NET] WiFi already connected, skipping reset and WiFi connect\r\n");
+        // WiFi已连接，跳过复位和WiFi连接，直接从TCP连接开始
+        g_wifi_init_connected = 1;
+        g_tcp_init_connected = 0;
+        g_subscribed = 0;
+        g_init_step = INIT_STEP_CONNECT_TCP;  // 直接跳到TCP连接
+    } else {
+        Serial_Printf("[NET] WiFi not connected, will reset module and connect\r\n");
+        // WiFi未连接，需要复位模块并从AT测试开始
+        g_wifi_init_connected = 0;
+        g_tcp_init_connected = 0;
+        g_subscribed = 0;
+        g_init_step = INIT_STEP_RESET;  // 从复位开始
+    }
     // g_init_start_time = sys_tick_ms;  // 已注释，未使用
 }
 
@@ -1330,7 +1520,7 @@ check_tcp_status:
             
             // 尝试3次，每次给足超时时间（ESP-01S响应可能很慢）
             for (uint8_t retry = 0; retry < 3; retry++) {
-                uint32_t timeout = 3000 + (retry * 1000);  // 3s, 4s, 5s
+                uint32_t timeout = 4000 + (retry * 1000);  // 4s, 5s, 6s
                 Serial_Printf("[NET] AT test #%d (timeout=%lums)...\r\n", retry + 1, timeout);
                 
                 if (WiFi_Send_AT_Command("AT\r\n", "OK", timeout)) {
