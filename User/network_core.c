@@ -295,7 +295,7 @@ typedef struct {
 
 static TimeSyncState_t g_time_sync = {0};
 
-#define TIME_SYNC_INTERVAL_MS 60000 // 2天 = 172800000ms (2UL * 24 * 3600 * 1000)
+#define TIME_SYNC_INTERVAL_MS  (2UL * 24 * 3600 * 1000) // 2天 = 172800000ms (2UL * 24 * 3600 * 1000)
 #define TIME_SYNC_MAX_RETRY    3                           // 最大重试次数
 #define TIME_SYNC_TIMEOUT_MS   10000                       // 同步超时10秒（巴法云响应较慢）
 

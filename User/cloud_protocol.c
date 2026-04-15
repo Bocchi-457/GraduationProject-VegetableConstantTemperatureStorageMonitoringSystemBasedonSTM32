@@ -15,15 +15,16 @@ uint16_t Cloud_Build_Upload_Packet(
     uint8_t dehumidifier, uint8_t humidifier,
     int16_t temp_x10, int16_t hum_x10)
 {
+    // ✅ 使用浮点数格式，支持小数和负数
     int n = snprintf(buffer, buf_size,
-        "cmd=2&uid=%s&topic=data&msg=Mode:%d th:%d tl:%d hh:%d hl:%d "
+        "cmd=2&uid=%s&topic=data&msg=Mode:%d th:%.1f tl:%.1f hh:%.1f hl:%.1f "
         "jr:%d zl:%d cs:%d js:%d temp:%d.%d humi:%d.%d\r\n",
         BEMFA_UID,
         mode,
-        temp_high / 10,
-        temp_low / 10,
-        humid_high / 10,
-        humid_low / 10,
+        (float)temp_high / 10.0f,   // th: 温度上限（浮点数，支持负数）
+        (float)temp_low / 10.0f,    // tl: 温度下限（浮点数，支持负数）
+        (float)humid_high / 10.0f,  // hh: 湿度上限（浮点数）
+        (float)humid_low / 10.0f,   // hl: 湿度下限（浮点数）
         heater, cooler, dehumidifier, humidifier,
         temp_x10 / 10,
         (temp_x10 < 0 ? -temp_x10 : temp_x10) % 10,
