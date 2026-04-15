@@ -53,24 +53,6 @@ static void Show_Network_Failure(const char *message) {
 }
 
 /**
- * @brief 显示联网离线状态
- * @note 初始化失败时调用，显示离线提示后清屏
- */
-static void Show_Network_Offline(void) {
-    OLED_Clear(0);
-    
-    OLED_ShowCHinese(0, 0, 56);  // 联
-    OLED_ShowCHinese(18, 0, 57); // 网
-    OLED_ShowCHinese(36, 0, 36); // 失  
-    OLED_ShowCHinese(54, 0, 37); // 败
-    OLED_ShowString(0, 3, (uint8_t *)"Offline Mode", 16);
-    OLED_ShowString(0, 6, (uint8_t *)"System running", 16);
-    
-    delay_ms(2000);
-    OLED_Clear(0);
-}
-
-/**
  * @brief 显示初始化失败信息（带3秒倒计时）
  * @param message: 失败原因（英文）
  */
@@ -981,19 +963,27 @@ static void Init_Step_Execute(void) {
       // 检查是否有收到任何数据
       // 调试信息已移除（新架构下AT响应在WiFi_Send_AT_Command内部处理）
 
-      // 重试3次后失败
+      // 重试3次后失败，进入重连状态
       static uint8_t retry = 0;
       retry++;
       Serial_Printf("[NET] AT retry count: %d\r\n", retry);
       if (retry >= 3) {
         Serial_Printf(
-            "[NET] AT test failed after 3 retries, going OFFLINE\r\n");
-        g_net_state = NET_STATE_OFFLINE;
+            "[NET] AT test failed after 3 retries, entering reconnect state\r\n");
+        
+        // ✅ 进入重连状态，而不是离线状态
+        g_net_state = NET_STATE_RECONNECTING;
         g_init_step = INIT_STEP_IDLE;
         retry = 0; // 重置计数器，以便下次初始化
+        
+        // ✅ 设置重连标志
+        g_upload_monitor.is_reconnecting = 1;
+        g_upload_monitor.reconnect_attempts = 0;
+        g_upload_monitor.next_retry_time = sys_tick_ms + 10000; // 10秒后重试
+        g_upload_monitor.reconnect_state = RECONNECT_STATE_IDLE;
 
-        // 显示离线提示并清屏
-        Show_Network_Offline();
+        // 显示失败提示并解锁OLED
+        Show_Network_Failure("AT command failed");
         g_oled_locked = 0;
       }
     }
@@ -1013,12 +1003,19 @@ static void Init_Step_Execute(void) {
       g_init_step = INIT_STEP_CONNECT_WIFI;
     } else {
       Serial_Printf("[NET] STA mode FAILED\r\n");
-      Show_Network_Failure("WiFi mode setting failed");
-      g_net_state = NET_STATE_OFFLINE;
+      
+      // ✅ 进入重连状态，而不是离线状态
+      g_net_state = NET_STATE_RECONNECTING;
       g_init_step = INIT_STEP_IDLE;
+      
+      // ✅ 设置重连标志
+      g_upload_monitor.is_reconnecting = 1;
+      g_upload_monitor.reconnect_attempts = 0;
+      g_upload_monitor.next_retry_time = sys_tick_ms + 10000; // 10秒后重试
+      g_upload_monitor.reconnect_state = RECONNECT_STATE_IDLE;
 
-      // 显示离线提示并清屏
-      Show_Network_Offline();
+      // 显示失败提示并解锁OLED
+      Show_Network_Failure("WiFi mode setting failed");
       g_oled_locked = 0; // 解锁OLED
     }
     break;
@@ -1471,15 +1468,6 @@ void Network_Core_Task(void) {
     // 如果已连接，检查云端指令
     if (g_net_state == NET_STATE_CONNECTED) {
         Check_Cloud_Command();
-    }
-    
-    // 离线状态
-    if (g_net_state == NET_STATE_OFFLINE) {
-        static uint8_t offline_logged = 0;
-        if (!offline_logged) {
-            Serial_Printf("[NET] *** Network is OFFLINE ***\r\n");
-            offline_logged = 1;
-        }
     }
     
     // WiFi断开状态

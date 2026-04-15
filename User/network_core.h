@@ -10,7 +10,6 @@ typedef enum {
     NET_STATE_INITIALIZING,
     NET_STATE_CONNECTED,
     NET_STATE_RECONNECTING,
-    NET_STATE_OFFLINE,
     NET_STATE_WIFI_DISCONNECTED  // WiFi已断开，等待恢复
 } NetworkState_t;
 
