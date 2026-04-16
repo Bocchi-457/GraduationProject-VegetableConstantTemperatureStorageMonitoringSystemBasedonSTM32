@@ -43,7 +43,7 @@ FILE __stdout;
 void _sys_exit(int x) { x = x; }
 // 重定义fputc函数
 int fputc(int ch, FILE *f) {
-  // ✅ 修复：先发送数据，再等待发送完成
+  // 先发送数据再等待发送完成
   USART1->DR = (u8)ch;
   while ((USART1->SR & 0X40) == 0);  // 等待TXE置位（发送寄存器空）
   return ch;
@@ -279,11 +279,11 @@ void Serial_SendNumber(uint32_t Number, uint8_t Length) {
  * @note 自动在每条日志前添加 [T:xxxms] 时间戳，方便调试时序问题
  */
 void Serial_Printf_1(char *format, ...) {
-  char String[512];  // ✅ 增大缓冲区以避免长数据导致栈溢出
+  char String[512];  // 增大缓冲区避免长数据栈溢出
   char TimeStamp[20];
   va_list arg;
   
-  // ✅ 添加时间戳前缀
+  // 添加时间戳前缀
   extern uint32_t sys_tick_ms;  // 声明外部变量
   sprintf(TimeStamp, "[T:%lu] ", sys_tick_ms);
   

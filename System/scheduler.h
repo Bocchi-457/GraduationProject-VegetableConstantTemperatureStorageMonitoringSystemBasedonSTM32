@@ -1,3 +1,10 @@
+/**
+ * scheduler.h
+ * 轻量级协作式调度器头文件
+ * 版本：V1.0
+ * MCU：STM32F103C8T6
+ */
+
 #ifndef __SCHEDULER_H
 #define __SCHEDULER_H
 

@@ -8,7 +8,7 @@
 #include "OLED.h"
 #include "Key.h"
 #include "Timer.h"
-#include "DS1302.h"              // ✅ 新增：DS1302 RTC驱动
+#include "DS1302.h"              // DS1302 RTC驱动
 #include "dht22.h"
 #include "control.h"
 #include "control_task.h"
@@ -31,11 +31,11 @@ extern uint8_t g_humidifier_state;    // 加湿状态
 // 页面清除标志
 uint8_t g_page_clear_flag = 0;
 
-// ✅ 页面索引（移除static，使key_task可以访问）
+// 页面索引（移除static，使key_task可以访问）
 uint8_t s_page2_index = 1;     // 控制页面索引
 uint8_t s_page3_index = 1;     // 设置页面索引
 
-// ✅ 显示缓冲区（全局变量，照搬旧系统）
+// 显示缓冲区（全局变量，照搬旧系统）
 char oled_str[100];
 
 // 上次执行时间
@@ -87,7 +87,7 @@ void Display_ShowMode(void) {
  * @brief 显示时间（直接调用DS1302驱动中的TIME函数）
  */
 void Display_ShowTime(void) {
-    // ✅ 直接调用DS1302.c中已有的TIME函数，包含日期、时间、星期几的完整显示
+    // 直接调用DS1302.c中已有的TIME函数，包含日期、时间、星期几的完整显示
     // TIME()使用y=3显示日期和星期，y=4显示时间
     TIME();
 }
@@ -131,7 +131,6 @@ void OLED_Display_Task_Run(void) {
         // 显示WiFi状态图标（右上角，不遮挡其他信息）
         Show_WiFi_Status_Icon(Get_WiFi_State());
         
-        // ✅ 删除：按键处理已移至key_task.c，此处只负责显示
     }
     
     // ===== 页面2：控制页面 =====
@@ -140,8 +139,6 @@ void OLED_Display_Task_Run(void) {
             g_page_clear_flag = 2;
             OLED_Clear(0);
         }
-        
-        // ✅ 删除：按键2/3/4处理已移至key_task.c，此处只负责显示
         
         // 显示加热控制
         OLED_ShowCHinese(0, 0, 116);  // 加
@@ -186,7 +183,6 @@ void OLED_Display_Task_Run(void) {
             OLED_ShowString(60, 6, (uint8_t *)"<", 16);
         }
         
-        // ✅ 删除：手动模式下的按键控制已移至key_task.c
         
         // 显示执行器状态
         if (g_heater_state) {
@@ -221,7 +217,6 @@ void OLED_Display_Task_Run(void) {
             OLED_Clear(0);
         }
         
-        // ✅ 新增：显示缓冲区（支持小数和负数显示）
         static char temp_str[8];
         static char humid_str[8];
         
@@ -232,7 +227,7 @@ void OLED_Display_Task_Run(void) {
         OLED_ShowCHinese(48, 0, 125); // 限
         OLED_ShowChar(64, 0, ':', 16);
         
-        // ✅ 修改：格式化显示（支持负数和小数，如"25.0"或"-5.0"）
+        // 格式化显示（支持负数和小数，如"25.0"或"-5.0"）
         sprintf(temp_str, "%d.%d", 
                 g_temp_high / 10, 
                 abs(g_temp_high % 10));
@@ -245,7 +240,7 @@ void OLED_Display_Task_Run(void) {
         OLED_ShowCHinese(48, 2, 127); // 限
         OLED_ShowChar(64, 2, ':', 16);
         
-        // ✅ 修改：格式化显示（支持负数和小数）
+        // 格式化显示（支持负数和小数）
         sprintf(temp_str, "%d.%d", 
                 g_temp_low / 10, 
                 abs(g_temp_low % 10));
@@ -258,7 +253,7 @@ void OLED_Display_Task_Run(void) {
         OLED_ShowCHinese(48, 4, 125); // 限
         OLED_ShowChar(64, 4, ':', 16);
         
-        // ✅ 修改：格式化显示（湿度始终为正数）
+        // 格式化显示（湿度始终为正数）
         sprintf(humid_str, "%d.%d", 
                 g_humid_high / 10, 
                 g_humid_high % 10);
@@ -271,13 +266,13 @@ void OLED_Display_Task_Run(void) {
         OLED_ShowCHinese(48, 6, 127); // 限
         OLED_ShowChar(64, 6, ':', 16);
         
-        // ✅ 修改：格式化显示
+        // 格式化显示
         sprintf(humid_str, "%d.%d", 
                 g_humid_low / 10, 
                 g_humid_low % 10);
         OLED_ShowString(72, 6, (uint8_t *)humid_str, 16);
         
-        // ✅ 优化：光标位置指示右移，避免遮挡负号（从x=100移到x=116）
+        // 优化：光标位置指示右移，避免遮挡负号（从x=100移到x=116）
         if (s_page3_index == 1) {  // 温度上限
             OLED_ShowString(116, 0, (uint8_t *)"<", 16);
             OLED_ShowString(116, 2, (uint8_t *)" ", 16);

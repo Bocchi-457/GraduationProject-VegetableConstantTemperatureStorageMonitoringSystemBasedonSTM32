@@ -1,3 +1,11 @@
+/**
+ * network_core.c
+ * 网络核心模块实现文件
+ * 实现ESP8266联网、TCP连接、云端通信和时间同步功能
+ * 版本：V1.0
+ * MCU：STM32F103C8T6
+ */
+
 #include "network_core.h"
 #include "wifi_driver.h"  // 包含WIFI_SSID等宏定义
 #include "delay.h"
@@ -202,7 +210,7 @@ static uint8_t g_subscribe_retry_count = 0;
  * @note 由于初始化步骤是顺序执行的（WiFi→TCP→订阅），此变量可安全复用 */
 static uint32_t g_last_retry_time = 0;
 
-/* ✅ 已删除g_tcp_connected，统一使用g_upload_monitor.tcp_connected */
+/* 使用g_upload_monitor.tcp_connected统一管理连接状态 */
 
 /* 上传状态 */
 static uint8_t g_upload_busy = 0;
@@ -242,7 +250,7 @@ typedef struct {
     uint8_t tcp_disconnected;       // TCP是否断开标志
     uint8_t upload_paused;          // 上传是否暂停（TCP断开后暂停）
     
-    /* ✅ 统一网络连接状态 */
+    /* 统一网络连接状态 */
     uint8_t wifi_connected;         // WiFi连接状态（0=断开, 1=已连接）
     uint8_t tcp_connected;          // TCP连接状态（0=断开, 1=已连接）
     uint8_t subscribed;             // 订阅状态（0=未订阅, 1=已订阅）
@@ -268,7 +276,7 @@ typedef struct {
 
 static UploadMonitor_t g_upload_monitor = {0};
 
-/* ✅ 已删除旧的初始化状态变量，统一使用g_upload_monitor中的状态 */
+/* 使用g_upload_monitor中的状态变量 */
 
 /* WiFi连续断开计数器（用于触发WiFi重连）*/
 static uint8_t g_wifi_consecutive_disconnect_count = 0;
@@ -281,7 +289,7 @@ static uint8_t g_init_retry_enabled = 0;     // 是否启用初始化重试
 static uint32_t g_init_next_retry_time = 0;  // 下次重试时间
 #define INIT_RETRY_INTERVAL 30000            // 30秒重试间隔
 
-/* ✅ 初始化成功提示标志（只显示一次）*/
+/* 初始化成功提示标志（只显示一次）*/
 static uint8_t g_init_success_shown = 0;
 
 /* 时间同步状态 */
@@ -419,7 +427,7 @@ static uint8_t Check_WiFi_Connection(void) {
     
     // 首次调用，记录开始时间并发送指令
     if (g_wifi_check_start_time == 0) {
-        // ⭐ 发送指令前先清空AT缓冲区，避免残留数据干扰
+        // 发送指令前先清空AT缓冲区，避免残留数据干扰
         RingBuffer_AT_Clear();
         
         // 发送AT+CWJAP?指令
@@ -446,17 +454,17 @@ static uint8_t Check_WiFi_Connection(void) {
     if (recv_len > 0) {
         recv_buf[recv_len] = '\0';
         
-        // ⭐ 添加调试日志，打印原始响应内容
+        // 添加调试日志，打印原始响应内容
         Serial_Printf("[NET][DBG] WiFi check raw response (%d bytes): [%s]\r\n", recv_len, recv_buf);
         
-        // ⭐ 优先检查ALREADY CONNECTED（ESP-01S可能返回此响应）
+        // 优先检查ALREADY CONNECTED（ESP-01S可能返回此响应）
         if (strstr((char *)recv_buf, "ALREADY CONNECTED") != NULL) {
             Serial_Printf("[NET] WiFi status: CONNECTED (already connected)\r\n");
             g_wifi_check_start_time = 0;  // 重置
             return 1;
         }
         
-        // ⭐ 检查+CWJAP:并判断是否真的连接
+        // 检查+CWJAP:并判断是否真的连接
         char *cwjap_pos = strstr((char *)recv_buf, "+CWJAP:");
         if (cwjap_pos != NULL) {
             // 检查+CWJAP:后面是否是SSID（真正的连接）
@@ -491,7 +499,7 @@ static uint8_t Check_WiFi_Connection(void) {
             recv_len = RingBuffer_AT_Read(recv_buf, sizeof(recv_buf) - 1);
             if (recv_len > 0) {
                 recv_buf[recv_len] = '\0';
-                // ⭐ 打印延迟后的响应
+                // 打印延迟后的响应
                 Serial_Printf("[NET][DBG] WiFi check delayed response (%d bytes): [%s]\r\n", recv_len, recv_buf);
                 
                 // 再次检查ALREADY CONNECTED
@@ -746,7 +754,7 @@ static void Handle_TCP_Reconnection(void) {
     
     // 到达重试时间，执行重连步骤
     if (g_upload_monitor.reconnect_state == RECONNECT_STATE_IDLE) {
-        // ⭐ 新增：如果已经在WiFi恢复模式，不要重复启动检测
+        // 如果已经在WiFi恢复模式，不要重复启动检测
         if (g_net_state == NET_STATE_WIFI_DISCONNECTED) {
             // WiFi恢复模式正在运行，等待它完成
             return;
@@ -754,7 +762,7 @@ static void Handle_TCP_Reconnection(void) {
         
         // 首次重连前检查WiFi状态
         if (!g_upload_monitor.wifi_connected) {
-            // ⭐ 检查是否已有WiFi检测在进行中
+            // 检查是否已有WiFi检测在进行中
             if (g_wifi_check_start_time != 0) {
                 // WiFi检测正在进行，等待完成
                 return;
@@ -792,7 +800,7 @@ static void Handle_TCP_Reconnection(void) {
             g_upload_monitor.reconnect_attempts = 0;
             g_upload_monitor.reconnect_state = RECONNECT_STATE_IDLE;
             
-            // ⭐ 重置WiFi检测状态
+            // 重置WiFi检测状态
             g_wifi_check_start_time = 0;
             g_upload_monitor.wifi_check_state = WIFI_CHECK_STATE_IDLE;
             
@@ -840,14 +848,14 @@ static void Handle_WiFi_Management(void) {
         if (wifi_result == 2) {
             return;  // 还在检测中
         } else if (wifi_result == 1) {
-            // ✅ WiFi正常，统一处理逻辑
+            // WiFi正常，统一处理逻辑
             Serial_Printf("[NET] WiFi check result: CONNECTED\r\n");
             
-            // ✅ 统一设置WiFi状态
+            // 统一设置WiFi状态
             g_upload_monitor.wifi_connected = 1;
             g_upload_monitor.wifi_check_enabled = 0;
             
-            // ✅ 无论什么状态，都启动TCP重连
+            // 无论什么状态，都启动TCP重连
             Serial_Printf("[NET] WiFi OK, starting TCP reconnection...\r\n");
             
             g_net_state = NET_STATE_RECONNECTING;
@@ -866,7 +874,7 @@ static void Handle_WiFi_Management(void) {
             // WiFi断开
             Serial_Printf("[NET] WiFi check result: DISCONNECTED\r\n");
             
-            // ⭐ 新增：跟踪连续断开次数（使用全局变量）
+            // 跟踪连续断开次数（使用全局变量）
             g_wifi_consecutive_disconnect_count++;
             
             if (g_net_state != NET_STATE_WIFI_DISCONNECTED) {
@@ -881,7 +889,7 @@ static void Handle_WiFi_Management(void) {
                 g_upload_monitor.wifi_check_next_time = sys_tick_ms + WIFI_CHECK_INTERVAL;
                 Serial_Printf("[NET] WiFi still disconnected. Next check in 20 seconds...\r\n");
                 
-                // ⭐ 新增：连续3次检测断开，触发WiFi重连（不复位模块）
+                // 连续3次检测断开，触发WiFi重连（不复位模块）
                 if (g_wifi_consecutive_disconnect_count >= 3) {
                     Serial_Printf("[NET] WiFi disconnected for 3 consecutive checks. Triggering WiFi reconnection...\r\n");
                     g_wifi_consecutive_disconnect_count = 0;  // 重置计数器
@@ -890,7 +898,7 @@ static void Handle_WiFi_Management(void) {
                     g_net_state = NET_STATE_INITIALIZING;  // 临时切换到初始化状态
                     g_init_step = INIT_STEP_CONNECT_WIFI;  // 直接跳到WiFi连接步骤
                     g_wifi_retry_count = 0;
-                    // ✅ 不锁定OLED，避免进度显示破坏第一页面
+                    // 不锁定OLED，避免进度显示破坏第一页面
                     
                     Serial_Printf("[NET] Starting WiFi reconnection without reset...\r\n");
                     return;  // 退出WiFi检测，让Network_Core_Task处理初始化
@@ -925,7 +933,7 @@ static void Handle_WiFi_Management(void) {
         
         // 到达检测时间，启动WiFi检测
         if (g_upload_monitor.wifi_check_state == WIFI_CHECK_STATE_IDLE) {
-            // ⭐ 检查是否已有WiFi检测在进行中
+            // 检查是否已有WiFi检测在进行中
             if (g_wifi_check_start_time != 0) {
                 // WiFi检测正在进行，等待完成
                 return;
@@ -942,20 +950,8 @@ static void Handle_WiFi_Management(void) {
  * @brief 执行初始化步骤
  */
 static void Init_Step_Execute(void) {
-  // ✅ 不在这里设置g_oled_locked，由Network_Core_Init()统一设置
-  
-//   // 显示OLED
-//   OLED_ShowCHinese(0, 3, 21);  // 正
-//   OLED_ShowCHinese(18, 3, 22); // 在
-//   OLED_ShowCHinese(36, 3, 23); // 连
-//   OLED_ShowCHinese(54, 3, 24); // 接
-//   OLED_ShowString(72, 3, "WIFI", 16);
-//   OLED_ShowString(108, 3, "..", 16);
-//   OLED_ShowCHinese(0, 6, 4);   // 进
-//   OLED_ShowCHinese(18, 6, 5);  // 度
-//   OLED_ShowCHinese(36, 6, 13); // ：
-//   OLED_ShowString(60, 6, "10%", 16);
-  
+  // 不在这里设置g_oled_locked，由Network_Core_Init()统一设置
+
   char cmd_buf[128];
   uint8_t tcp_result; // TCP连接结果
   uint16_t data_len;  // 数据长度
@@ -1010,12 +1006,12 @@ static void Init_Step_Execute(void) {
         Serial_Printf(
             "[NET] AT test failed after 3 retries, entering reconnect state\r\n");
         
-        // ✅ 进入重连状态，而不是离线状态
+        // 进入重连状态，而不是离线状态
         g_net_state = NET_STATE_RECONNECTING;
         g_init_step = INIT_STEP_IDLE;
         retry = 0; // 重置计数器，以便下次初始化
         
-        // ✅ 设置重连标志
+        // 设置重连标志
         g_upload_monitor.is_reconnecting = 1;
         g_upload_monitor.reconnect_attempts = 0;
         g_upload_monitor.next_retry_time = sys_tick_ms + 10000; // 10秒后重试
@@ -1032,7 +1028,7 @@ static void Init_Step_Execute(void) {
     Serial_Printf("[NET] Step 3: Setting STA mode...\r\n");
     if (WiFi_Send_AT_Command("AT+CWMODE=1\r\n", "OK", 1000)) {
       Serial_Printf("[NET] STA mode set OK\r\n");
-      // ✅ 只在OLED锁定时才显示进度
+      // 只在OLED锁定时才显示进度
       if (g_oled_locked) {
         OLED_ShowString(60, 6, "50%", 16);
       }
@@ -1043,11 +1039,11 @@ static void Init_Step_Execute(void) {
     } else {
       Serial_Printf("[NET] STA mode FAILED\r\n");
       
-      // ✅ 进入重连状态，而不是离线状态
+      // 进入重连状态，而不是离线状态
       g_net_state = NET_STATE_RECONNECTING;
       g_init_step = INIT_STEP_IDLE;
       
-      // ✅ 设置重连标志
+      // 设置重连标志
       g_upload_monitor.is_reconnecting = 1;
       g_upload_monitor.reconnect_attempts = 0;
       g_upload_monitor.next_retry_time = sys_tick_ms + 10000; // 10秒后重试
@@ -1083,19 +1079,19 @@ static void Init_Step_Execute(void) {
     if (WiFi_Send_AT_Command(cmd_buf, "WIFI CONNECTED", current_timeout)) {
       Serial_Printf("[NET] WiFi connected OK\r\n");
       
-      // ✅ 更新统一状态变量
+      // 更新统一状态变量
       g_upload_monitor.wifi_connected = 1;
       
       g_wifi_retry_count = 0; // 重置计数器
       
-      // ⭐ 新增：重置所有相关计数器，避免显示异常
+      // 重置所有相关计数器，避免显示异常
       g_tcp_retry_count = 0;
       g_subscribe_retry_count = 0;
       
-      // ⭐ 新增：重置WiFi连续断开计数器
+      // 重置WiFi连续断开计数器
       g_wifi_consecutive_disconnect_count = 0;
       
-      // ✅ 只在OLED锁定时才显示进度（真正的初始化）
+      // 只在OLED锁定时才显示进度（真正的初始化）
       if (g_oled_locked) {
         OLED_ShowString(60, 6, "70%", 16);
       }
@@ -1170,11 +1166,11 @@ static void Init_Step_Execute(void) {
     if (tcp_result) {
       Serial_Printf("[NET] TCP connected (response: CONNECT)\r\n");
       
-      // ✅ 更新统一状态变量
+      // 更新统一状态变量
       g_upload_monitor.tcp_connected = 1;
       
       g_tcp_retry_count = 0; // 重置计数器
-      // ✅ 只在OLED锁定时才显示进度
+      // 只在OLED锁定时才显示进度
       if (g_oled_locked) {
         OLED_ShowString(60, 6, "90%", 16);
       }
@@ -1187,11 +1183,11 @@ static void Init_Step_Execute(void) {
       if (WiFi_Send_AT_Command(cmd_buf, "OK", current_tcp_timeout)) {
         Serial_Printf("[NET] TCP connected (response: OK)\r\n");
         
-        // ✅ 更新统一状态变量
+        // 更新统一状态变量
         g_upload_monitor.tcp_connected = 1;
         
         g_tcp_retry_count = 0; // 重置计数器
-        // ✅ 只在OLED锁定时才显示进度
+        // 只在OLED锁定时才显示进度
         if (g_oled_locked) {
           OLED_ShowString(60, 6, "90%", 16);
         }
@@ -1288,20 +1284,20 @@ static void Init_Step_Execute(void) {
         // 服务器可能会异步返回 cmd=1&res=1，但我们不阻塞等待
         Serial_Printf("[NET] Topic subscribed (async response expected)\r\n");
 
-        // ✅ 更新统一状态变量
+        // 更新统一状态变量
         g_upload_monitor.subscribed = 1;
         g_init_retry_enabled = 0; // 禁用重试
 
-        // ✅ 重置重连标志（避免误触发）
+        // 重置重连标志（避免误触发）
         g_upload_monitor.is_reconnecting = 0;
         g_upload_monitor.reconnect_attempts = 0;
         g_upload_monitor.reconnect_state = RECONNECT_STATE_IDLE;
         
-        // ✅ 重置WiFi检测状态
+        // 重置WiFi检测状态
         g_wifi_check_start_time = 0;
         g_upload_monitor.wifi_check_state = WIFI_CHECK_STATE_IDLE;
 
-        // ✅ 显示初始化成功提示（只显示一次）
+        // 显示初始化成功提示（只显示一次）
         if (!g_init_success_shown) {
           Show_Network_Success();  // 显示3秒“联网成功”界面
           g_init_success_shown = 1;  // 标记已显示
@@ -1310,7 +1306,7 @@ static void Init_Step_Execute(void) {
           g_oled_locked = 0;
         }
 
-        // ✅ 进入正常联网状态
+        // 进入正常联网状态
         g_init_step = INIT_STEP_IDLE;  // 重置初始化步骤
         g_net_state = NET_STATE_CONNECTED;
         g_subscribe_retry_count = 0; // 重置计数器
@@ -1384,7 +1380,7 @@ static void Init_Step_Execute(void) {
     }
     break;
 
-  // ✅ 已删除INIT_STEP_COMPLETE分支，订阅成功后直接进入NET_STATE_CONNECTED
+  // 已删除INIT_STEP_COMPLETE分支，订阅成功后直接进入NET_STATE_CONNECTED
 
   default:
     break;
@@ -1395,7 +1391,7 @@ static void Init_Step_Execute(void) {
  * @brief 初始化网络模块
  */
 void Network_Core_Init(void) {
-  // ✅ 锁定OLED，禁止其他任务刷新
+  // 锁定OLED，禁止其他任务刷新
   g_oled_locked = 1;
   
   // 显示OLED
@@ -1422,7 +1418,7 @@ void Network_Core_Init(void) {
   // 开始初始化流程
   g_net_state = NET_STATE_INITIALIZING;
 
-  // ✅ 移除WiFi预检，直接从复位开始完整初始化
+  // 移除WiFi预检，直接从复位开始完整初始化
   Serial_Printf("[NET] Starting full initialization from reset...\r\n");
   g_upload_monitor.wifi_connected = 0;
   g_upload_monitor.tcp_connected = 0;
@@ -1564,7 +1560,7 @@ static void Time_Sync_Execute(void) {
                 return;
             }
             
-            // ✅ 暂停上传任务，避免数据混乱
+            // 暂停上传任务，避免数据混乱
             g_upload_monitor.upload_paused = 1;
             Serial_Printf("[TIME] Upload paused for time sync\r\n");
             
@@ -1581,10 +1577,10 @@ static void Time_Sync_Execute(void) {
                 char time_cmd[128];
                 int len = sprintf(time_cmd, "cmd=7&uid=%s&type=1", BEMFA_UID);
                 
-                // ✅ 重置解析器状态，避免上次遗留的状态影响
+                // 重置解析器状态，避免上次遗留的状态影响
                 WiFi_Reset_Parse_State();
                 
-                // ✅ 清空云端缓冲区，避免读取到旧数据
+                // 清空云端缓冲区，避免读取到旧数据
                 RingBuffer_Cloud_Clear();
                 Serial_Printf("[TIME] Parse state reset and cloud buffer cleared\r\n");
                 
@@ -1621,7 +1617,7 @@ static void Time_Sync_Execute(void) {
                 if (strstr((char *)recv_buf, ">") != NULL) {
                     Serial_Printf("[TIME] Got '>' prompt, sending time request...\r\n");
                     
-                    // ✅ 再次重置解析器状态，确保干净的环境
+                    // 再次重置解析器状态，确保干净的环境
                     WiFi_Reset_Parse_State();
                     RingBuffer_Cloud_Clear();
                     
@@ -1644,16 +1640,16 @@ static void Time_Sync_Execute(void) {
                 return;
             }
             
-            // ✅ 使用不依赖\r\n的读取函数（巴法云时间响应没有\r\n结尾）
+            // 使用不依赖\r\n的读取函数（巴法云时间响应没有\r\n结尾）
             recv_len = WiFi_Read_Cloud_Data_NoDelimiter((uint8_t *)g_time_response_buf, 
                                                         sizeof(g_time_response_buf) - 1);
             if (recv_len > 0) {
                 g_time_response_buf[recv_len] = '\0';
                 Serial_Printf("[TIME] Received time response: %s\r\n", g_time_response_buf);
                 
-                // ✅ 改进：搜索"20XX-"格式的时间字符串（兼容混合数据）
+                // 改进：搜索"20XX-"格式的时间字符串（兼容混合数据）
                 char *time_pos = NULL;
-                for (uint16_t i = 0; i <= recv_len - 19; i++) {  // ✅ 使用<=而非<
+                for (uint16_t i = 0; i <= recv_len - 19; i++) {  // 使用<=而非<
                     if (g_time_response_buf[i] == '2' && 
                         g_time_response_buf[i+1] == '0' &&
                         g_time_response_buf[i+4] == '-' &&
@@ -1699,7 +1695,7 @@ static void Time_Sync_Execute(void) {
             // 同步完成，重置状态
             g_time_sync_step = TIME_SYNC_STATE_IDLE;
             
-            // ✅ 恢复上传任务
+            // 恢复上传任务
             g_upload_monitor.upload_paused = 0;
             Serial_Printf("[TIME] Upload resumed after successful sync\r\n");
             break;
@@ -1720,14 +1716,14 @@ static void Time_Sync_Execute(void) {
                 Serial_Printf("[TIME] Time sync failed after %d retries\r\n", 
                              TIME_SYNC_MAX_RETRY);
                 
-                // ✅ 设置first_sync_done和last_sync_timestamp，避免无限重试
+                // 设置first_sync_done和last_sync_timestamp，避免无限重试
                 g_time_sync.first_sync_done = 1;
                 g_time_sync.last_sync_timestamp = sys_tick_ms;
                 g_time_sync.sync_requested = 0;
                 g_time_sync.sync_in_progress = 0;
                 g_time_sync_step = TIME_SYNC_STATE_IDLE;
                 
-                // ✅ 恢复上传任务
+                // 恢复上传任务
                 g_upload_monitor.upload_paused = 0;
                 Serial_Printf("[TIME] Upload resumed after failed sync\r\n");
                 
@@ -1761,7 +1757,7 @@ static void Periodic_TCP_Check(void) {
         return;
     }
     
-    // ✅ 如果时间同步正在进行，跳过检查
+    // 如果时间同步正在进行，跳过检查
     if (g_time_sync.sync_in_progress) {
         return;
     }
@@ -1813,19 +1809,19 @@ void Network_Core_Task(void) {
     
     // 如果已连接，检查云端指令
     if (g_net_state == NET_STATE_CONNECTED) {
-        // ✅ 时间同步期间禁用云端指令检查，避免数据竞争
+        // 时间同步期间禁用云端指令检查，避免数据竞争
         if (!g_time_sync.sync_in_progress) {
             Check_Cloud_Command();
         }
     }
     
-    // ✅ 检查时间同步触发条件
+    // 检查时间同步触发条件
     Check_Time_Sync_Trigger();
     
-    // ✅ 执行时间同步状态机
+    // 执行时间同步状态机
     Time_Sync_Execute();
     
-    // ✅ 定期检查TCP连接状态（每2分钟）
+    // 定期检查TCP连接状态（每2分钟）
     Periodic_TCP_Check();
     
     // WiFi断开状态
@@ -1837,7 +1833,7 @@ void Network_Core_Task(void) {
         }
     }
     
-    // ✅ 验证网络状态一致性（每10秒检查一次）
+    // 验证网络状态一致性（每10秒检查一次）
     Validate_Network_State();
 }
 
@@ -1971,7 +1967,7 @@ check_tcp_status:
                 g_tcp_retry_count = 0;
                 g_subscribe_retry_count = 0;
                 
-                // ✅ 重置时间同步状态
+                // 重置时间同步状态
                 g_time_sync.sync_requested = 0;
                 g_time_sync.sync_in_progress = 0;
                 g_time_sync_step = TIME_SYNC_STATE_IDLE;

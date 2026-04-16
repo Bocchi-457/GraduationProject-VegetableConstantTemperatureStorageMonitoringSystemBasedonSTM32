@@ -1,9 +1,11 @@
 /**
- * @file main_new.c
- * @brief 蔬菜恒温库监控系统 - 重构版主程序
- * @note 采用调度器架构，彻底消除阻塞延时
- * @version V2.0 (重构版)
+ * main.c
+ * 蔬菜恒温库监控系统主程序
+ * 实现系统初始化、任务调度和联网控制功能
+ * 版本：V2.0
+ * MCU：STM32F103C8T6
  */
+
 
 #include "stm32f10x.h"
 #include "scheduler.h"
@@ -35,7 +37,7 @@
     extern uint8_t
         g_dht22_data_valid; // DHT22数据有效性（在dht22_task.c中定义）
 
-    // ✅ 新增：联网模式标志（1=联网模式，0=离线模式）
+    // 联网模式标志（1=联网模式，0=离线模式）
     uint8_t g_network_enabled = 0;
 
 /***
@@ -62,10 +64,10 @@ void System_Init(void) {
     OLED_Init();          // OLED显示初始化
     OLED_Clear(0);        // 清屏
     
-    Ds1302_Init();        // ✅ 新增：DS1302 RTC初始化
+    Ds1302_Init();        // DS1302 RTC初始化
     Timer_Init();         // 定时器初始化（TIM2: 10ms心跳）
     
-    // ✅ 关键改进：OLED初始化后立即显示提示，避免用户面对黑屏等待
+    // 关键改进：OLED初始化后立即显示提示，避免用户面对黑屏等待
     OLED_ShowCHinese(0, 3, 19);  // 系
     OLED_ShowCHinese(18, 3, 20); // 统
     OLED_ShowCHinese(36, 3, 21); // 正
@@ -74,7 +76,7 @@ void System_Init(void) {
     OLED_ShowCHinese(90, 3, 1);  // 始
     OLED_ShowCHinese(108, 3, 2); // 化
     
-    // ✅ 核心任务初始化（属于系统初始化的一部分，必须在开机引导前完成）
+    // 核心任务初始化（属于系统初始化的一部分，必须在开机引导前完成）
     DHT22_Task_Init();    // DHT22任务初始化
     Control_Task_Init();  // 控制任务初始化
     Key_Task_Init();      // 按键任务初始化
@@ -83,12 +85,12 @@ void System_Init(void) {
     // 上电延时，确保DHT22稳定（2秒）
     delay_ms(2000);
     
-    // ✅ 系统初始化完成，蜂鸣器鸣响提示
+    // 系统初始化完成，蜂鸣器鸣响提示
     beep = 0;
     delay_ms(100);
     beep = 1;
     
-    // ✅ 开机引导界面 - 询问是否联网
+    // 开机引导界面 - 询问是否联网
     OLED_Clear(0);
     
     // 显示标题："是否需要联网？"
@@ -115,7 +117,7 @@ void System_Init(void) {
     
     OLED_Clear(0);  // 清屏，准备进入主界面
     
-    // ✅ 根据用户选择决定是否初始化网络模块
+    // 根据用户选择决定是否初始化网络模块
     if (key_choice == 1) {
         // 用户选择“是”，初始化网络模块
         g_network_enabled = 1;
@@ -266,12 +268,12 @@ int main(void) {
     Scheduler_Init();
     
     // 注册周期性任务
-    Scheduler_Register(OLED_Display_Task_Run, 100);   // ✅ OLED显示：100ms（完整3页面）
-    Scheduler_Register(Key_Task_Scan, 50);            // ✅ 按键扫描：50ms
+    Scheduler_Register(OLED_Display_Task_Run, 100);   // OLED显示：100ms（完整3页面）
+    Scheduler_Register(Key_Task_Scan, 50);            // 按键扫描：50ms
     Scheduler_Register(DHT22_Task_Run, 2000);         // DHT22读取：2s
     Scheduler_Register(Control_Task_Run, 500);        // 控制逻辑：500ms
     
-    // ✅ 根据联网模式决定是否注册网络任务
+    // 根据联网模式决定是否注册网络任务
     if (g_network_enabled) {
         Scheduler_Register(Network_Core_Task, 50);             // 【重构】网络任务：50ms
         // Scheduler_Register(Network_Upload_Task, 2000);      // 数据上传已移至DHT22任务中
@@ -288,11 +290,11 @@ int main(void) {
         // 调度器运行（非阻塞）
         Scheduler_Run();
         
-        // ✅ 仅在联网模式下处理云端指令
+        // 仅在联网模式下处理云端指令
         if (g_network_enabled) {
             Handle_Cloud_Command();
             
-            // ✅ 删除：独立心跳发送逻辑
+            // 删除：独立心跳发送逻辑
             // 根据巴法云协议，每次成功的数据上传即视为心跳，无需单独发送
             // 这样可以减少AT指令竞争，简化代码逻辑
         }

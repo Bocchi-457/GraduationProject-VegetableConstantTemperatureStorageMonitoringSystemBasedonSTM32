@@ -1,7 +1,7 @@
 /**
  * DS1302.c
  * DS1302实时时钟驱动文件
- * 功能：实现DS1302实时时钟的初始化、读写操作和时间显示
+ * 实现DS1302实时时钟的初始化、读写操作和时间显示
  * 版本：V1.0
  * MCU：STM32F103C8T6
  */
@@ -65,12 +65,12 @@ u8 HEX2BCD(u8 hex_data) // HEXtoBCD
   temp = (hex_data / 10 * 16 + hex_data % 10);
   return temp;
 }
-//============================================
-// 函数名称：void Ds1302_Write_Byte (byte addr, byte dat)
-// 功能：    串行发送地址、数据，先发低位，且在上升沿发送
-// 参数传递：有，地址和数据
-// 返回值：  无
-//===========================================
+/**
+ * @brief DS1302写一个字节
+ * @param addr 地址
+ * @param dat 数据
+ * @note 串行发送地址、数据，先发低位，在上升沿发送
+ */
 void Ds1302_Write_Byte(u8 addr, u8 dat) {
   u8 i;
   DS1302_IO_OUT(); // 数据端口定义为输出
@@ -107,12 +107,12 @@ void Ds1302_Write_Byte(u8 addr, u8 dat) {
   ; // 停止DS1302总线
   delay_us(10);
 }
-//===============================================
-// 函数名称：byte Ds1302_Read_Byte ( byte addr )
-// 功能：    串行读取数据，先发低位，且在下降沿发送
-// 参数传递：有，地址
-// 返回值：  有，读取的数据
-//===============================================
+/**
+ * @brief DS1302读一个字节
+ * @param addr 地址
+ * @return 读取的数据
+ * @note 串行读取数据，先发低位，在下降沿发送
+ */
 u8 Ds1302_Read_Byte(u8 addr) {
   u8 i;
   u8 temp = 1;
@@ -148,10 +148,14 @@ u8 Ds1302_Read_Byte(u8 addr) {
   delay_us(10);
   return temp;
 }
-// 获得现在是星期几
-// 功能描述:输入公历日期得到星期(只允许1901-2099年)
-// 输入参数：公历年月日
-// 返回值：星期号
+/**
+ * @brief 计算星期几
+ * @param year 年
+ * @param month 月
+ * @param day 日
+ * @return 星期号（0-6）
+ * @note 输入公历日期得到星期，只允许1901-2099年
+ */
 u8 RTC_Get_Week(u16 year, u8 month, u8 day) {
   u16 temp2;
   u8 yearH, yearL;
@@ -166,9 +170,15 @@ u8 RTC_Get_Week(u16 year, u8 month, u8 day) {
     temp2--;
   return (temp2 % 7);
 }
-//===============================================
-//           向DS1302写入时钟数据
-//===============================================
+/**
+ * @brief 向DS1302写入时钟数据
+ * @param year 年
+ * @param mon 月
+ * @param day 日
+ * @param hour 时
+ * @param min 分
+ * @param sec 秒
+ */
 void RTC_Set(u16 year, u8 mon, u8 day, u8 hour, u8 min, u8 sec) {
   u8 WR_week;
   u8 WR_yearL = 0;
@@ -178,7 +188,6 @@ void RTC_Set(u16 year, u8 mon, u8 day, u8 hour, u8 min, u8 sec) {
   WR_week = RTC_Get_Week(year, mon, day); // 根据写入的日期算星期几
   Ds1302_Write_Byte(WRITE_PROTECT, 0x00); // 关闭写保护
   Ds1302_Write_Byte(WRITE_SECOND, 0x80);  // 暂停
-  //	Ds1302_Write_Byte(ds1302_charger_add,0xa9);    //涓流充电
   Ds1302_Write_Byte(WRITE_YEAR, HEX2BCD(WR_yearL)); // 年
   Ds1302_Write_Byte(WRITE_MONTH, HEX2BCD(mon));     // 月
   Ds1302_Write_Byte(WRITE_DAY, HEX2BCD(day));       // 日
@@ -189,9 +198,9 @@ void RTC_Set(u16 year, u8 mon, u8 day, u8 hour, u8 min, u8 sec) {
   Ds1302_Write_Byte(WRITE_PROTECT, 0x80);           // 打开写保护
 }
 
-//========================================
-//           从DS1302读出时钟数据
-//========================================
+/**
+ * @brief 从DS1302读出时钟数据
+ */
 void RTC_Get(void) {
   //	u8  i,tmp;
   calendar.w_year = BCD2HEX(Ds1302_Read_Byte(READ_YEAR));       // 年
@@ -204,9 +213,9 @@ void RTC_Get(void) {
   calendar.w_year = calendar.w_year + 2000;
 }
 
-//==========================================
-//              DS1302初始化
-//==========================================
+/**
+ * @brief DS1302初始化
+ */
 void Ds1302_Init(void) {
   IO_Init();                             // GPIO初始化
   CE = 0;                                // RST脚置低
@@ -217,12 +226,11 @@ void Ds1302_Init(void) {
 }
 
 //*******************以下UTC时间计算部分函数*****************
-// 判断是否是闰年函数
-// 月份   1  2  3  4  5  6  7  8  9  10 11 12
-// 闰年   31 29 31 30 31 30 31 31 30 31 30 31
-// 非闰年 31 28 31 30 31 30 31 31 30 31 30 31
-// 输入:年份
-// 输出:该年份是不是闰年.1,是.0,不是
+/**
+ * @brief 判断是否是闰年
+ * @param year 年份
+ * @return 1=是闰年，0=不是闰年
+ */
 u8 Is_Leap_Year(u16 year) {
   if (year % 4 == 0) // 必须能被4整除
   {

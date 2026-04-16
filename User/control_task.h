@@ -1,3 +1,10 @@
+/**
+ * control_task.h
+ * 自动控制逻辑任务头文件
+ * 版本：V1.0
+ * MCU：STM32F103C8T6
+ */
+
 #ifndef __CONTROL_TASK_H__
 #define __CONTROL_TASK_H__
 
@@ -7,7 +14,7 @@
  * 【调试开关】控制任务日志控制
  */
 #ifndef DEBUG_CONTROL_TASK
-  #define DEBUG_CONTROL_TASK  0  // ✅ 默认关闭，防止日志刷屏
+  #define DEBUG_CONTROL_TASK  0  // 默认关闭，防止日志刷屏
 #endif
 
 // 设备类型枚举

@@ -1,14 +1,16 @@
 /**
- * @file key_task.c
- * @brief 按键任务模块实现
- * @note 处理按键扫描和页面切换，每50ms扫描一次
+ * key_task.c
+ * 按键任务模块实现文件
+ * 实现按键扫描和页面切换功能
+ * 版本：V1.0
+ * MCU：STM32F103C8T6
  */
 
 #include "key_task.h"
 #include "Key.h"
 #include "Timer.h"
 #include "control_task.h"     // 访问Control_Task_SetMode等函数
-#include "oled_display_task.h"  // ✅ 访问s_page2_index/s_page3_index/g_temp_high等
+#include "oled_display_task.h"  // 访问s_page2_index/s_page3_index/g_temp_high等
 #include <stdio.h>
 
 #if DEBUG_KEY_TASK
@@ -55,7 +57,7 @@ void Key_Task_Scan(void) {
     if (g_key_num > 0) {
         KEY_LOG("Key pressed: %d, Page: %d\r\n", g_key_num, g_current_page);
         
-        // ✅ 根据当前页面处理不同按键
+        // 根据当前页面处理不同按键
         switch (g_current_page) {
             case PAGE_MAIN:  // 页面1：主页
                 if (g_key_num == 1) {

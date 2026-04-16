@@ -1,14 +1,16 @@
 /**
- * @file control_task.c
- * @brief 自动控制逻辑任务模块
- * @note 根据温湿度阈值自动控制执行器，每500ms执行一次
+ * control_task.c
+ * 自动控制逻辑任务模块实现文件
+ * 实现温湿度控制和执行器管理功能
+ * 版本：V1.0
+ * MCU：STM32F103C8T6
  */
 
 #include "control_task.h"
 #include "control.h"
 #include "dht22.h"
 #include "dht22_task.h"   // g_dht22_data_valid
-#include "flash_config.h"  // ✅ 新增：Flash配置持久化
+#include "flash_config.h"  // Flash配置持久化
 #include "Timer.h"
 #include <stdio.h>
 #include <stdlib.h>       // abs()函数
@@ -23,12 +25,12 @@
 // 上次执行时间戳
 static uint32_t g_last_control_time = 0;
 
-// ✅ 新增：Flash延迟保存机制（防止频繁擦写）
+// Flash延迟保存机制（防止频繁擦写）
 static uint32_t g_last_config_change_time = 0;  // 最后一次配置修改时间
 static uint8_t s_config_dirty = 0;              // 配置是否已修改（待保存）
 #define CONFIG_SAVE_DELAY_MS  5000  // 延迟5秒后保存到Flash
 
-// ✅ 新增：超范围报警状态
+// 超范围报警状态
 static uint8_t s_beep_count = 0;      // 蜂鸣器计数
 static uint8_t s_beep_state = 0;      // 蜂鸣器状态
 
@@ -57,7 +59,7 @@ void Control_Task_Init(void) {
     chushi_init();    // 除湿器GPIO初始化
     jiashi_init();    // 加湿器GPIO初始化
     
-    // ✅ 从Flash加载配置（如果无效则使用默认值）
+    // 从Flash加载配置（如果无效则使用默认值）
     Flash_Config_Init();
     
     // 从Flash配置中读取参数
@@ -79,7 +81,7 @@ void Control_Task_Init(void) {
     g_dehumid_state = 0;
     g_humidifier_state = 0;
     
-    // ✅ 新增：初始化蜂鸣器为关闭状态（高电平=关）
+    // 初始化蜂鸣器为关闭状态（高电平=关）
     beep = 1;
     s_beep_state = 0;
     s_beep_count = 0;
@@ -94,7 +96,7 @@ void Control_Task_Init(void) {
  * @note 每500ms执行一次控制判断
  */
 void Control_Task_Run(void) {
-    // ✅ 新增：检查是否需要延迟保存配置到Flash
+    // 检查是否需要延迟保存配置到Flash
     if (s_config_dirty && (sys_tick_ms - g_last_config_change_time >= CONFIG_SAVE_DELAY_MS)) {
         // 同步内存中的配置到Flash结构体
         SystemConfig_t *config = Flash_Config_Get();
@@ -169,26 +171,26 @@ void Control_Task_Run(void) {
     // 温度控制逻辑（滞回比较防止抖动）
     if (temp > g_temp_high) {
         // 温度过高 → 开启制冷（高电平=开）
-        zhileng = 1;  // ✅ 高电平开启
+        zhileng = 1;  // 高电平开启
         g_cooler_state = 1;
-        jiare = 0;    // ✅ 低电平关闭加热
+        jiare = 0;    // 低电平关闭加热
         g_heater_state = 0;
         CONTROL_LOG("Temp high: %d.%d > %d.%d, cooler ON\r\n",
                    temp / 10, abs(temp % 10),
                    g_temp_high / 10, abs(g_temp_high % 10));
     } else if (temp < g_temp_low) {
         // 温度过低 → 开启加热（高电平=开）
-        jiare = 1;    // ✅ 高电平开启
+        jiare = 1;    // 高电平开启
         g_heater_state = 1;
-        zhileng = 0;  // ✅ 低电平关闭制冷
+        zhileng = 0;  // 低电平关闭制冷
         g_cooler_state = 0;
         CONTROL_LOG("Temp low: %d.%d < %d.%d, heater ON\r\n",
                    temp / 10, abs(temp % 10),
                    g_temp_low / 10, abs(g_temp_low % 10));
     } else {
         // 温度正常 → 关闭加热和制冷（低电平=关）
-        jiare = 0;    // ✅ 低电平关闭
-        zhileng = 0;  // ✅ 低电平关闭
+        jiare = 0;    // 低电平关闭
+        zhileng = 0;  // 低电平关闭
         g_heater_state = 0;
         g_cooler_state = 0;
     }
@@ -196,26 +198,26 @@ void Control_Task_Run(void) {
     // 湿度控制逻辑
     if (humid > g_humid_high) {
         // 湿度过高 → 开启除湿（高电平=开）
-        chushi = 1;   // ✅ 高电平开启
+        chushi = 1;   // 高电平开启
         g_dehumid_state = 1;
-        jiashi = 0;   // ✅ 低电平关闭加湿
+        jiashi = 0;   // 低电平关闭加湿
         g_humidifier_state = 0;
         CONTROL_LOG("Humid high: %d.%d > %d.%d, dehumid ON\r\n",
                    humid / 10, abs(humid % 10),
                    g_humid_high / 10, abs(g_humid_high % 10));
     } else if (humid < g_humid_low) {
         // 湿度过低 → 开启加湿（高电平=开）
-        jiashi = 1;   // ✅ 高电平开启
+        jiashi = 1;   // 高电平开启
         g_humidifier_state = 1;
-        chushi = 0;   // ✅ 低电平关闭除湿
+        chushi = 0;   // 低电平关闭除湿
         g_dehumid_state = 0;
         CONTROL_LOG("Humid low: %d.%d < %d.%d, humidifier ON\r\n",
                    humid / 10, abs(humid % 10),
                    g_humid_low / 10, abs(g_humid_low % 10));
     } else {
         // 湿度正常 → 关闭除湿和加湿（低电平=关）
-        chushi = 0;   // ✅ 低电平关闭
-        jiashi = 0;   // ✅ 低电平关闭
+        chushi = 0;   // 低电平关闭
+        jiashi = 0;   // 低电平关闭
         g_dehumid_state = 0;
         g_humidifier_state = 0;
     }
@@ -229,18 +231,18 @@ void Control_Task_SetMode(uint8_t mode) {
     if (mode == 1 || mode == 2) {
         g_work_mode = mode;
         
-        // ✅ 标记配置已修改，延迟保存（防止频繁擦写Flash）
+        // 标记配置已修改，延迟保存（防止频繁擦写Flash）
         s_config_dirty = 1;
         g_last_config_change_time = sys_tick_ms;
         
         CONTROL_LOG("Mode set to: %s (pending save)\r\n", mode == 1 ? "Auto" : "Manual");
         
-        // ✅ 关键修复：切换到手动模式时，关闭所有执行器（低电平=关）
+        // 关键修复：切换到手动模式时，关闭所有执行器（低电平=关）
         if (mode == 2) {
-            jiare = 0;      // ✅ 低电平关闭
-            zhileng = 0;    // ✅ 低电平关闭
-            chushi = 0;     // ✅ 低电平关闭
-            jiashi = 0;     // ✅ 低电平关闭
+            jiare = 0;      // 低电平关闭
+            zhileng = 0;    // 低电平关闭
+            chushi = 0;     // 低电平关闭
+            jiashi = 0;     // 低电平关闭
             
             g_heater_state = 0;
             g_cooler_state = 0;
@@ -267,7 +269,7 @@ void Control_Task_ManualControl(ControlDevice_t actuator, uint8_t state) {
     switch (actuator) {
         case CTRL_HEATER:
             if (state == 1) {
-                // ✅ 开启加热时，强制关闭制冷（互斥）
+                // 开启加热时，强制关闭制冷（互斥）
                 jiare = 1;
                 zhileng = 0;
                 g_heater_state = 1;
@@ -282,7 +284,7 @@ void Control_Task_ManualControl(ControlDevice_t actuator, uint8_t state) {
             
         case CTRL_COOLER:
             if (state == 1) {
-                // ✅ 开启制冷时，强制关闭加热（互斥）
+                // 开启制冷时，强制关闭加热（互斥）
                 zhileng = 1;
                 jiare = 0;
                 g_cooler_state = 1;
@@ -297,7 +299,7 @@ void Control_Task_ManualControl(ControlDevice_t actuator, uint8_t state) {
             
         case CTRL_DEHUMID:
             if (state == 1) {
-                // ✅ 开启除湿时，强制关闭加湿（互斥）
+                // 开启除湿时，强制关闭加湿（互斥）
                 chushi = 1;
                 jiashi = 0;
                 g_dehumid_state = 1;
@@ -312,7 +314,7 @@ void Control_Task_ManualControl(ControlDevice_t actuator, uint8_t state) {
             
         case CTRL_HUMIDIFIER:
             if (state == 1) {
-                // ✅ 开启加湿时，强制关闭除湿（互斥）
+                // 开启加湿时，强制关闭除湿（互斥）
                 jiashi = 1;
                 chushi = 0;
                 g_humidifier_state = 1;
@@ -338,7 +340,7 @@ void Control_Task_ManualControl(ControlDevice_t actuator, uint8_t state) {
  * @note 范围限制：-40.0℃ ~ 80.0℃（即-400 ~ 800）
  */
 void Control_Task_SetTempThreshold(int16_t temp_high, int16_t temp_low) {
-    // ✅ 双重保护：校验范围（-400 ~ 800）
+    // 双重保护：校验范围（-400 ~ 800）
     if (temp_high < -400 || temp_high > 800 || temp_low < -400 || temp_low > 800) {
         CONTROL_LOG("[ERR] Temp threshold out of range: high=%d, low=%d\r\n", temp_high, temp_low);
         return;
@@ -349,7 +351,7 @@ void Control_Task_SetTempThreshold(int16_t temp_high, int16_t temp_low) {
         g_temp_high = temp_high;
         g_temp_low = temp_low;
         
-        // ✅ 标记配置已修改，延迟保存（防止频繁擦写Flash）
+        // 标记配置已修改，延迟保存（防止频繁擦写Flash）
         s_config_dirty = 1;
         g_last_config_change_time = sys_tick_ms;
         
@@ -366,7 +368,7 @@ void Control_Task_SetTempThreshold(int16_t temp_high, int16_t temp_low) {
  * @note 范围限制：0.0% ~ 100.0%（即0 ~ 1000）
  */
 void Control_Task_SetHumidThreshold(int16_t humid_high, int16_t humid_low) {
-    // ✅ 双重保护：校验范围（0 ~ 1000）
+    // 双重保护：校验范围（0 ~ 1000）
     if (humid_high < 0 || humid_high > 1000 || humid_low < 0 || humid_low > 1000) {
         CONTROL_LOG("[ERR] Humid threshold out of range: high=%d, low=%d\r\n", humid_high, humid_low);
         return;
@@ -377,7 +379,7 @@ void Control_Task_SetHumidThreshold(int16_t humid_high, int16_t humid_low) {
         g_humid_high = humid_high;
         g_humid_low = humid_low;
         
-        // ✅ 标记配置已修改，延迟保存（防止频繁擦写Flash）
+        // 标记配置已修改，延迟保存（防止频繁擦写Flash）
         s_config_dirty = 1;
         g_last_config_change_time = sys_tick_ms;
         

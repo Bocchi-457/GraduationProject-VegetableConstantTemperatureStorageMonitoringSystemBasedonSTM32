@@ -1,3 +1,10 @@
+/**
+ * wifi_driver.h
+ * ESP8266 WiFi驱动头文件
+ * 版本：V1.0
+ * MCU：STM32F103C8T6
+ */
+
 #ifndef __WIFI_DRIVER_H__
 #define __WIFI_DRIVER_H__
 

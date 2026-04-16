@@ -1,7 +1,8 @@
 /**
- * @file key_task.h
- * @brief 按键任务模块头文件
- * @note 处理按键扫描和页面切换
+ * key_task.h
+ * 按键任务模块头文件
+ * 版本：V1.0
+ * MCU：STM32F103C8T6
  */
 
 #ifndef __KEY_TASK_H__

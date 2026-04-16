@@ -1,7 +1,8 @@
 /**
- * @file flash_config.h
- * @brief Flash配置持久化模块
- * @note 用于保存和读取系统配置参数（阈值、模式等）到STM32内部Flash
+ * flash_config.h
+ * Flash配置持久化模块头文件
+ * 版本：V1.0
+ * MCU：STM32F103C8T6
  */
 
 #ifndef __FLASH_CONFIG_H__

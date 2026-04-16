@@ -1,3 +1,10 @@
+/**
+ * dht22_task.h
+ * DHT22温湿度传感器读取任务头文件
+ * 版本：V1.0
+ * MCU：STM32F103C8T6
+ */
+
 #ifndef __DHT22_TASK_H__
 #define __DHT22_TASK_H__
 

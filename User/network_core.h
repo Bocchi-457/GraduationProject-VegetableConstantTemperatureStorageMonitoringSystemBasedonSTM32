@@ -1,3 +1,10 @@
+/**
+ * network_core.h
+ * 网络核心模块头文件
+ * 版本：V1.0
+ * MCU：STM32F103C8T6
+ */
+
 #ifndef __NETWORK_CORE_H__
 #define __NETWORK_CORE_H__
 

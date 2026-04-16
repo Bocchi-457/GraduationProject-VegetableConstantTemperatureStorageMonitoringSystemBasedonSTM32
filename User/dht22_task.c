@@ -1,7 +1,9 @@
 /**
- * @file dht22_task.c
- * @brief DHT22温湿度传感器读取任务模块
- * @note 遵循非阻塞原则，每2秒读取一次
+ * dht22_task.c
+ * DHT22温湿度传感器读取任务模块实现文件
+ * 实现DHT22数据读取和上传触发功能
+ * 版本：V1.0
+ * MCU：STM32F103C8T6
  */
 
 #include "dht22_task.h"

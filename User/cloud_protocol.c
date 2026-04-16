@@ -1,3 +1,11 @@
+/**
+ * cloud_protocol.c
+ * 云端通信协议实现文件
+ * 实现巴法云数据上传和指令解析功能
+ * 版本：V1.0
+ * MCU：STM32F103C8T6
+ */
+
 #include "cloud_protocol.h"
 #include "wifi_driver.h"
 #include <stdlib.h>  // 包含atof函数声明
@@ -15,7 +23,7 @@ uint16_t Cloud_Build_Upload_Packet(
     uint8_t dehumidifier, uint8_t humidifier,
     int16_t temp_x10, int16_t hum_x10)
 {
-    // ✅ 使用浮点数格式，支持小数和负数
+    // 使用浮点数格式，支持小数和负数
     int n = snprintf(buffer, buf_size,
         "cmd=2&uid=%s&topic=data&msg=Mode:%d th:%.1f tl:%.1f hh:%.1f hl:%.1f "
         "jr:%d zl:%d cs:%d js:%d temp:%d.%d humi:%d.%d\r\n",

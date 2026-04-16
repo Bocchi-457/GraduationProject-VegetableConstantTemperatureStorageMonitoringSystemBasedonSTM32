@@ -1,21 +1,27 @@
+/**
+ * DS1302.h
+ * DS1302实时时钟驱动头文件
+ * 版本：V1.0
+ * MCU：STM32F103C8T6
+ */
+
 #ifndef __DS1302_H
 #define __DS1302_H
 #include "sys.h"
 
-//-------------------------------------------------------------------------*
-// 文件名:  DS1302.h (实时时钟头文件)                                          *
-//-------------------------------------------------------------------------*
 // IO方向设置
 #define DS1302_IO_IN()                                                         \
   {                                                                            \
     GPIOC->CRH &= 0xF0FFFFFF;                                                  \
     GPIOC->CRH |= 0x08000000;                                                  \
   } // 低八位引脚的PC14脚定义为输入
+
 #define DS1302_IO_OUT()                                                        \
   {                                                                            \
     GPIOC->CRH &= 0xF0FFFFFF;                                                  \
     GPIOC->CRH |= 0x03000000;                                                  \
   } // 低八位引脚的PC14脚定义为输出
+
 // IO操作函数
 #define DIO_OUT PCout(14) // 数据端口	PC14
 #define DIO_IN PCin(14)   // 数据端口	PC14
@@ -23,6 +29,7 @@
 
 #define CE PCout(15)   // PC15
 #define SCLK PCout(13) // PC13
+
 /**
  * 下一个时间结构体
  */

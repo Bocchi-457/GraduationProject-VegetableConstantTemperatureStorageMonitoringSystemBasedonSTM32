@@ -147,7 +147,7 @@ uint8_t Read_DHT22(DHT22_Data_TypeDef *data) {
   if (DHT22_Check() != 0)
     return ERROR;
 
-  // ✅ 优化：仅在关键时序段关中断（缩短至约0.8ms/字节）
+  // 仅在关键时序段关中断（缩短至约0.8ms/字节）
   // 策略：在读取每个字节时临时关中断，读完立即恢复
   for (i = 0; i < 5; i++) {
     __disable_irq();  // 关中断保护单字节读取

@@ -1,7 +1,9 @@
 /**
- * @file flash_config.c
- * @brief Flash配置持久化模块实现
- * @note 使用STM32内部Flash存储系统配置参数
+ * flash_config.c
+ * Flash配置持久化模块实现文件
+ * 实现系统配置的Flash存储和读取功能
+ * 版本：V1.0
+ * MCU：STM32F103C8T6
  */
 
 #include "flash_config.h"

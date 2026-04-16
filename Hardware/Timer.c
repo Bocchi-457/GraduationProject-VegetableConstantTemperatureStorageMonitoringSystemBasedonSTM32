@@ -42,7 +42,7 @@ void Timer_Init(void) {
   TIM_TimeBaseInitStructure.TIM_CounterMode =
       TIM_CounterMode_Up; // 计数器模式，选择向上计数
   
-  // ✅ 修改为10ms周期：72MHz / 7200 / 100 = 100Hz (10ms)
+  // 修改为10ms周期：72MHz / 7200 / 100 = 100Hz (10ms)
   TIM_TimeBaseInitStructure.TIM_Period = 100 - 1;    // ARR = 100
   TIM_TimeBaseInitStructure.TIM_Prescaler = 7200 - 1; // PSC = 7200
 
@@ -62,7 +62,7 @@ void Timer_Init(void) {
   NVIC_InitStructure.NVIC_IRQChannel = TIM2_IRQn; // 选择配置NVIC的TIM2线
   NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE; // 指定NVIC线路使能
   NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority =
-      0; // ✅ 最高抢占优先级，确保系统时间基准不被阻塞
+      0; // 最高抢占优先级，确保系统时间基准不被阻塞
   NVIC_InitStructure.NVIC_IRQChannelSubPriority =
       0;                          // 指定NVIC线路的响应优先级为0
   NVIC_Init(&NVIC_InitStructure); // 配置NVIC外设
@@ -76,7 +76,7 @@ void Timer_Init(void) {
 void TIM2_IRQHandler(void) {
   if (TIM_GetITStatus(TIM2, TIM_IT_Update) == SET) {
     TIMER_IT = 1;       // 标志位，每10ms置1一次
-    sys_tick_ms += 10;  // ✅ 每10毫秒增加10毫秒
+    sys_tick_ms += 10;  // 每10毫秒增加10毫秒
     TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
   }
 }

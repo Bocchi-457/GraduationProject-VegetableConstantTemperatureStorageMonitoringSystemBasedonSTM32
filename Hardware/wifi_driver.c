@@ -1,3 +1,11 @@
+/**
+ * wifi_driver.c
+ * ESP8266 WiFi驱动实现文件
+ * 实现ESP8266模块的AT指令控制、双缓冲区管理和数据收发
+ * 版本：V1.0
+ * MCU：STM32F103C8T6
+ */
+
 #include "wifi_driver.h"
 #include "Usart.h"
 #include "delay.h"
@@ -272,7 +280,7 @@ uint8_t WiFi_Send_AT_Command(const char *cmd, const char *expected_ack, uint32_t
     uint8_t recv_buf[256];
     uint16_t recv_len = 0;
     
-    // ✅ 不在这里清空缓冲区，保留可能已到达的响应
+    // 不在这里清空缓冲区，保留可能已到达的响应
     
     // 发送AT指令
     const char *p = cmd;
@@ -290,10 +298,10 @@ uint8_t WiFi_Send_AT_Command(const char *cmd, const char *expected_ack, uint32_t
             recv_buf[recv_len] = '\0';
             
             if (strstr((char *)recv_buf, expected_ack) != NULL) {
-                // ⭐ 打印完整响应内容，用于调试
+                // 打印完整响应内容用于调试
                 Serial_Printf("[NET][DBG] AT Response [%s]: [%s]\r\n", expected_ack, recv_buf);
                 
-                // ✅ 确认响应后清空
+                // 确认响应后清空
                 RingBuffer_AT_Clear();
                 return 1;
             }

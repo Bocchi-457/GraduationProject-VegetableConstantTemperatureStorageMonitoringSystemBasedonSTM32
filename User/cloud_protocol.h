@@ -1,3 +1,10 @@
+/**
+ * cloud_protocol.h
+ * 云端通信协议头文件
+ * 版本：V1.0
+ * MCU：STM32F103C8T6
+ */
+
 #ifndef __CLOUD_PROTOCOL_H__
 #define __CLOUD_PROTOCOL_H__
 
