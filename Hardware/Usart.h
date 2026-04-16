@@ -6,11 +6,28 @@
  * 测试硬件：STM32F103RCT6
  */
 
-#ifndef __USART_H
-#define __USART_H
 
 #include "stdio.h"
 #include "sys.h"
+
+#ifndef __USART_H
+#define __USART_H
+
+/**
+ * 【全局日志开关】
+ * 1 = 调试模式（启用所有Serial_Printf日志）
+ * 0 = 生产模式（禁用所有日志，零性能开销）
+ */
+#define DEBUG_LOG  0
+
+#if DEBUG_LOG
+    // 调试模式：Serial_Printf 映射到实际函数
+    void Serial_Printf_1(char *format, ...);
+    #define Serial_Printf(fmt, ...) Serial_Printf_1(fmt, ##__VA_ARGS__)
+#else
+    // 生产模式：Serial_Printf 为空宏，不产生任何代码
+    #define Serial_Printf(fmt, ...)
+#endif
 
 /**
  * @brief 数据包长度
@@ -74,14 +91,6 @@ void Serial_SendString(char *String);
  * @return 无
  */
 void Serial_SendNumber(uint32_t Number, uint8_t Length);
-
-/**
- * @brief 格式化发送函数
- * @param format: 格式化字符串
- * @param ...: 可变参数
- * @return 无
- */
-void Serial_Printf(char *format, ...);
 
 /**
  * @brief 发送数据包

@@ -278,7 +278,7 @@ void Serial_SendNumber(uint32_t Number, uint8_t Length) {
  * @return 无
  * @note 自动在每条日志前添加 [T:xxxms] 时间戳，方便调试时序问题
  */
-void Serial_Printf(char *format, ...) {
+void Serial_Printf_1(char *format, ...) {
   char String[512];  // ✅ 增大缓冲区以避免长数据导致栈溢出
   char TimeStamp[20];
   va_list arg;

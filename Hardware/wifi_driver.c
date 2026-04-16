@@ -1,4 +1,5 @@
 #include "wifi_driver.h"
+#include "Usart.h"
 #include "delay.h"
 #include "stm32f10x_usart.h"
 #include <stdio.h>
@@ -290,7 +291,6 @@ uint8_t WiFi_Send_AT_Command(const char *cmd, const char *expected_ack, uint32_t
             
             if (strstr((char *)recv_buf, expected_ack) != NULL) {
                 // ⭐ 打印完整响应内容，用于调试
-                extern void Serial_Printf(const char *format, ...);
                 Serial_Printf("[NET][DBG] AT Response [%s]: [%s]\r\n", expected_ack, recv_buf);
                 
                 // ✅ 确认响应后清空
