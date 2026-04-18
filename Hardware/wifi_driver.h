@@ -34,7 +34,7 @@
 #define CLOUD_RING_BUFFER_SIZE     512   // 云端数据缓冲区
 
 /* WiFi配置 */
-#define WIFI_SSID                  "TheWorld"
+#define WIFI_SSID                  "bocchi457"
 #define WIFI_PASSWORD              "2020625663"
 
 /* 巴法云配置 */

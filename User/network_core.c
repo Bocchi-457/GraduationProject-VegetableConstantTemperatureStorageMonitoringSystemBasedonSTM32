@@ -993,7 +993,6 @@ static void Init_Step_Execute(void) {
       g_init_step = INIT_STEP_SET_STA;
     } else {
       Serial_Printf("[NET] AT test FAILED\r\n");
-      Show_Network_Failure("AT command failed");
 
       // 检查是否有收到任何数据
       // 调试信息已移除（新架构下AT响应在WiFi_Send_AT_Command内部处理）
@@ -1292,6 +1291,9 @@ static void Init_Step_Execute(void) {
         g_upload_monitor.is_reconnecting = 0;
         g_upload_monitor.reconnect_attempts = 0;
         g_upload_monitor.reconnect_state = RECONNECT_STATE_IDLE;
+        
+        // 恢复上传任务
+        g_upload_monitor.upload_paused = 0;
         
         // 重置WiFi检测状态
         g_wifi_check_start_time = 0;

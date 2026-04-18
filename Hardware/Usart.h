@@ -18,7 +18,7 @@
  * 1 = 调试模式（启用所有Serial_Printf日志）
  * 0 = 生产模式（禁用所有日志，零性能开销）
  */
-#define DEBUG_LOG  0
+#define DEBUG_LOG  1
 
 #if DEBUG_LOG
     // 调试模式：Serial_Printf 映射到实际函数
