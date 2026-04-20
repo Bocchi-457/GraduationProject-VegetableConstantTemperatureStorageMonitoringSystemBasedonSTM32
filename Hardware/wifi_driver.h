@@ -24,11 +24,6 @@
 #define ESP8266_RST_PORT           GPIOA
 #define ESP8266_RST_CLK            RCC_APB2Periph_GPIOA
 
-/* DMA配置（保留但不再使用）*/
-#define ESP8266_DMA_CHANNEL        DMA1_Channel6
-#define ESP8266_DMA_CLK            RCC_AHBPeriph_DMA1
-#define DMA_BUFFER_SIZE            512
-
 /* 双缓冲区配置 */
 #define AT_RING_BUFFER_SIZE        256   // AT响应缓冲区
 #define CLOUD_RING_BUFFER_SIZE     512   // 云端数据缓冲区
